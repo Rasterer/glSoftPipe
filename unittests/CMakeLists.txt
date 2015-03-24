@@ -1,0 +1,10 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
+
+SET(TESTPIPE_SRC test_vs_example.cpp)
+SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
+
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/core)
+
+ADD_EXECUTABLE(test_softpipe ${TESTPIPE_SRC})
+TARGET_LINK_LIBRARIES(test_softpipe softpipe ws_offscreen)
+ADD_DEPENDENCIES(test_softpipe softpipe ws_offscreen)
