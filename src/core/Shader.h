@@ -33,7 +33,8 @@ private:
 	char *source;
 };
 
-// TODO: use shader compiler
+// TODO: 1. use shader compiler
+// TODO: 2. use DSO
 class VertexShader: public Shader
 {
 public:

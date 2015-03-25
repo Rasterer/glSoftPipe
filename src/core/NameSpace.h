@@ -21,7 +21,7 @@ class NameSpace
 public:
 	NameSpace();
 	bool genNames(unsigned n, unsigned *pNames);
-	bool deleteNames(unsigned n, unsigned *pNames);
+	bool deleteNames(unsigned n, const unsigned *pNames);
 	NameBlock * validate(unsigned name);
 	NameItem * retrieveObject(unsigned name);
 	bool insertObject(NameItem *pNameItem);

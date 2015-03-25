@@ -1,3 +1,5 @@
+#pragma once
+
 #include "glcorearb.h"
 #include "NameSpace.h"
 
@@ -5,6 +7,8 @@
 #define ELEMENT_ARRAY_BUFFER_INDEX	1
 
 #define MAX_BUFOBJ_BINDINGS 2
+
+class GLContext;
 
 struct BufferObject
 {
@@ -35,7 +39,7 @@ class BufferObjectMachine
 {
 public:
 	bool GenBuffers(GLContext *gc, int n, unsigned *buffers);
-	bool DeleteBuffers(GLContext *gc, int n, unsigned *buffers);
+	bool DeleteBuffers(GLContext *gc, int n, const unsigned *buffers);
 	bool BindBuffer(GLContext *gc, unsigned target, unsigned buffer);
 	bool BufferData(GLContext *gc, unsigned target, int size, const void *data, unsigned usage);
 

@@ -1,29 +1,35 @@
 #include <iostream>
-#include "BufferObject.h"
+#include <cassert>
+#include <cstdlib>
+#include <cstring>
 #include "glsp_defs.h"
+#include "BufferObject.h"
+#include "GLContext.h"
+
+using namespace std;
 
 GLAPI void APIENTRY glGenBuffers (GLsizei n, GLuint *buffers)
 {
-	__GET_GC();
+	__GET_CONTEXT();
 	gc->mBOM->GenBuffers(gc, n, buffers); 
 }
 
 GLAPI void APIENTRY glDeleteBuffers (GLsizei n, const GLuint *buffers)
 {
-	__GET_GC();
+	__GET_CONTEXT();
 	gc->mBOM->DeleteBuffers(gc, n, buffers);
 }
 
 GLAPI void APIENTRY glBindBuffer (GLenum target, GLuint buffer)
 {
-	__GET_GC();
+	__GET_CONTEXT();
 	gc->mBOM->BindBuffer(gc, target, buffer);
 }
 
 GLAPI void APIENTRY glBufferData (GLenum target, GLsizeiptr size, const void *data, GLenum usage)
 {
-	__GET_GC();
-	gc->mBOM->BufferData(gc, target, buffer);
+	__GET_CONTEXT();
+	gc->mBOM->BufferData(gc, target, size, data, usage);
 }
 
 bool BufferObjectMachine::GenBuffers(GLContext *gc, int n, unsigned *buffers)
@@ -33,7 +39,7 @@ bool BufferObjectMachine::GenBuffers(GLContext *gc, int n, unsigned *buffers)
 	return mNameSpace.genNames(n, buffers);
 }
 
-bool BufferObjectMachine::DeleteBuffers(GLContext *gc, int n, unsigned *buffers)
+bool BufferObjectMachine::DeleteBuffers(GLContext *gc, int n, const unsigned *buffers)
 {
 	GLSP_UNREFERENCED_PARAM(gc);
 
@@ -66,13 +72,13 @@ bool BufferObjectMachine::BindBuffer(GLContext *gc, unsigned target, unsigned bu
 			return false;
 		}
 
-		pBO = mNameSpace.retieveObject(buffer);
+		pBO = (BufferObject *)mNameSpace.retrieveObject(buffer);
 
 		if(!pBO)
 		{
 			pBO = new BufferObject();
 			pBO->mNameItem.mName = buffer;
-			insertObject(&pBO->mNameItem);
+			mNameSpace.insertObject(&pBO->mNameItem);
 		}
 
 		mBindings[targetIndex].mBO = pBO;
@@ -81,7 +87,7 @@ bool BufferObjectMachine::BindBuffer(GLContext *gc, unsigned target, unsigned bu
 	return true;
 }
 
-bool BufferObjectMachine::BufferData(GLContext *gc, GLenum target, GLsizeiptr size, const GLvoid *data, GLenum usage)
+bool BufferObjectMachine::BufferData(GLContext *gc, unsigned target, int size, const void *data, unsigned usage)
 {
 	int targetIndex = TargetToIndex(target);
 
@@ -114,7 +120,7 @@ bool BufferObjectMachine::BufferData(GLContext *gc, GLenum target, GLsizeiptr si
 	return true;
 }
 
-int TargetToIndex(GLenum target)
+int BufferObjectMachine::TargetToIndex(GLenum target)
 {
 	switch(target)
 	{

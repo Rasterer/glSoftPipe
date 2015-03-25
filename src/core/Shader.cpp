@@ -1,5 +1,6 @@
 #include "Shader.h"
 
+// vertex shader cache
 void VertexShader::compile()
 {
 	// No need to compile for embed shader

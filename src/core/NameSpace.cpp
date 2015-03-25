@@ -53,7 +53,7 @@ bool NameSpace::genNames(unsigned n, unsigned *pNames)
 	return true;
 }
 
-bool NameSpace::deleteNames(unsigned n, unsigned *pNames)
+bool NameSpace::deleteNames(unsigned n, const unsigned *pNames)
 {
 	for(size_t i = 0; i < n; i++)
 	{

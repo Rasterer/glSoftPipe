@@ -2,6 +2,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
 SET(PIPELINE_SRC
 	NameSpace.cpp
+	GLContext.cpp
 	BufferObject.cpp
 	Shader.cpp
 	vs_example.cpp
