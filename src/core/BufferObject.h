@@ -19,10 +19,10 @@ struct BufferObject
 	{
 	}
 
-	NameItem mNameItem;
-	size_t mSize;
-	unsigned mUsage;
-	void *mAddr;
+	NameItem	mNameItem;
+	unsigned	mSize;
+	unsigned	mUsage;
+	void	*mAddr;
 };
 
 struct BindingPoint
@@ -41,7 +41,7 @@ public:
 	bool GenBuffers(GLContext *gc, int n, unsigned *buffers);
 	bool DeleteBuffers(GLContext *gc, int n, const unsigned *buffers);
 	bool BindBuffer(GLContext *gc, unsigned target, unsigned buffer);
-	bool BufferData(GLContext *gc, unsigned target, int size, const void *data, unsigned usage);
+	bool BufferData(GLContext *gc, unsigned target, unsigned size, const void *data, unsigned usage);
 
 private:
 	int TargetToIndex(unsigned target);

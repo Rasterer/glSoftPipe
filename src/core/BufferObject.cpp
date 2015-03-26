@@ -11,25 +11,25 @@ using namespace std;
 GLAPI void APIENTRY glGenBuffers (GLsizei n, GLuint *buffers)
 {
 	__GET_CONTEXT();
-	gc->mBOM->GenBuffers(gc, n, buffers); 
+	gc->mBOM.GenBuffers(gc, n, buffers); 
 }
 
 GLAPI void APIENTRY glDeleteBuffers (GLsizei n, const GLuint *buffers)
 {
 	__GET_CONTEXT();
-	gc->mBOM->DeleteBuffers(gc, n, buffers);
+	gc->mBOM.DeleteBuffers(gc, n, buffers);
 }
 
 GLAPI void APIENTRY glBindBuffer (GLenum target, GLuint buffer)
 {
 	__GET_CONTEXT();
-	gc->mBOM->BindBuffer(gc, target, buffer);
+	gc->mBOM.BindBuffer(gc, target, buffer);
 }
 
 GLAPI void APIENTRY glBufferData (GLenum target, GLsizeiptr size, const void *data, GLenum usage)
 {
 	__GET_CONTEXT();
-	gc->mBOM->BufferData(gc, target, size, data, usage);
+	gc->mBOM.BufferData(gc, target, size, data, usage);
 }
 
 bool BufferObjectMachine::GenBuffers(GLContext *gc, int n, unsigned *buffers)
@@ -87,7 +87,7 @@ bool BufferObjectMachine::BindBuffer(GLContext *gc, unsigned target, unsigned bu
 	return true;
 }
 
-bool BufferObjectMachine::BufferData(GLContext *gc, unsigned target, int size, const void *data, unsigned usage)
+bool BufferObjectMachine::BufferData(GLContext *gc, unsigned target, unsigned size, const void *data, unsigned usage)
 {
 	int targetIndex = TargetToIndex(target);
 

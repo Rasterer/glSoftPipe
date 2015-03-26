@@ -3,52 +3,47 @@
 
 NameSpace::NameSpace()
 {
-	for(size_t i = 0; i < NS_HASH_TABLE_SIZE; i++)
-	{
-		mNameHashTable[i] = NULL;
-	}
-
 	// Zero was reserved by default
-	mNameBlocks = new NameBlock();
-	mNameBlocks->start = 0;
-	mNameBlocks->end = 0;
-	mNameBlocks->mNext = NULL;
+	NameBlock	nb;
+	nb.start = 0;
+	nb.end = 0;
+	mNameBlockLists.push_back(nb);
 }
 
 bool NameSpace::genNames(unsigned n, unsigned *pNames)
 {
-	NameBlock *pNameBlock = mNameBlocks;
+	NameBlockList_t::iterator iter = mNameBlockLists.begin();
 
-	while(pNameBlock)
+	while(iter != mNameBlockLists.end())
 	{
-		unsigned end = pNameBlock->end + n;
-		NameBlock *pNext = pNameBlock->mNext;
+		NameBlockList_t::iterator next = std::next(iter, 1);
+		unsigned end = iter->end + n;
 
 		// wrap happen, just return false
-		if(end < pNameBlock->end)
+		if(end < iter->end)
 		{
 			return false;
 		}
 
-		if(pNext == NULL || end < pNext->start - 1)
+		if(next == mNameBlockLists.end() || end < next->start - 1)
 		{
-			pNameBlock->end = end;
+			iter->end = end;
 			break;
 		}
-		else if(end == pNext->start - 1)
+		else if(end == next->start - 1)
 		{
-			pNameBlock->end = pNext->end;
-			pNameBlock->mNext = pNext->mNext;
-			delete pNext;
+			iter->end = next->end;
+			mNameBlockLists.erase(next);
+			break;
 		}
 		else
 		{
-			pNameBlock = pNameBlock->mNext;
+			iter++;
 		}
 	}
 
 	for(size_t i = 0; i < n; i++)
-		pNames[i] = pNameBlock->end - (n - i) + 1;
+		pNames[i] = iter->end - (n - i) + 1;
 
 	return true;
 }
@@ -57,61 +52,59 @@ bool NameSpace::deleteNames(unsigned n, const unsigned *pNames)
 {
 	for(size_t i = 0; i < n; i++)
 	{
-		NameBlock *pNameBlock = validate(pNames[i]);
-		if(!pNameBlock)
+		NameBlockList_t::iterator iter = mNameBlockLists.begin();
+
+		if(!pNames[i])
 			continue;
 
-		if(pNameBlock->start == pNameBlock->end)
+		while(iter != mNameBlockLists.end())
 		{
-			NameBlock *pTmpBlock = mNameBlocks;
-			NameBlock *pNextBlock;
+			if(pNames[i] <= iter->end)
+				break;
 
-			while(pTmpBlock)
-			{
-				pNextBlock = pTmpBlock->mNext;
-				if(pNextBlock == pNameBlock)
-				{
-					pTmpBlock->mNext = pNextBlock->mNext;
-					delete pNameBlock;
-					break;
-				}
-			}
+			iter++;
 		}
-		else if(pNameBlock->start == pNames[i])
+
+		if(iter == mNameBlockLists.end())
+			continue;
+
+		if(iter->start == iter->end)
 		{
-			pNameBlock->start++;
+			mNameBlockLists.erase(iter);
 		}
-		else if(pNameBlock->end == pNames[i])
+		else if(iter->start == pNames[i])
 		{
-			pNameBlock->end--;
+			iter->start++;
+		}
+		else if(iter->end == pNames[i])
+		{
+			iter->end--;
 		}
 		else
 		{
-			NameBlock *pNewBlock = new NameBlock();
-			pNewBlock->start = pNames[i] + 1;
-			pNewBlock->end = pNameBlock->end;
-			pNameBlock->end = pNames[i] - 1;
-			pNewBlock->mNext = pNameBlock->mNext;
-			pNameBlock->mNext = pNewBlock;
+			NameBlock nb;
+			nb.start = iter->start;
+			nb.end = pNames[i] - 1;
+			iter->start = pNames[i] + 1;
+			mNameBlockLists.insert(iter, nb);
 		}
 	}
 
 	return true;
 }
 
-NameBlock * NameSpace::validate(unsigned name)
+const NameBlock * NameSpace::validate(unsigned name)
 {
-	NameBlock *pNameBlock = mNameBlocks;
-
 	if(!name)
 		return NULL;
 
-	while(pNameBlock)
+	NameBlockList_t::const_iterator iter = mNameBlockLists.begin();
+	while(iter != mNameBlockLists.end())
 	{
-		if(name <= pNameBlock->end)
-			return pNameBlock;
+		if(name <= iter->end)
+			return &(*iter);
 
-		pNameBlock = pNameBlock->mNext;
+		iter++;
 	}
 
 	return NULL;
@@ -119,58 +112,52 @@ NameBlock * NameSpace::validate(unsigned name)
 
 NameItem * NameSpace::retrieveObject(unsigned name)
 {
-	unsigned ht = name % NS_HASH_TABLE_SIZE;
-	NameItem *pNameItem = mNameHashTable[ht];
-
-	while(pNameItem)
+	NameHashTable_t::const_iterator iter = mNameHashTable.find(name);
+	
+	if(iter != mNameHashTable.end())
 	{
-		if(pNameItem->mName == name)
-			return pNameItem;
-
-		pNameItem = pNameItem->mNext;
+		return mNameHashTable[name];
 	}
-
-	return NULL;
+	else
+	{
+		return NULL;
+	}
 }
 
 bool NameSpace::insertObject(NameItem *pNameItem)
 {
-	if(!validate(pNameItem->mName))
+	unsigned name = pNameItem->mName;
+	if(!validate(name))
 		return false;
 
-	unsigned ht = pNameItem->mName % NS_HASH_TABLE_SIZE;
-	NameItem *pEntry = mNameHashTable[ht];
-
-	pNameItem->mNext = pEntry;
-	mNameHashTable[ht] = pNameItem;
-
-	return true;
+	NameHashTable_t::const_iterator iter = mNameHashTable.find(name);
+	
+	if(iter != mNameHashTable.end())
+	{
+		return false;
+	}
+	else
+	{
+		mNameHashTable[name] = pNameItem;
+		return true;
+	}
 }
 
 bool NameSpace::removeObject(NameItem *pNameItem)
 {
-	if(!validate(pNameItem->mName))
+	unsigned name = pNameItem->mName;
+	if(!validate(name))
 		return false;
 
-	unsigned ht = pNameItem->mName % NS_HASH_TABLE_SIZE;
-	NameItem *pEntry = mNameHashTable[ht];
-	NameItem *pNext;
-
-	if(pEntry == pNameItem)
+	NameHashTable_t::const_iterator iter = mNameHashTable.find(name);
+	
+	if(iter != mNameHashTable.end())
 	{
-		mNameHashTable[ht] = pEntry->mNext;
+		mNameHashTable.erase(iter);
 		return true;
 	}
-
-	while(pEntry)
+	else
 	{
-		pNext = pEntry->mNext;
-		if(pNext == pNameItem)
-		{
-			pEntry->mNext = pNext->mNext;
-			return true;
-		}
+		return false;
 	}
-
-	return false;
 }

@@ -1,19 +1,19 @@
 #pragma once
 
-#define NS_HASH_TABLE_SIZE 11
+#include <unordered_map>
+#include <list>
+
+using namespace std;
 
 struct NameItem
 {
 	unsigned int mName;
-	NameItem *mNext;
 };
 
 struct NameBlock
 {
 	unsigned start;
 	unsigned end;
-	NameBlock *mPrev;
-	NameBlock *mNext;
 };
 
 class NameSpace
@@ -22,12 +22,14 @@ public:
 	NameSpace();
 	bool genNames(unsigned n, unsigned *pNames);
 	bool deleteNames(unsigned n, const unsigned *pNames);
-	NameBlock * validate(unsigned name);
-	NameItem * retrieveObject(unsigned name);
+	const NameBlock *validate(unsigned name);
+	NameItem *retrieveObject(unsigned name);
 	bool insertObject(NameItem *pNameItem);
 	bool removeObject(NameItem *pNameItem);
 
 private:
-	NameItem *mNameHashTable[NS_HASH_TABLE_SIZE];
-	NameBlock *mNameBlocks;
+	typedef unordered_map<unsigned, NameItem *> NameHashTable_t;
+	typedef list<NameBlock>	NameBlockList_t;
+	NameHashTable_t	mNameHashTable;
+	NameBlockList_t	mNameBlockLists;
 };

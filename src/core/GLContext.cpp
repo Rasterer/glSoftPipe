@@ -17,20 +17,19 @@ void setCurrentContext(void *gc)
 	pthread_setspecific(TLSKey, gc);
 }
 
-void *getCurrentContext()
+GLContext * getCurrentContext()
 {
-	pthread_getspecific(TLSKey);
+	return (GLContext *)pthread_getspecific(TLSKey);
 }
 
-bool CreateContext()
+GLContext * CreateContext()
 {
 	GLContext *gc = new GLContext();
-	return true;
+	return gc;
 }
 
 bool DestroyContext(GLContext *gc)
 {
-	delete gc->mBOM;
 	delete gc;
 	return true;
 }
@@ -43,5 +42,4 @@ bool MakeCurrent(GLContext *gc)
 
 GLContext::GLContext()
 {
-	mBOM = new BufferObjectMachine();
 }

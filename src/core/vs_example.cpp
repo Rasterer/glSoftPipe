@@ -6,6 +6,8 @@ int vs_example::UniformMatrix4(mat4 world, mat4 view, mat4 proj)
 	mView = view;
 	mProj = proj;
 	mWVP = mProj * mView * mWorld;
+
+	return 0;
 }
 
 void vs_example::execute(unsigned int VertexID)
