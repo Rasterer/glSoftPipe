@@ -93,7 +93,7 @@ bool NameSpace::deleteNames(unsigned n, const unsigned *pNames)
 	return true;
 }
 
-const NameBlock * NameSpace::validate(unsigned name)
+bool NameSpace::validate(unsigned name)
 {
 	if(!name)
 		return NULL;
@@ -126,7 +126,7 @@ NameItem * NameSpace::retrieveObject(unsigned name)
 
 bool NameSpace::insertObject(NameItem *pNameItem)
 {
-	unsigned name = pNameItem->mName;
+	unsigned name = pNameItem->getName();
 	if(!validate(name))
 		return false;
 
@@ -145,7 +145,7 @@ bool NameSpace::insertObject(NameItem *pNameItem)
 
 bool NameSpace::removeObject(NameItem *pNameItem)
 {
-	unsigned name = pNameItem->mName;
+	unsigned name = pNameItem->getName();
 	if(!validate(name))
 		return false;
 

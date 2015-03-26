@@ -15,6 +15,7 @@ public:
 	GLContext();
 	BufferObjectMachine	mBOM;
 	VAOMachine			mVAOM;
+	ProgramMachine		mPM;
 };
 
 void initTLS();

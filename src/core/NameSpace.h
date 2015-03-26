@@ -5,8 +5,13 @@
 
 using namespace std;
 
-struct NameItem
+class NameItem
 {
+public:
+	inline getName() {return mName;}
+	inline setName(unsigned name) {mName = name;}
+
+private:
 	unsigned int mName;
 };
 
@@ -22,7 +27,7 @@ public:
 	NameSpace();
 	bool genNames(unsigned n, unsigned *pNames);
 	bool deleteNames(unsigned n, const unsigned *pNames);
-	const NameBlock *validate(unsigned name);
+	bool validate(unsigned name);
 	NameItem *retrieveObject(unsigned name);
 	bool insertObject(NameItem *pNameItem);
 	bool removeObject(NameItem *pNameItem);

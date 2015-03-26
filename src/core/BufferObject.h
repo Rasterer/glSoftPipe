@@ -10,7 +10,7 @@
 
 class GLContext;
 
-struct BufferObject
+struct BufferObject: public NameItem
 {
 	BufferObject():
 		mSize(0),
@@ -19,7 +19,6 @@ struct BufferObject
 	{
 	}
 
-	NameItem	mNameItem;
 	unsigned	mSize;
 	unsigned	mUsage;
 	void	*mAddr;
