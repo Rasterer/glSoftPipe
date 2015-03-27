@@ -43,7 +43,7 @@ bool BufferObjectMachine::DeleteBuffers(GLContext *gc, int n, const unsigned *bu
 {
 	GLSP_UNREFERENCED_PARAM(gc);
 
-	for(size_t i = 0; i < n; i++)
+	for(int i = 0; i < n; i++)
 	{
 		BufferObject *pBO = static_cast<BufferObject *>(mNameSpace.retrieveObject(buffers[i]));
 		if(pBO)

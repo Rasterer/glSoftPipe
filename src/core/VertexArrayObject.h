@@ -2,6 +2,7 @@
 
 #include "glcorearb.h"
 #include "NameSpace.h"
+#include "BufferObject.h"
 
 #define MAX_VERTEX_ATTRIBS 16
 

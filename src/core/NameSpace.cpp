@@ -116,7 +116,7 @@ NameItem * NameSpace::retrieveObject(unsigned name)
 	
 	if(iter != mNameHashTable.end())
 	{
-		return mNameHashTable[name];
+		return iter->second;
 	}
 	else
 	{
