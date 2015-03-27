@@ -1,7 +1,7 @@
 #include <iostream>
 #include "Shader.h"
-
-using namespace std;
+#include "GLContext.h"
+#include "glsp_defs.h"
 
 GLAPI GLuint APIENTRY glCreateShader (GLenum type)
 {
@@ -21,16 +21,22 @@ GLAPI GLuint APIENTRY glCreateProgram (void)
 	return gc->mPM.CreateProgram(gc);
 }
 
+GLAPI void APIENTRY glDeleteProgram (GLuint program)
+{
+	__GET_CONTEXT();
+	gc->mPM.DeleteProgram(gc, program);
+}
+
 GLAPI void APIENTRY glShaderSource (GLuint shader, GLsizei count, const GLchar *const*string, const GLint *length)
 {
 	__GET_CONTEXT();
-	gc->mPM.ShaderSource(shader, count, string, length);
+	gc->mPM.ShaderSource(gc, shader, count, string, length);
 }
 
 GLAPI void APIENTRY glCompileShader (GLuint shader)
 {
 	__GET_CONTEXT();
-	gc->mPM.CompileShader(gc);
+	gc->mPM.CompileShader(gc, shader);
 }
 
 GLAPI void APIENTRY glAttachShader (GLuint program, GLuint shader)
@@ -39,56 +45,28 @@ GLAPI void APIENTRY glAttachShader (GLuint program, GLuint shader)
 	gc->mPM.AttachShader(gc, program, shader);
 }
 
+GLAPI void APIENTRY glUseProgram (GLuint program)
+{
+	__GET_CONTEXT();
+	gc->mPM.UseProgram(gc, program);
+}
+
+GLAPI GLint APIENTRY glGetUniformLocation (GLuint program, const GLchar *name)
+{
+	__GET_CONTEXT();
+	gc->mPM.GetUniformLocation(gc, program, name);
+}
+
+GLAPI void APIENTRY glUniformMatrix4fv (GLint location, GLsizei count, GLboolean transpose, const GLfloat *value)
+{
+	__GET_CONTEXT();
+	gc->mPM.GetUniformLocation(gc, location, count, transpose, value);
+}
+
 // vertex shader cache
-Shader::Shader(ShaderType eType)
+Shader::Shader()
 {
-	mType = eType;
 	mSource = NULL;
-}
-
-void ShaderSource(char *src)
-{
-	mSource = src;
-}
-
-void VertexShader::compile()
-{
-	// No need to compile for embed shader
-}
-
-void VertexShader::execute()
-{
-	std::cout << __func__ << ": Please insert the code you want to excute!" << std::endl;
-}
-
-int VertexShader::SetVertexCount(unsigned int count)
-{
-	mVertexCount = count;
-	return 0;
-}
-
-int VertexShader::SetAttribCount(unsigned int count)
-{
-	mAttribCount = count;
-	return 0;
-}
-
-int VertexShader::SetVaryingCount(unsigned int count)
-{
-	mVaryingCount = count;
-	return 0;
-}
-
-int VertexShader::AttribPointer(int index, void *ptr)
-{
-	mIn[index] = ptr;
-	return 0;
-}
-
-int VertexShader::VaryingPointer(int index, void *ptr)
-{
-	mOut[index] = ptr;
-	return 0;
 }
 
 void PixelShader::compile()
@@ -117,7 +95,7 @@ void PixelShader::execute()
 class ShaderPlaceHolder: public NameItem
 {
 public:
-	ShaderType mType;
+	Shader::ShaderType mType;
 };
 
 unsigned ProgramMachine::CreateShader(GLContext *gc, unsigned type)
@@ -150,7 +128,7 @@ unsigned ProgramMachine::CreateProgram(GLContext *gc)
 	unsigned name;
 	GLSP_UNREFERENCED_PARAM(gc);
 
-	if(mProgramNameSpace.genNames(1, name))
+	if(mProgramNameSpace.genNames(1, &name))
 	{
 		Program *pProg = new Program();
 		pProg->setName(name);
@@ -161,6 +139,12 @@ unsigned ProgramMachine::CreateProgram(GLContext *gc)
 	{
 		return 0;
 	}
+}
+
+// TODO: impl
+void ProgramMachine::DeleteProgram(GLContext *gc, unsigned program)
+{
+	GLSP_UNREFERENCED_PARAM(gc);
 }
 
 void ProgramMachine::ShaderSource(
@@ -175,8 +159,9 @@ void ProgramMachine::ShaderSource(
 	GLSP_UNREFERENCED_PARAM(length);
 
 	Shader *pShader;
-	ShaderFactory *pFact = reinterpret_cast<ShaderFactory *>(string);
-	ShaderPlaceHolder *pSPH = mShaderNameSpace.retrieveObject(shader);
+	const char ** pString = const_cast<const char **>(string);
+	ShaderFactory *pFact = reinterpret_cast<ShaderFactory *>(pString);
+	ShaderPlaceHolder *pSPH = static_cast<ShaderPlaceHolder *>(mShaderNameSpace.retrieveObject(shader));
 
 	if(pSPH->mType == Shader::VERTEX)
 		pShader = pFact->createVertexShader();
@@ -187,24 +172,70 @@ void ProgramMachine::ShaderSource(
 		return;
 	
 	mShaderNameSpace.removeObject(pSPH);
+	pShader->setType(pSPH->mType);
 	pShader->setName(shader);
-	pShader->shaderSource(string);
+	pShader->shaderSource(pString);
 	mShaderNameSpace.insertObject(pShader);
+	delete pSPH;
 }
 
-void ProgramMachine::CompileShader(GLContext *gc)
+void ProgramMachine::CompileShader(GLContext *gc, unsigned shader)
 {
 	GLSP_UNREFERENCED_PARAM(gc);
 	return;
 }
 
-void ProgramMachine::AttachShader(GLContext *gc, program, shader)
+void ProgramMachine::AttachShader(GLContext *gc, unsigned program, unsigned shader)
 {
-	Program *pProg = mProgramNameSpace.retrieveObject(program);
-	Shader *pShader = mShaderNameSpace.retrieveObject(shader);
+	GLSP_UNREFERENCED_PARAM(gc);
+
+	Program *pProg = static_cast<Program *>(mProgramNameSpace.retrieveObject(program));
+	Shader *pShader = static_cast<Shader *>(mShaderNameSpace.retrieveObject(shader));
 
 	if(!pProg || !pShader)
 		return;
 	
 	pProg->attachShader(pShader);
+}
+
+void ProgramMachine::UseProgram(GLContext *gc, unsigned program)
+{
+	GLSP_UNREFERENCED_PARAM(gc);
+
+	Program *pProg = static_cast<Program *>(mProgramNameSpace.retrieveObject(program));
+	if(!pProg || !(pProg->validate()))
+		return;
+
+	mCurrentProgram = pProg;
+}
+
+int ProgramMachine::GetUniformLocation(GLContext, unsigned program, const char *name)
+{
+	int location1, location2;
+	GLSP_UNREFERENCED_PARAM(gc);
+
+	Program *pProg = static_cast<Program *>(mProgramNameSpace.retrieveObject(program));
+
+	if(!pProg)
+		return -1;
+
+	location1 = pProg->getVS()->GetUniformLocation(name);
+	location2 = pProg->getFS()->GetUniformLocation(name);
+
+	if(location1 == -1 && location2 == -1)
+	{
+		cout << __func__ << ": no such uniform in neither VS or FS!" << endl;
+		return -1;
+	}
+	else if(location1 != -1 && location2 != -1)
+	{
+		cout << __func__ << ": uniform name conflict in VS and FS!" << endl;
+		return -1;
+	}
+	else
+		return (location1 != -1)? location1: location2;
+}
+
+void UniformValue(GLContext *gc, int location, int count, bool transpose, const float *value)
+{
 }

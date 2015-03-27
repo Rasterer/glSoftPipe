@@ -2,6 +2,7 @@
 
 #include "BufferObject.h"
 #include "VertexArrayObject.h"
+#include "Shader.h"
 
 #define __GET_CONTEXT()		\
 	GLContext *gc = getCurrentContext();
