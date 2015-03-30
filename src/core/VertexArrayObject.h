@@ -9,7 +9,8 @@
 struct VertexAttribState
 {
 	VertexAttribState();
-	int	mSize;
+	int	mCompSize;
+	int mCompNum;
 	int	mStride;
 	unsigned	mOffset;
 	BufferObject	*mBO;
@@ -27,6 +28,12 @@ class VAOMachine
 {
 public:
 	VAOMachine();
+	void VertexAttribPointer(GLContext *gc, unsigned index, int size, unsigned type, bool normalized, int stride, const void *pointer);
+	void GenVertexArrays(GLContext *gc, int n, unsigned *arrays);
+	void DeleteVertexArrays(GLContext *gc, int n, unsigned *arrays);
+	void BindVertexArray(GLContext *gc, unsigned array);
+	void EnableVertexArrayAttrib(GLContext *gc, unsigned vaobj, unsigned index);
+	void DisableVertexArrayAttrib(GLContext *gc, unsigned vaobj, unsigned index);
 
 private:
 	NameSpace	mNameSpace;

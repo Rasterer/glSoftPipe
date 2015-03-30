@@ -41,6 +41,7 @@ public:
 	bool DeleteBuffers(GLContext *gc, int n, const unsigned *buffers);
 	bool BindBuffer(GLContext *gc, unsigned target, unsigned buffer);
 	bool BufferData(GLContext *gc, unsigned target, unsigned size, const void *data, unsigned usage);
+	BufferObject *getBoundBuffer(unsigned target);
 
 private:
 	int TargetToIndex(unsigned target);

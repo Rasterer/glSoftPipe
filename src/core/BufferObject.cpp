@@ -127,6 +127,13 @@ bool BufferObjectMachine::BufferData(GLContext *gc, unsigned target, unsigned si
 	return true;
 }
 
+BufferObject *BufferObjectMachine::getBoundBuffer(unsigned target)
+{
+	int targetIndex = TargetToIndex(target);
+
+	return mBindings[targetIndex].mBO;
+}
+
 int BufferObjectMachine::TargetToIndex(GLenum target)
 {
 	switch(target)
