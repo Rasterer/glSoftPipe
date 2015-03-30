@@ -1,7 +1,7 @@
 #include "Rasterizer.h"
 #include "utils.h"
 
-int Rasterizer::setupInput(size_t vertexCount, size_t varyingNum, void *varyingPtr[], size_t *elementSize, int *indexBuffer, size_t indexBufferSize, PixelShader *ps)
+int Rasterizer::setupInput(size_t vertexCount, size_t varyingNum, void *varyingPtr[], size_t *elementSize, int *indexBuffer, size_t indexBufferSize, FragmentShader *ps)
 {
 	mVertexCount = vertexCount;
 	mIndexBuffer = indexBuffer;

@@ -8,16 +8,16 @@
 
 struct VertexAttribState
 {
+	VertexAttribState();
 	int	mSize;
-	int	mstride;
+	int	mStride;
 	unsigned	mOffset;
 	BufferObject	*mBO;
 };
 
-struct VertexArrayObject
+struct VertexArrayObject: public NameItem
 {
 	VertexArrayObject();
-	NameItem	mNameItem;
 	unsigned	mAttribEnables;
 	BufferObject	*mBoundElementBuffer;
 	VertexAttribState	mAttribState[MAX_VERTEX_ATTRIBS];

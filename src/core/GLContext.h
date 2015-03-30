@@ -26,4 +26,3 @@ GLContext *getCurrentContext();
 GLContext * CreateContext();
 bool DestroyContext();
 bool MakeCurrent(GLContext *gc);
-

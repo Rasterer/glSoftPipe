@@ -2,6 +2,7 @@
 
 #include <glm/glm.hpp>
 #include "Shader.h"
+#include "VertexArrayObject.h"
 #include "utils.h"
 
 using namespace glm;
@@ -23,8 +24,8 @@ struct viewport_t {
 
 struct PrimitiveContext
 {
-	void *vertexAttri[MAX_ATTRIBUTE_NUM];
-	size_t elementSize[MAX_ATTRIBUTE_NUM];
+	void *vertexAttri[MAX_VERTEX_ATTRIBS];
+	size_t elementSize[MAX_VERTEX_ATTRIBS];
 	size_t vertexCount;
 	size_t attriNum;
 	int *indexBuffer;

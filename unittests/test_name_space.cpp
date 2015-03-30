@@ -17,8 +17,8 @@ int main(void)
 	if(!ret)
 		cout << "genNames failed!" << endl;
 
-	nameItems[0].mName = names[0];
-	nameItems[1].mName = names[1];
+	nameItems[0].setName(names[0]);
+	nameItems[1].setName(names[1]);
 
 	if(!pNameSpace->retrieveObject(names[0]))
 	{

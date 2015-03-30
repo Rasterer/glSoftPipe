@@ -17,7 +17,7 @@ class Rasterizer
 {
 public:
 	Rasterizer(): mVertexCount(0), mVaryingNum(0), mIndexBuffer(NULL), mWidth(1280), mHeight(720) {}
-	int setupInput(size_t vertexCount, size_t varyingNum, void *varyingPtr[], size_t *elementSize, int *indexBuffer, size_t indexBufferSize, PixelShader *ps);
+	int setupInput(size_t vertexCount, size_t varyingNum, void *varyingPtr[], size_t *elementSize, int *indexBuffer, size_t indexBufferSize, FragmentShader *ps);
 	int rasterizing();
 	virtual int onRasterizing();
 
@@ -35,7 +35,7 @@ public:
 	int mWidth;
 	int mHeight;
 
-	PixelShader *mPS;
+	FragmentShader *mPS;
 };
 
 // active edge table implementation

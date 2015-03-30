@@ -5,7 +5,7 @@ SET(PIPELINE_SRC
 	GLContext.cpp
 	BufferObject.cpp
 	Shader.cpp
-	vs_example.cpp
+	VertexArrayObject.cpp
 	PrimitiveProcessor.cpp
 	Rasterizer.cpp
 )

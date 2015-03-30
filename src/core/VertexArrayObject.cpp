@@ -1,12 +1,21 @@
 #include "VertexArrayObject.h"
 
-VertexArrayObject::VertexArrayObject()
+VertexAttribState::VertexAttribState():
+	mSize(0),
+	mStride(0),
+	mOffset(0),
+	mBO(NULL)
 {
-	mAttribEnables = 0;
+}
+
+VertexArrayObject::VertexArrayObject():
+	mAttribEnables(0),
+	mBoundElementBuffer(NULL)
+{
 }
 
 VAOMachine::VAOMachine()
 {
-	mDefaultVAO.mNameItem.mName = 0;
+	mDefaultVAO.setName(0);
 	mActiveVAO = &mDefaultVAO;
 }

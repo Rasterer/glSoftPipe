@@ -1,4 +1,5 @@
 #include <cstring>
+#include <iostream>
 #include "PrimitiveProcessor.h"
 
 // TODO: unify the vertex data struct in all pipe stages
