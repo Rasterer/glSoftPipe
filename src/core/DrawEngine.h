@@ -12,7 +12,8 @@ struct DrawContext
 	GLContext *gc;
 };
 
-// contain serveral pipe stages
+// Containing fixed funtion pipeline stages
+// Shaders are injected from DrawContext.gc
 class DrawEngine
 {
 public:
@@ -27,7 +28,11 @@ public:
 
 private:
 	VertexCachedAssembler	mAsbl;
-	PrimitiveProcessor		mPP;
+	PrimitiveAssembler		mPrimAsbl;
+	Clipper					mClipper;
+	FaceCuller				mCuller;
+	PerspectiveDivider		mDivider;
+	ViewportMapper			mMapper;
 	Rasterizer				mRast;
 	DrawContext			   *mCtx;
 };

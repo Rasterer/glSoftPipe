@@ -1,5 +1,6 @@
 #include "Shader.h"
 #include "GLContext.h"
+#include "VertexCache.h"
 #include "glcorearb.h"
 
 using namespace std;
@@ -96,8 +97,14 @@ void VertexShader::compile()
 {
 }
 
-void VertexShader::execute()
+void VertexShader::execute(vsInput &in, vsOutput &out)
 {
+	out.outputSize(in.size());
+
+	for(size_t i = 0; i < in.size(); i++)
+	{
+		out.getVarying(i) = in.getAttrib(i);
+	}
 }
 
 void VertexShader::onExecute(vsInput &in, vsOutput &out)
@@ -150,6 +157,26 @@ int VertexShader::GetAttribLocation(const string &name)
 		return it->second;
 	else
 		return -1;
+}
+
+void VertexShader::emit(void *data)
+{
+	Batch *bat = static_cast<Batch *>(data);
+	vsCache &cache = bat->mCache;
+	vsOutBuf &out = bat->mOut;
+	vsCache::iterator it = cache.begin();
+	vsOutBuf::iterator iter = out.begin();
+
+	bat->mOut.resize(cache.size());
+
+	while(it != cache.end())
+	{
+		execute(it->first, *iter);
+		it++;
+		iter++
+	}
+
+	getNextStage()->emit(bat);
 }
 
 void FragmentShader::compile()

@@ -31,14 +31,14 @@ typedef vector<vec4> RegArray;
 
 #define VS_RESOLVE_ATTRIB(type, attr, input)	\
 	int a_##attr = this->resolveAttrib(#attr, typeid(type));	\
-	type &attr = *(reinterpret_cast<type *>(input.getAttrib(a_##attr)));
+	type &attr = reinterpret_cast<type &>(input.getAttrib(a_##attr));
 
 #define VS_DECLARE_VARYING(type, attr)	\
 	this->declareVarying(#attr, typeid(type));
 
 #define VS_RESOLVE_VARYING(type, varying, output)	\
 	int a_##varying = this->resolveVarying(#varying, typeid(type));	\
-	type &varying = *(reinterpret_cast<type *>(output.getVarying(a_##varying)));
+	type &varying = reinterpret_cast<type &>(output.getVarying(a_##varying));
 
 #define DECLARE_UNIFORM(uni)	\
 	this->declareUniform(#uni, &uni);
@@ -92,9 +92,6 @@ public:
 		mUniformRegs.push_back(uniform(constant, name));
 	}
 
-	virtual void compile() = 0;
-	virtual void execute() = 0;
-
 private:
 	ShaderType mType;
 	const char **mSource;
@@ -140,10 +137,10 @@ struct uniform
 class vsInput
 {
 public:
-	inline vec4 *getAttrib(int location)
+	inline vec4 & getAttrib(int location)
 	{
 		assert(location < (int)mRegs.size());
-		return &(mRegs[location]);
+		return mRegs[location];
 	}
 
 	inline void assemble(const vec4 &attr)
@@ -178,10 +175,10 @@ private:
 class vsOutput
 {
 public:
-	inline vec4 *getVarying(int location)
+	inline vec4 & getVarying(int location)
 	{
 		assert(location < (int)mRegs.size());
-		return &(mRegs[location]);
+		return mRegs[location];
 	}
 
 	inline void outputSize(int n)
@@ -193,13 +190,14 @@ private:
 	RegArray mRegs;
 };
 
-class VertexShader: public Shader
+class VertexShader: public Shader,
+					public PipeStage
 {
 public:
 	VertexShader() {}
+	virtual void emit(void *data);
 	virtual void compile();
-	virtual void execute();
-	virtual void onExecute(vsInput &in, vsOutput &out);
+	virtual void execute(vsInput &in, vsOutput &out);
 	void declareAttrib(const string &name, const type_info &type);
 	int resolveAttrib(const string &name, const type_info &type);
 	void declareVarying(const string &name, const type_info &type);

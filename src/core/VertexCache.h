@@ -47,6 +47,7 @@ class VertexCachedAssembler: public PipeStage
 public:
 	VertexCachedAssembler();
 	virtual void emit(void *data);
+	virtual finalize();
 	void assembleVertex();
 	void dispatch(Batch &batch);
 };

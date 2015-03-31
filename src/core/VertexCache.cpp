@@ -61,7 +61,7 @@ void VertexCachedAssembler::assembleVertex(DrawContext *dc, GLContext *gc)
 				}
 				memcpy(&attrib, src, vas.mAttribSize);
 			}
-			else // TODO: Impl accessing non-enabled attrib
+			else // TODO: Impl accessing non-enabled attributes
 			{
 			}
 			
