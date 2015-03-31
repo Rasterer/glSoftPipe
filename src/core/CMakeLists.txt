@@ -6,6 +6,7 @@ SET(PIPELINE_SRC
 	BufferObject.cpp
 	Shader.cpp
 	VertexArrayObject.cpp
+	VertexCache.cpp
 	PrimitiveProcessor.cpp
 	Rasterizer.cpp
 )

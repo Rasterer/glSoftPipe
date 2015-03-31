@@ -2,6 +2,7 @@
 
 #include <typeinfo>
 #include <string>
+#include <cstring>
 #include <vector>
 #include <map>
 #include <glm/glm.hpp>
@@ -148,6 +149,26 @@ public:
 	inline void assemble(const vec4 &attr)
 	{
 		mRegs.push_back(attr);
+	}
+
+	inline int getAttribNum()
+	{
+		return mRegs.size();
+	}
+
+	bool operator == (vsInput &rhs)
+	{
+		int size1 = getAttribNum();
+		int size2 = rhs.getAttribNum();
+
+		if(size1 != size2)
+		{
+			return false;
+		}
+		else
+		{
+			return !memcmp(getAttrib(0), rhs.getAttrib(0), sizeof(vec4));
+		}
 	}
 
 private:

@@ -10,6 +10,8 @@
 #define __SET_CONTEXT(gc)	\
 	setCurrentContext(gc);
 
+class DrawEngine;
+
 class GLContext
 {
 public:
@@ -17,6 +19,7 @@ public:
 	BufferObjectMachine	mBOM;
 	VAOMachine			mVAOM;
 	ProgramMachine		mPM;
+	DrawEngine		   *mDE;
 };
 
 void initTLS();

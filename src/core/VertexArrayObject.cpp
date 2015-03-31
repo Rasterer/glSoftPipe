@@ -1,5 +1,6 @@
 #include "VertexArrayObject.h"
 #include "BufferObject.h"
+#include "GLContext.h"
 #include "glcorearb.h"
 
 GLAPI void APIENTRY glGenVertexArrays (GLsizei n, GLuint *arrays)
@@ -39,7 +40,8 @@ GLAPI void APIENTRY glVertexAttribPointer (GLuint index, GLint size, GLenum type
 }
 
 VertexAttribState::VertexAttribState():
-	mSize(0),
+	mAttribSize(0),
+	mCompNum(0),
 	mStride(0),
 	mOffset(0),
 	mBO(NULL)
@@ -61,16 +63,16 @@ VAOMachine::VAOMachine()
 void VAOMachine::GenVertexArrays(GLContext *gc, int n, unsigned *arrays)
 {
 	GLSP_UNREFERENCED_PARAM(gc);
-	mNameSpace.GenNames(n, arrays);
+	mNameSpace.genNames(n, arrays);
 }
 
-void VAOMachine::DeleteVertexArrays(GLContext *gc, int n, unsigned *arrays)
+void VAOMachine::DeleteVertexArrays(GLContext *gc, int n, const unsigned *arrays)
 {
 	GLSP_UNREFERENCED_PARAM(gc);
 
 	for(int i = 0; i < n; i++)
 	{
-		VertexArrayObject *pVAO = mNameSpace.retrieveObject(arrays[i]);
+		VertexArrayObject *pVAO = static_cast<VertexArrayObject *>(mNameSpace.retrieveObject(arrays[i]));
 
 		if(pVAO)
 		{
@@ -78,7 +80,7 @@ void VAOMachine::DeleteVertexArrays(GLContext *gc, int n, unsigned *arrays)
 		}
 	}
 
-	mNameSpace.DeleteNames(n, arrays);
+	mNameSpace.deleteNames(n, arrays);
 }
 
 void VAOMachine::BindVertexArray(GLContext *gc, unsigned array)
@@ -96,7 +98,7 @@ void VAOMachine::BindVertexArray(GLContext *gc, unsigned array)
 		if(!mNameSpace.validate(array))
 			return;
 
-		pVAO = mNameSpace.retrieveObject(array);
+		pVAO = static_cast<VertexArrayObject *>(mNameSpace.retrieveObject(array));
 
 		if(!pVAO)
 		{
@@ -112,7 +114,7 @@ void VAOMachine::EnableVertexArrayAttrib(GLContext *gc, unsigned vaobj, unsigned
 {
 	GLSP_UNREFERENCED_PARAM(gc);
 
-	VertexArrayObject *pVAO = mNameSpace.retrieveObject(vaobj);
+	VertexArrayObject *pVAO = static_cast<VertexArrayObject *>(mNameSpace.retrieveObject(vaobj));
 
 	if(!pVAO)
 		return;
@@ -124,7 +126,7 @@ void VAOMachine::DisableVertexArrayAttrib(GLContext *gc, unsigned vaobj, unsigne
 {
 	GLSP_UNREFERENCED_PARAM(gc);
 
-	VertexArrayObject *pVAO = mNameSpace.retrieveObject(vaobj);
+	VertexArrayObject *pVAO = static_cast<VertexArrayObject *>(mNameSpace.retrieveObject(vaobj));
 
 	if(!pVAO)
 		return;
@@ -149,9 +151,9 @@ void VAOMachine::VertexAttribPointer(
 
 	VertexArrayObject *pVAO = mActiveVAO;
 	VertexAttribState &vas = pVAO->mAttribState[index];
-	vas.mCompSize = sizeof(GL_FLOAT);
 	vas.mCompNum = size;
+	vas.mAttribSize = sizeof(GL_FLOAT) * size;
 	vas.mStride = stride;
-	vas.mOffset = reinterpret_cast<unsigned>(pointer);
+	vas.mOffset = reinterpret_cast<unsigned long>(pointer);
 	vas.mBO = gc->mBOM.getBoundBuffer(GL_ARRAY_BUFFER);
 }
