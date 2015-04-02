@@ -4,7 +4,8 @@ DrawEngine::DrawEngine()
 {
 }
 
-DrawEngine::init()
+// TODO: connect all the pipeline stages
+void DrawEngine::init()
 {
 }
 
@@ -14,8 +15,7 @@ void DrawEngine::validateState(GLContext *gc)
 
 void DrawEngine::emit(DrawContext *dc, GLContext *gc)
 {
-	Batch *bat = mAsbl.assemble(dc, gc);
-
-	mPP->
-
+	getFirstStage()->emit(dc);
 }
+
+DrawEngine DrawEngine::DE;

@@ -1,22 +1,28 @@
+#pragma once
+
+#include <string>
+
+class DrawEngine;
+class DrawContext;
+
 class PipeStage
 {
 public:
-	PipeStage(string &name);
+	PipeStage(const std::string &name, DrawEngine *de);
 	virtual void emit(void *data) = 0;
 	virtual void finalize() = 0;
+	DrawContext *getDrawCtx();
 
-	inline void setNextStage(PipeStage *stage)
-	{
-		mNext = stage;
-	}
+	// accessors
+	DrawEngine *getDrawEngine() const { return mDrawEngine; }
+	PipeStage *getNextStage() const { return mNextStage; }
+	const std::string & getName() const { return mName; }
 
-	inline PipeStage *getNextStage()
-	{
-		return mNext;
-	}
+	// mutators
+	void setNextStage(PipeStage *stage) { mNextStage = stage; }
 
 private:
-	DrawEngine *mDE;
-	PipeStage *mNext;
-	string mName;
+	DrawEngine * const mDrawEngine;
+	PipeStage *mNextStage;
+	const std::string mName;
 };

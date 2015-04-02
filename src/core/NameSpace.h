@@ -8,8 +8,11 @@ using namespace std;
 class NameItem
 {
 public:
-	inline unsigned getName() {return mName;}
-	inline void setName(unsigned name) {mName = name;}
+	// accessors
+	unsigned getName() const { return mName; }
+
+	// mutators
+	void setName(unsigned name) { mName = name; }
 
 private:
 	unsigned int mName;

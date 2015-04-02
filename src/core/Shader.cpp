@@ -1,9 +1,11 @@
 #include "Shader.h"
 #include "GLContext.h"
-#include "VertexCache.h"
+#include "DataFlow.h"
+#include "DrawEngine.h"
 #include "glcorearb.h"
 
 using namespace std;
+using namespace glm;
 
 GLAPI GLuint APIENTRY glCreateShader (GLenum type)
 {
@@ -93,28 +95,32 @@ Shader::ShaderType Shader::OGLToInternal(unsigned type)
 	}
 }
 
+VertexInfo::VertexInfo(const string &name, const type_info &type):
+	mName(name),
+	mType(type)
+{
+}
+
 void VertexShader::compile()
+{
+}
+
+VertexShader::VertexShader():
+	PipeStage("Vertex Shading", DrawEngine::getDrawEngine())
 {
 }
 
 void VertexShader::execute(vsInput &in, vsOutput &out)
 {
-	out.outputSize(in.size());
-
-	for(size_t i = 0; i < in.size(); i++)
-	{
-		out.getVarying(i) = in.getAttrib(i);
-	}
-}
-
-void VertexShader::onExecute(vsInput &in, vsOutput &out)
-{
+	out = in;
 }
 
 void VertexShader::declareAttrib(const string &name, const type_info &type)
 {
 	mAttribMap[name] = mAttribRegs.size();
-	mAttribRegs.push_back(PerVertVar(name, type));
+	mAttribRegs.push_back(VertexInfo(name, type));
+
+	assert(mAttribRegs.size() <= MAX_VERTEX_ATTRIBS);
 }
 
 int VertexShader::resolveAttrib(const string &name, const type_info &type)
@@ -133,7 +139,7 @@ int VertexShader::resolveAttrib(const string &name, const type_info &type)
 void VertexShader::declareVarying(const string &name, const type_info &type)
 {
 	mVaryingMap[name] = mVaryingRegs.size();
-	mVaryingRegs.push_back(PerVertVar(name, type));
+	mVaryingRegs.push_back(VertexInfo(name, type));
 }
 
 int VertexShader::resolveVarying(const string &name, const type_info &type)
@@ -162,19 +168,25 @@ int VertexShader::GetAttribLocation(const string &name)
 void VertexShader::emit(void *data)
 {
 	Batch *bat = static_cast<Batch *>(data);
-	vsCache &cache = bat->mCache;
-	vsOutBuf &out = bat->mOut;
-	vsCache::iterator it = cache.begin();
-	vsOutBuf::iterator iter = out.begin();
+	vsCache &in = bat->mVertexCache;
+	vsOutput_v &out = bat->mVsOut;
 
-	bat->mOut.resize(cache.size());
+	out.resize(in.size());
 
-	while(it != cache.end())
+	for(size_t i = 0; i < in.size(); i++)
 	{
-		execute(it->first, *iter);
-		it++;
-		iter++
+#if PRIMITIVE_REFS_VERTICES
+		out[i] = new vsOutput();
+		execute(in[i], *out[i]);
+
+#elif PRIMITIVE_OWNS_VERTICES
+		execute(in[i], out[i]);
+#endif
 	}
+
+	// Free the memory in Batch.mVertexCache to avoid large memory occupy
+	vsCache().swap(in);
+	vsCacheIndex().swap(bat->mCacheIndex);
 
 	getNextStage()->emit(bat);
 }
@@ -208,27 +220,51 @@ public:
 	Shader::ShaderType mType;
 };
 
+Program::Program():
+	mVertexShader(NULL),
+	mFragmentShader(NULL)
+{
+}
+
+void Program::attachShader(Shader *pShader)
+{
+	if(pShader->getType() == Shader::VERTEX)
+		mVertexShader = static_cast<VertexShader *>(pShader);
+	else if(pShader->getType() == Shader::FRAGMENT)
+		mFragmentShader = static_cast<FragmentShader *>(pShader);
+	else
+		assert(false);
+}
+
+bool Program::validate()
+{
+	if(mVertexShader && mFragmentShader)
+		return true;
+	else
+		return false;
+}
+
 void Program::LinkProgram()
 {
-	vUniform_t & VSUniform = mVertexShader->getUniformBlock();
-	vUniform_t & FSUniform = mFragmentShader->getUniformBlock();
+	uniform_v & VSUniform = mVertexShader->getUniformBlock();
+	uniform_v & FSUniform = mFragmentShader->getUniformBlock();
 
 	if(validate() != true)
 		return;
 
 	// TODO: add uniform conflict check
-	vUniform_t::iterator it = VSUniform.begin();
+	uniform_v::iterator it = VSUniform.begin();
 	while(it != VSUniform.end())
 	{
-		mUniformMap[it->mName] = mUniformRegs.size();
-		mUniformRegs.push_back(*it++);
+		mUniformMap[it->mName] = mUniformBlock.size();
+		mUniformBlock.push_back(*it++);
 	}
 
 	it = FSUniform.begin();
 	while(it != FSUniform.end())
 	{
-		mUniformMap[it->mName] = mUniformRegs.size();
-		mUniformRegs.push_back(*it++);
+		mUniformMap[it->mName] = mUniformBlock.size();
+		mUniformBlock.push_back(*it++);
 	}
 }
 
@@ -324,7 +360,7 @@ void ProgramMachine::ShaderSource(
 	mShaderNameSpace.removeObject(pSPH);
 	pShader->setType(pSPH->mType);
 	pShader->setName(shader);
-	pShader->shaderSource(pString);
+	pShader->setSource(pString);
 	mShaderNameSpace.insertObject(pShader);
 	delete pSPH;
 }
@@ -369,7 +405,7 @@ void ProgramMachine::UseProgram(GLContext *gc, unsigned program)
 	if(!pProg)
 		return;
 
-	mCurrentProgram = pProg;
+	setCurrentProgram(pProg);
 }
 
 int ProgramMachine::GetUniformLocation(GLContext *gc, unsigned program, const char *name)

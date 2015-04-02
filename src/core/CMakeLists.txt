@@ -4,10 +4,16 @@ SET(PIPELINE_SRC
 	NameSpace.cpp
 	GLContext.cpp
 	BufferObject.cpp
-	Shader.cpp
 	VertexArrayObject.cpp
+	PipeStage.cpp
+	DrawEngine.cpp
 	VertexCache.cpp
-	PrimitiveProcessor.cpp
+	Shader.cpp
+	PrimitiveAssembler.cpp
+	Clipper.cpp
+	PerspectiveDivider.cpp
+	ScreenMapper.cpp
+	FaceCuller.cpp
 	Rasterizer.cpp
 )
 
@@ -17,3 +23,5 @@ ADD_LIBRARY(glsp SHARED ${PIPELINE_SRC})
 
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/include/khronos)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/include/export)
+
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DPRIMITIVE_OWNS_VERTICES")

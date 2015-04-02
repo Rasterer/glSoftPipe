@@ -1,6 +1,13 @@
 #include "ScreenMapper.h"
+#include "DataFlow.h"
+#include "DrawEngine.h"
 
-int ScreenMapper::viewPort(int x, int y, int w, int h)
+ScreenMapper::ScreenMapper():
+	PipeStage("Viewport Transform", DrawEngine::getDrawEngine())
+{
+}
+
+void ScreenMapper::setViewPort(int x, int y, int w, int h)
 {
 	mViewPort.x = x;
 	mViewPort.y = y;
@@ -8,20 +15,40 @@ int ScreenMapper::viewPort(int x, int y, int w, int h)
 	mViewPort.h = h;
 }
 
-int ScreenMapper::setupInput(size_t vertexCount, vec4 *posInNDC)
+void ScreenMapper::getViewPort(int &x, int &y, int &w, int &h)
 {
-	mVertexCount = vertexCount;
-	mPosInNDC = posInNDC;
-	return 0;
+	x = mViewPort.x;
+	y = mViewPort.y;
+	w = mViewPort.w;
+	h = mViewPort.h;
 }
 
-int ScreenMapper::mapNDCToScreen()
+void ScreenMapper::emit(void *data)
 {
-	for(int i = 0; i < mVertexCount; i++)
-	{
-		mPosInNDC[i].x = (mPosInNDC[i].x + 1.0) * mViewPort.w / 2.0;
-		mPosInNDC[i].y = (mPosInNDC[i].y + 1.0) * mViewPort.h / 2.0;
-	}
+	Batch *bat = static_cast<Batch *>(data);
 
-	return 0;
+	viewportTransform(bat);
+
+	getNextStage()->emit(bat);
+}
+
+void ScreenMapper::viewportTransform(Batch *bat)
+{
+#if PRIMITIVE_OWNS_VERTICES
+	PrimBatch &in = bat->mPrim;
+
+	for(PrimBatch::iterator it = in.begin(); it != in.end(); ++it)
+	{
+		for(size_t i = 0; i < 3; ++i)
+		{
+			vec4 &pos = it->mVert[i].position();
+			pos.x = (pos.x + 1.0f) * mViewPort.w / 2.0;
+			pos.y = (pos.y + 1.0f) * mViewPort.h / 2.0;
+		}
+	}
+#endif
+}
+
+void ScreenMapper::finalize()
+{
 }

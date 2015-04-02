@@ -1,4 +1,10 @@
-// Mainly fixed functions
+#include "VertexCache.h"
+#include "PrimitiveAssembler.h"
+#include "Clipper.h"
+#include "FaceCuller.h"
+#include "PerspectiveDivider.h"
+#include "ScreenMapper.h"
+#include "Rasterizer.h"
 
 class GLContext;
 
@@ -17,22 +23,33 @@ struct DrawContext
 class DrawEngine
 {
 public:
-	DrawEngine();
 	void init();
 	void validateState(GLContext *gc);
 	void emit(DrawContext *dc, GLContext *gc);
-	inline DrawContext *getDC()
-	{
-		return mCtx;
-	}
+
+	// accessors
+	static DrawEngine  *getDrawEngine() { return &DrawEngine::DE; }
+	DrawContext *getDrawContext() const { return mCtx; }
+	PipeStage   *getFirstStage() const { return mFirstStage; }
+
+	// mutators
+	void setDC(DrawContext *dc) { mCtx = dc; }
+	void setFirstStage(PipeStage *stage) { mFirstStage = stage; }
+
+private:
+	DrawEngine();
 
 private:
 	VertexCachedAssembler	mAsbl;
 	PrimitiveAssembler		mPrimAsbl;
 	Clipper					mClipper;
-	FaceCuller				mCuller;
 	PerspectiveDivider		mDivider;
-	ViewportMapper			mMapper;
+	ScreenMapper			mMapper;
+	FaceCuller				mCuller;
 	Rasterizer				mRast;
 	DrawContext			   *mCtx;
+	PipeStage			   *mFirstStage;
+
+	// implicit singleton
+	static DrawEngine		DE;
 };

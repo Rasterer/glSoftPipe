@@ -12,12 +12,7 @@ class GLContext;
 
 struct BufferObject: public NameItem
 {
-	BufferObject():
-		mSize(0),
-		mUsage(0),
-		mAddr(NULL)
-	{
-	}
+	BufferObject();
 
 	unsigned	mSize;
 	unsigned	mUsage;
@@ -26,10 +21,7 @@ struct BufferObject: public NameItem
 
 struct BindingPoint
 {
-	BindingPoint():
-		mBO(NULL)
-	{
-	}
+	BindingPoint();
 
 	BufferObject *mBO;
 };

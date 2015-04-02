@@ -32,6 +32,18 @@ GLAPI void APIENTRY glBufferData (GLenum target, GLsizeiptr size, const void *da
 	gc->mBOM.BufferData(gc, target, size, data, usage);
 }
 
+BufferObject::BufferObject():
+	mSize(0),
+	mUsage(0),
+	mAddr(NULL)
+{
+}
+
+BindingPoint::BindingPoint():
+	mBO(NULL)
+{
+}
+
 bool BufferObjectMachine::GenBuffers(GLContext *gc, int n, unsigned *buffers)
 {
 	GLSP_UNREFERENCED_PARAM(gc);

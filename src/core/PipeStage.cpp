@@ -1,11 +1,13 @@
 #include "PipeStage.h"
+#include "DrawEngine.h"
 
-PipeStage::PipeStage(string &name)
+PipeStage::PipeStage(const string &name, DrawEngine *de):
+	mDrawEngine(de),
 	mName(name)
 {
 }
 
 DrawContext * PipeStage::getDrawCtx()
 {
-	return mDE->getDC();
+	return mDrawEngine->getDrawContext();
 }
