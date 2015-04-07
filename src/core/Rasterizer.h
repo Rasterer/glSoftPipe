@@ -13,7 +13,7 @@
 using namespace glm;
 using namespace std;
 
-class Rasterizer
+class Rasterizer:
 {
 public:
 	Rasterizer(): mVertexCount(0), mVaryingNum(0), mIndexBuffer(NULL), mWidth(1280), mHeight(720) {}

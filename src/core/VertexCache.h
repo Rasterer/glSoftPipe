@@ -15,5 +15,5 @@ public:
 	VertexCachedAssembler();
 	virtual void emit(void *data);
 	virtual void finalize();
-	void assembleVertex(DrawContext *dc, GLContext *gc);
+	void assembleVertex(DrawContext *dc);
 };

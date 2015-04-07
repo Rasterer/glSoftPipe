@@ -13,24 +13,22 @@ VertexCachedAssembler::VertexCachedAssembler():
 
 void VertexCachedAssembler::emit(void *data)
 {
-	GLSP_UNREFERENCED_PARAM(data);
+	DrawContext *dc = static_cast<DrawContext *>(data);
 
-	DrawContext *dc = getDrawCtx();
-	GLContext *gc = dc->gc;
-
-	assembleVertex(dc, gc);
+	assembleVertex(dc);
 }
 
 // Pre T&L cache implementation
 // TODO: need post T&L cache ?
-void VertexCachedAssembler::assembleVertex(DrawContext *dc, GLContext *gc)
+void VertexCachedAssembler::assembleVertex(DrawContext *dc)
 {
+	GLContext *gc = dc->gc;
 	int *iBuf = static_cast<int *>(dc->mIndices);
 	VertexArrayObject *pVAO = gc->mVAOM.getActiveVAO();
 	VertexShader *pVS = gc->mPM.getCurrentProgram()->getVS();
 	Batch * bat = NULL;
 
-	assert(dc->mIndexType == GL_UNSIGNED_INT);
+	assert(dc->mIndexSize == sizeof(unsigned int));
 
 	// OPT: Too many copies 
 	for(int i = 0; i < dc->mCount; i++)

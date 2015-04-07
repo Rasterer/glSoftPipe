@@ -10,30 +10,41 @@ class GLContext;
 
 struct DrawContext
 {
+	enum DrawType
+	{
+		kArrayDraw = 0,
+		kElementDraw
+	}
 	unsigned mMode;
 	int mFirst;
 	int mCount;
-	unsigned mIndexType;
+	unsigned mIndexSize;
+	DrawType mDrawType;
 	void *mIndices;
 	GLContext *gc;
 };
 
-// Containing fixed funtion pipeline stages
-// Shaders are injected from DrawContext.gc
+// DrawEngine is the abstraction of GPU pipeline, containing fixed function stages.
+// Shaders are injected from DrawContext during validateState().
+// It's a singleton, but can be triggered in any thread without lock protection.
+// That requires the respect stage classes shall not use writable members,
+// or any other global writable variables(local variables or heap alloc are qualified).
 class DrawEngine
 {
 public:
 	void init();
-	void validateState(GLContext *gc);
-	void emit(DrawContext *dc, GLContext *gc);
+	void validateState(DrawContext *dc);
+	// DrawContext *prepareDrawContext(const GLContext *gc, unsigned mode, int first, int count, unsigned indexType, DrawContext::DrawType type, void indices);
+	void emit(DrawContext *dc);
+	void finalize();
 
 	// accessors
 	static DrawEngine  *getDrawEngine() { return &DrawEngine::DE; }
-	DrawContext *getDrawContext() const { return mCtx; }
+	// DrawContext *getDrawContext() const { return mCtx; }
 	PipeStage   *getFirstStage() const { return mFirstStage; }
 
 	// mutators
-	void setDC(DrawContext *dc) { mCtx = dc; }
+	void setDrawContext(DrawContext *dc) { mCtx = dc; }
 	void setFirstStage(PipeStage *stage) { mFirstStage = stage; }
 
 private:
@@ -47,7 +58,10 @@ private:
 	ScreenMapper			mMapper;
 	FaceCuller				mCuller;
 	Rasterizer				mRast;
-	DrawContext			   *mCtx;
+
+	// TODO: Use member pointer may limit the multi-thread use of DrawEngine.
+	// Find a more decent way
+	// DrawContext			   *mCtx;
 	PipeStage			   *mFirstStage;
 
 	// implicit singleton
