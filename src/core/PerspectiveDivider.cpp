@@ -20,7 +20,7 @@ void PerspectiveDivider::emit(void *data)
 void PerspectiveDivider::dividing(Batch *bat)
 {
 #if PRIMITIVE_OWNS_VERTICES
-	PrimBatch &in = bat->mPrim;
+	PrimBatch &in = bat->mPrims;
 
 	for(PrimBatch::iterator it = in.begin(); it != in.end(); ++it)
 	{

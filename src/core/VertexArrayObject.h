@@ -20,7 +20,7 @@ struct VertexArrayObject: public NameItem
 {
 	VertexArrayObject();
 	unsigned	mAttribEnables;
-	BufferObject	*mBoundElementBuffer;
+	BindingPoint	mBoundElementBuffer;
 	VertexAttribState	mAttribState[MAX_VERTEX_ATTRIBS];
 };
 

@@ -49,8 +49,7 @@ VertexAttribState::VertexAttribState():
 }
 
 VertexArrayObject::VertexArrayObject():
-	mAttribEnables(0),
-	mBoundElementBuffer(NULL)
+	mAttribEnables(0)
 {
 }
 

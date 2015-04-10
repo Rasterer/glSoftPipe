@@ -6,8 +6,3 @@ PipeStage::PipeStage(const string &name, DrawEngine *de):
 	mName(name)
 {
 }
-
-DrawContext * PipeStage::getDrawCtx()
-{
-	return mDrawEngine->getDrawContext();
-}

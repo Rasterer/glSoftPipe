@@ -36,6 +36,7 @@ public:
 	BufferObject *getBoundBuffer(unsigned target);
 
 private:
+	BindingPoint *getBindingPoing(GLContext *gc, unsigned target);
 	int TargetToIndex(unsigned target);
 	NameSpace mNameSpace;
 	BindingPoint mBindings[MAX_BUFOBJ_BINDINGS];

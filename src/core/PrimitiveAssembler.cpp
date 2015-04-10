@@ -26,7 +26,7 @@ void PrimitiveAssembler::assemble(Batch *bat)
 {
 	vsOutput_v &out = bat->mVsOut;
 	IBuffer_v &index = bat->mIndexBuf;
-	PrimBatch &pb = bat->mPrim;
+	PrimBatch &pb = bat->mPrims;
 	IBuffer_v::iterator it = index.begin();
 
 	assert(index.size() / 3 == 0);

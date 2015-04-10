@@ -31,7 +31,7 @@ void Clipper::emit(void *data)
 void Clipper::clipping(Batch *bat)
 {
 	PrimBatch out;
-	PrimBatch &in = bat->mPrim;
+	PrimBatch &in = bat->mPrims;
 #if PRIMITIVE_OWNS_VERTICES
 	vsOutput tmp[ARRAY_SIZE(mPlanes) * 3];
 #elif PRIMITIVE_REFS_VERTICES

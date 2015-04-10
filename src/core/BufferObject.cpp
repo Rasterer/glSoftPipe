@@ -67,19 +67,14 @@ bool BufferObjectMachine::DeleteBuffers(GLContext *gc, int n, const unsigned *bu
 
 bool BufferObjectMachine::BindBuffer(GLContext *gc, unsigned target, unsigned buffer)
 {
-	int targetIndex = TargetToIndex(target);
+	BindingPoint *pBP = getBindingPoing(gc, target);
 
-	GLSP_UNREFERENCED_PARAM(gc);
-
-	if(targetIndex == -1)
-	{
-		cout << "BindBuffer: error target " << target << "!" << endl;
+	if(!pBP)
 		return false;
-	}
 
 	if(!buffer)
 	{
-		mBindings[targetIndex].mBO = NULL;
+		pBP->mBO = NULL;
 	}
 	else
 	{
@@ -100,7 +95,7 @@ bool BufferObjectMachine::BindBuffer(GLContext *gc, unsigned target, unsigned bu
 			mNameSpace.insertObject(pBO);
 		}
 
-		mBindings[targetIndex].mBO = pBO;
+		pBP->mBO = pBO;
 	}
 
 	return true;
@@ -108,11 +103,12 @@ bool BufferObjectMachine::BindBuffer(GLContext *gc, unsigned target, unsigned bu
 
 bool BufferObjectMachine::BufferData(GLContext *gc, unsigned target, unsigned size, const void *data, unsigned usage)
 {
-	int targetIndex = TargetToIndex(target);
+	BindingPoint *pBP = getBindingPoing(gc, target);
 
-	GLSP_UNREFERENCED_PARAM(gc);
+	if(!pBP)
+		return false;
 
-	BufferObject *pBO = mBindings[targetIndex].mBO;
+	BufferObject *pBO = pBP->mBO;
 	if(!pBO)
 	{
 		cout << "BufferData: no buffer bound " << target << "!" << endl;
@@ -141,9 +137,29 @@ bool BufferObjectMachine::BufferData(GLContext *gc, unsigned target, unsigned si
 
 BufferObject *BufferObjectMachine::getBoundBuffer(unsigned target)
 {
+	__GET_CONTEXT();
+	BindingPoint *pBP = getBindingPoing(gc, target);
+
+	if(!pBP)
+		return NULL;
+
+	return pBP->mBO;
+}
+
+BindingPoint *BufferObjectMachine::getBindingPoing(GLContext *gc, unsigned target)
+{
 	int targetIndex = TargetToIndex(target);
 
-	return mBindings[targetIndex].mBO;
+	if(targetIndex == -1)
+	{
+		cout << "BindBuffer: error target " << target << "!" << endl;
+		return NULL;
+	}
+
+	if(targetIndex == ELEMENT_ARRAY_BUFFER_INDEX)
+		return &(gc->mVAOM.getActiveVAO()->mBoundElementBuffer);
+	else
+		return &(mBindings[target]);
 }
 
 int BufferObjectMachine::TargetToIndex(GLenum target)

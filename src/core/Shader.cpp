@@ -2,6 +2,7 @@
 #include "GLContext.h"
 #include "DataFlow.h"
 #include "DrawEngine.h"
+#include "Rasterizer.h"
 #include "glcorearb.h"
 
 using namespace std;
@@ -85,7 +86,7 @@ Shader::Shader()
 	mSource = NULL;
 }
 
-Shader::ShaderType Shader::OGLToInternal(unsigned type)
+Shader::ShaderType Shader::OGLShaderTypeToInternal(unsigned type)
 {
 	switch(type)
 	{
@@ -93,6 +94,56 @@ Shader::ShaderType Shader::OGLToInternal(unsigned type)
 		case GL_FRAGMENT_SHADER:	return FRAGMENT;
 		default:					return INVALID;
 	}
+}
+
+void Shader::declareInput(const string &name, const type_info &type)
+{
+	mInRegsMap[name] = mInRegs.size();
+	mInRegs.push_back(VertexInfo(name, type));
+
+	assert(mInRegs.size() <= MAX_VERTEX_ATTRIBS);
+}
+
+int Shader::resolveInput(const string &name, const type_info &type)
+{
+	VarMap::iterator it = mInRegsMap.find(name);
+	if(it != mInRegsMap.end())
+	{
+		assert(it->second < (int)mInRegs.size());
+		assert(mInRegs[it->second].mType == type);
+		return it->second;
+	}
+
+	return -1;
+}
+
+void Shader::declareOutput(const string &name, const type_info &type)
+{
+	mOutRegsMap[name] = mOutRegs.size();
+	mOutRegs.push_back(VertexInfo(name, type));
+}
+
+int Shader::resolveOutput(const string &name, const type_info &type)
+{
+	VarMap::iterator it = mOutRegsMap.find(name);
+	if(it != mOutRegsMap.end())
+	{
+		assert(it->second < (int)mOutRegs.size());
+		assert(mOutRegs[it->second].mType == type);
+		return it->second;
+	}
+
+	return -1;
+}
+
+int Shader::GetInRegLocation(const string &name)
+{
+	VarMap::iterator it = mInRegsMap.find(name);
+
+	if(it != mInRegsMap.end())
+		return it->second;
+	else
+		return -1;
 }
 
 VertexInfo::VertexInfo(const string &name, const type_info &type):
@@ -113,56 +164,6 @@ VertexShader::VertexShader():
 void VertexShader::execute(vsInput &in, vsOutput &out)
 {
 	out = in;
-}
-
-void VertexShader::declareAttrib(const string &name, const type_info &type)
-{
-	mAttribMap[name] = mAttribRegs.size();
-	mAttribRegs.push_back(VertexInfo(name, type));
-
-	assert(mAttribRegs.size() <= MAX_VERTEX_ATTRIBS);
-}
-
-int VertexShader::resolveAttrib(const string &name, const type_info &type)
-{
-	VarMap::iterator it = mAttribMap.find(name);
-	if(it != mAttribMap.end())
-	{
-		assert(it->second < (int)mAttribRegs.size());
-		assert(mAttribRegs[it->second].mType == type);
-		return it->second;
-	}
-
-	return -1;
-}
-
-void VertexShader::declareVarying(const string &name, const type_info &type)
-{
-	mVaryingMap[name] = mVaryingRegs.size();
-	mVaryingRegs.push_back(VertexInfo(name, type));
-}
-
-int VertexShader::resolveVarying(const string &name, const type_info &type)
-{
-	VarMap::iterator it = mVaryingMap.find(name);
-	if(it != mVaryingMap.end())
-	{
-		assert(it->second < (int)mVaryingRegs.size());
-		assert(mVaryingRegs[it->second].mType == type);
-		return it->second;
-	}
-
-	return -1;
-}
-
-int VertexShader::GetAttribLocation(const string &name)
-{
-	VarMap::iterator it = mAttribMap.find(name);
-
-	if(it != mAttribMap.end())
-		return it->second;
-	else
-		return -1;
 }
 
 void VertexShader::emit(void *data)
@@ -191,27 +192,30 @@ void VertexShader::emit(void *data)
 	getNextStage()->emit(bat);
 }
 
+FragmentShader::FragmentShader():
+	PipeStage("Fragment Shading", DrawEngine::getDrawEngine())
+{
+}
+
+void FragmentShader::emit(void *data)
+{
+	ScanlineRasterizer::SRHelper *hlp = static_cast<SRHelper *>(data);
+
+	execute(hlp->in, hlp->out);
+
+	//getNextStage()->emit(hlp);
+}
+
 void FragmentShader::compile()
 {
 }
 
-void FragmentShader::attribPointer(float *attri)
-{
-	mIn = attri;
-}
-
-void FragmentShader::setupOutputRegister(char *outReg)
-{
-	mOutReg = outReg;
-}
-
 // TODO: Inherit PixelShader to do concrete implementation
-void FragmentShader::execute()
+void FragmentShader::execute(fsInput& in, fsOutput& out)
 {
-	mOutReg[0] = (int)mIn[0];
-	mOutReg[1] = (int)mIn[1];
-	mOutReg[2] = (int)mIn[2];
-	mOutReg[3] = (int)mIn[3];
+	GLSP_UNREFERENCED_PARAM(in);
+
+	out.fragcolor() = vec4(0.0f, 0.0f, 0.0f, 255.0f);
 }
 
 class ShaderPlaceHolder: public NameItem
@@ -226,7 +230,7 @@ Program::Program():
 {
 }
 
-void Program::attachShader(Shader *pShader)
+void Program::AttachShader(Shader *pShader)
 {
 	if(pShader->getType() == Shader::VERTEX)
 		mVertexShader = static_cast<VertexShader *>(pShader);
@@ -292,7 +296,7 @@ unsigned ProgramMachine::CreateShader(GLContext *gc, unsigned type)
 	{
 		ShaderPlaceHolder *pSPH = new ShaderPlaceHolder();
 		pSPH->setName(name);
-		pSPH->mType = Shader::OGLToInternal(type);
+		pSPH->mType = Shader::OGLShaderTypeToInternal(type);
 		mShaderNameSpace.insertObject(pSPH);
 		return name;
 	}
@@ -382,7 +386,7 @@ void ProgramMachine::AttachShader(GLContext *gc, unsigned program, unsigned shad
 	if(!pProg || !pShader)
 		return;
 	
-	pProg->attachShader(pShader);
+	pProg->AttachShader(pShader);
 }
 
 void ProgramMachine::LinkProgram(GLContext *gc, unsigned program)
@@ -429,5 +433,5 @@ int ProgramMachine::GetAttribLocation(GLContext *gc, unsigned program, const cha
 	if(!pProg)
 		return -1;
 
-	return pProg->getVS()->GetAttribLocation(name);
+	return pProg->getVS()->GetRegisterLocation(name);
 }

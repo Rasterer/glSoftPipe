@@ -40,6 +40,7 @@ bool MakeCurrent(GLContext *gc)
 	return true;
 }
 
-GLContext::GLContext()
+GLContext::GLContext():
+	mbInFrame(false)
 {
 }

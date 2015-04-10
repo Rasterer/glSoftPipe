@@ -8,20 +8,31 @@
 
 class GLContext;
 
+struct RenderTarget
+{
+	int width;
+	int height;
+	void  *pColorBuffer;
+	float *pDepthBuffer;
+	void  *pStencilBuffer;
+};
+
 struct DrawContext
 {
 	enum DrawType
 	{
 		kArrayDraw = 0,
 		kElementDraw
-	}
+	};
 	unsigned mMode;
 	int mFirst;
 	int mCount;
 	unsigned mIndexSize;
 	DrawType mDrawType;
-	void *mIndices;
+	const void *mIndices;
 	GLContext *gc;
+
+	RenderTarget mRT;
 };
 
 // DrawEngine is the abstraction of GPU pipeline, containing fixed function stages.
@@ -33,22 +44,22 @@ class DrawEngine
 {
 public:
 	void init();
-	void validateState(DrawContext *dc);
-	// DrawContext *prepareDrawContext(const GLContext *gc, unsigned mode, int first, int count, unsigned indexType, DrawContext::DrawType type, void indices);
+	bool validateState(DrawContext *dc);
+	void prepareToDraw(DrawContext *dc);
 	void emit(DrawContext *dc);
+	void SwapBuffers(DrawContext *dc);
 	void finalize();
 
 	// accessors
 	static DrawEngine  *getDrawEngine() { return &DrawEngine::DE; }
-	// DrawContext *getDrawContext() const { return mCtx; }
 	PipeStage   *getFirstStage() const { return mFirstStage; }
 
 	// mutators
-	void setDrawContext(DrawContext *dc) { mCtx = dc; }
 	void setFirstStage(PipeStage *stage) { mFirstStage = stage; }
 
 private:
 	DrawEngine();
+	void beginFrame(DrawContext *dc);
 
 private:
 	VertexCachedAssembler	mAsbl;
@@ -59,7 +70,7 @@ private:
 	FaceCuller				mCuller;
 	Rasterizer				mRast;
 
-	// TODO: Use member pointer may limit the multi-thread use of DrawEngine.
+	// TODO(done): Use member pointer may limit the multi-thread use of DrawEngine.
 	// Find a more decent way
 	// DrawContext			   *mCtx;
 	PipeStage			   *mFirstStage;

@@ -26,7 +26,7 @@ void FaceCuller::emit(void *data)
 void FaceCuller::culling(Batch *bat)
 {
 #if PRIMITIVE_OWNS_VERTICES
-	PrimBatch &in = bat->mPrim;
+	PrimBatch &in = bat->mPrims;
 	PrimBatch::iterator it = in.begin();
 
 	while(it != in.end())
@@ -41,7 +41,7 @@ void FaceCuller::culling(Batch *bat)
 		float fy = pos2.y - pos0.y;
 		float area = ex * fy - ey * fx;
 
-		if(!EQUAL(area, 0.0f))
+		if(abs(area) > 1.0f)
 		{
 			orient_t orient = (area > 0)? CCW: CW;
 			face_t face = (mOrient == orient)? FRONT: BACK;
@@ -51,6 +51,15 @@ void FaceCuller::culling(Batch *bat)
 				it = in.erase(it);
 				continue;
 			}
+			else
+			{
+				it->mAreaReciprocal = 1.0f / area;
+			}
+		}
+		else
+		{
+			it = in.erase(it);
+			continue;
 		}
 		++it;
 	}

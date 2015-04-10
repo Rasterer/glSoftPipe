@@ -20,6 +20,8 @@ public:
 	VAOMachine			mVAOM;
 	ProgramMachine		mPM;
 	DrawEngine		   *mDE;
+	DrawContext		   *mDC;
+	bool				mbInFrame;
 };
 
 void initTLS();

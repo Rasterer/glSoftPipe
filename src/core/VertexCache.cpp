@@ -23,21 +23,26 @@ void VertexCachedAssembler::emit(void *data)
 void VertexCachedAssembler::assembleVertex(DrawContext *dc)
 {
 	GLContext *gc = dc->gc;
-	int *iBuf = static_cast<int *>(dc->mIndices);
+	const unsigned int *iBuf = static_cast<const unsigned int *>(dc->mIndices);
 	VertexArrayObject *pVAO = gc->mVAOM.getActiveVAO();
 	VertexShader *pVS = gc->mPM.getCurrentProgram()->getVS();
+	BufferObject *pIBO = gc->mBOM.getBoundBuffer(GL_ELEMENT_ARRAY_BUFFER);
 	Batch * bat = NULL;
 
 	assert(dc->mIndexSize == sizeof(unsigned int));
 
+	if(pIBO)
+		iBuf = (unsigned int *)((char *)pIBO->mAddr + (ptrdiff_t)iBuf);
+
 	// OPT: Too many copies 
 	for(int i = 0; i < dc->mCount; i++)
 	{
-		int idx = iBuf[dc->mFirst + i];
+		unsigned int idx = iBuf[dc->mFirst + i];
 
 		if(!bat)
 		{
 			bat = new Batch();
+			bat->mDC = dc;
 		}
 
 		vsCache & cache = bat->mVertexCache;
@@ -52,9 +57,9 @@ void VertexCachedAssembler::assembleVertex(DrawContext *dc)
 		{
 			vsInput in;
 
-			in.reserve(pVS->getAttribNum());
+			in.reserve(pVS->getInRegsNum());
 
-			for(size_t j = 0; j < pVS->getAttribNum(); j++)
+			for(size_t j = 0; j < pVS->getInRegsNum(); j++)
 			{
 				vec4 attrib(0.0f, 0.0f, 0.0f, 1.0f);
 
@@ -81,7 +86,7 @@ void VertexCachedAssembler::assembleVertex(DrawContext *dc)
 				{
 				}
 				
-				in.assemble(attrib);
+				in.pushReg(attrib);
 			}
 
 			cacheIndex[idx] = cache.size();

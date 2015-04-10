@@ -21,21 +21,20 @@ typedef std::map<string, int> UniformMap;
 typedef std::vector<VertexInfo> var_v;
 typedef std::map<string, int> VarMap;
 
-// For vertex shader:
-// APP should use these two macros to define its own attributes(name and type)
-// for varying: To make life easy, glPosition should come first!
-#define VS_DECLARE_ATTRIB(type, attr)	\
-	this->declareAttrib(#attr, typeid(type));
+// APP should use these two macros to define its own variables(name and type)
+// for vertex shader varying: To make life easy, glPosition should come first!
+#define DECLARE_IN(type, attr)	\
+	this->declareInput(#attr, typeid(type));
 
-#define VS_RESOLVE_ATTRIB(type, attr, input)	\
-	int a_##attr = this->resolveAttrib(#attr, typeid(type));	\
+#define RESOLVE_IN(type, attr, input)	\
+	int a_##attr = this->resolveInput(#attr, typeid(type));	\
 	type &attr = reinterpret_cast<type &>(input.getReg(a_##attr));
 
-#define VS_DECLARE_VARYING(type, attr)	\
-	this->declareVarying(#attr, typeid(type));
+#define DECLARE_OUT(type, attr)	\
+	this->declareOutput(#attr, typeid(type));
 
-#define VS_RESOLVE_VARYING(type, varying, output)	\
-	int a_##varying = this->resolveVarying(#varying, typeid(type));	\
+#define RESOLVE_OUT(type, varying, output)	\
+	int a_##varying = this->resolveOutput(#varying, typeid(type));	\
 	type &varying = reinterpret_cast<type &>(output.getReg(a_##varying));
 
 #define DECLARE_UNIFORM(uni)	\
@@ -64,7 +63,10 @@ public:
 	};
 
 	Shader();
-	static ShaderType OGLToInternal(unsigned type);
+
+	virtual void compile() = 0;
+
+	static ShaderType OGLShaderTypeToInternal(unsigned type);
 
 	// mutators
 	void setSource(const char **string) { mSource = string; }
@@ -78,10 +80,25 @@ public:
 	template <class T>
 	void declareUniform(const string &name, T *constant);
 
+	void declareInput(const string &name, const type_info &type);
+	int resolveInput(const string &name, const type_info &type);
+	void declareOutput(const string &name, const type_info &type);
+	int resolveOutput(const string &name, const type_info &type);
+
+	int GetInRegLocation(const string &name);
+	size_t getInRegsNum() const { return mInRegs.size(); }
+	size_t getOutRegsNum() const { return mOutRegs.size(); }
+
 private:
 	ShaderType mType;
 	const char **mSource;
 	uniform_v mUniformBlock;
+
+	var_v mInRegs;
+	VarMap mInRegsMap;
+
+	var_v mOutRegs;
+	VarMap mOutRegsMap;
 };
 
 template <class T>
@@ -134,39 +151,33 @@ class VertexShader: public Shader,
 {
 public:
 	VertexShader();
-	virtual void emit(void *data);
-	virtual void compile();
-	void declareAttrib(const string &name, const type_info &type);
-	int resolveAttrib(const string &name, const type_info &type);
-	void declareVarying(const string &name, const type_info &type);
-	int resolveVarying(const string &name, const type_info &type);
-	int GetAttribLocation(const string &name);
-	size_t getAttribNum() const { return mAttribRegs.size(); }
-	size_t getVaryingNum() const { return mVaryingRegs.size(); }
 
-private:
+	virtual void emit(void *data);
+	virtual void finalize();
+
+	virtual void compile();
+
+protected:
+	// App should rewrite this method
 	virtual void execute(vsInput &in, vsOutput &out);
 
 private:
-	var_v mAttribRegs;
-	VarMap mAttribMap;
-
-	var_v mVaryingRegs;
-	VarMap mVaryingMap;
 };
 
 // TODO: rework
-class FragmentShader: public Shader
+class FragmentShader: public Shader,
+					  public PipeStage
 {
 public:
-	FragmentShader() {}
+	FragmentShader();
+
+	virtual void emit(void *data);
+	virtual void finalize();
 	virtual void compile();
-	virtual void execute();
-	virtual void attribPointer(float *attri);
-	virtual void setupOutputRegister(char *outReg);
-	
-	float *mIn;
-	char *mOutReg;
+
+private:
+	virtual void execute(fsInput& in, fsOutput& out);
+
 };
 
 class Program: public NameItem
@@ -177,7 +188,7 @@ public:
 	VertexShader *getVS() const { return mVertexShader; }
 	FragmentShader *getFS() const { return mFragmentShader; }
 
-	void attachShader(Shader *pShader);
+	void AttachShader(Shader *pShader);
 	void LinkProgram();
 	int GetUniformLocation(const string &name);
 

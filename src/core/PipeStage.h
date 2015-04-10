@@ -11,10 +11,8 @@ public:
 	PipeStage(const std::string &name, DrawEngine *de);
 	virtual void emit(void *data) = 0;
 	virtual void finalize() = 0;
-	DrawContext *getDrawCtx();
 
 	// accessors
-	DrawEngine *getDrawEngine() const { return mDrawEngine; }
 	PipeStage *getNextStage() const { return mNextStage; }
 	const std::string & getName() const { return mName; }
 

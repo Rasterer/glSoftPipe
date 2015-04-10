@@ -7,7 +7,7 @@
 
 typedef std::vector<glm::vec4> RegArray;
 
-class vertex_data
+class ShaderRegisterFile
 {
 public:
 	// getReg() and resize is one pair
@@ -21,7 +21,13 @@ public:
 		return mRegs[location];
 	}
 
+	// glPosition and FragColor are both in the first location,
+	// which can be treat as a union.
 	glm::vec4 & position()
+	{
+		return mRegs[0];
+	}
+	glm::vec4 & fragcolor()
 	{
 		return mRegs[0];
 	}
@@ -32,7 +38,7 @@ public:
 		mRegs.reserve(n);
 	}
 
-	void assemble(const glm::vec4 &attr)
+	void pushReg(const glm::vec4 &attr)
 	{
 		mRegs.push_back(attr);
 	}
@@ -46,8 +52,11 @@ private:
 	RegArray mRegs;
 };
 
-typedef vertex_data vsInput;
-typedef vertex_data vsOutput;
+typedef ShaderRegisterFile vsInput;
+typedef ShaderRegisterFile vsOutput;
+
+typedef ShaderRegisterFile fsInput;
+typedef ShaderRegisterFile fsOutput;
 
 struct Primitive
 {
@@ -65,6 +74,7 @@ struct Primitive
 #elif PRIMITIVE_OWNS_VERTICES
 	vsOutput mVert[3];
 #endif
+	float mAreaReciprocal;
 };
 
 typedef std::vector<int> IBuffer_v;
@@ -84,13 +94,16 @@ typedef std::vector<vsOutput> vsOutput_v;
 // Here is rough explanation:
 // Input Assembly: read data from VBO, produce mVertexCache & mIndexBuf.
 // Vertex Shading: consumer mVertexCache, produce mVsOut
-// Primitive Assembly: consumer mIndexBuf & mVsOut, produce mPrim
-// Clipping ~ Viewport transform: consumer mPrim, produce mPrim
+// Primitive Assembly: consumer mIndexBuf & mVsOut, produce mPrims
+// Clipping ~ Viewport transform: consumer mPrims, produce mPrims
 struct Batch
 {
 	vsCache			mVertexCache;
 	vsCacheIndex	mCacheIndex;
 	vsOutput_v		mVsOut;
 	IBuffer_v		mIndexBuf;
-	PrimBatch		mPrim;
+	PrimBatch		mPrims;
+
+	// point back to the mDC
+	DrawContext	   *mDC;
 };
