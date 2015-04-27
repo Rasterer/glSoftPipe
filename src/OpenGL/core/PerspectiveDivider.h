@@ -2,12 +2,16 @@
 
 #include "PipeStage.h"
 
+NS_OPEN_GLSP_OGL()
+
 class Batch;
 
 class PerspectiveDivider: public PipeStage
 {
 public:
 	PerspectiveDivider();
+	virtual ~PerspectiveDivider() { }
+
 	virtual void emit(void *data);
 	virtual void finalize();
 
@@ -16,3 +20,5 @@ private:
 
 private:
 };
+
+NS_CLOSE_GLSP_OGL()

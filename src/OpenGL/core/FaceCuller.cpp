@@ -5,6 +5,8 @@
 
 using glm::vec4;
 
+NS_OPEN_GLSP_OGL()
+
 FaceCuller::FaceCuller():
 	PipeStage("Face Culling", DrawEngine::getDrawEngine()),
 	mOrient(CCW),
@@ -71,3 +73,5 @@ void FaceCuller::culling(Batch *bat)
 void FaceCuller::finalize()
 {
 }
+
+NS_CLOSE_GLSP_OGL()

@@ -11,6 +11,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "Shader.h"
 
+NS_OPEN_GLSP_OGL()
+
 using namespace glm;
 using namespace std;
 
@@ -18,6 +20,8 @@ class Rasterizer: public PipeStage
 {
 public:
 	Rasterizer();
+	virtual ~Rasterizer() { }
+
 	virtual void emit(void *data);
 	virtual void finalize();
 	void rasterizing(Batch *bat);
@@ -39,6 +43,8 @@ public:
 	ScanlineRasterizer(): Rasterizer()
 	{
 	}
+
+	virtual ~ScanlineRasterizer() { }
 
 protected:
 	virtual int onRasterizing(Batch *bat);
@@ -129,3 +135,5 @@ private:
 
 	void finalize(SRHelper *hlp);
 };
+
+NS_CLOSE_GLSP_OGL()

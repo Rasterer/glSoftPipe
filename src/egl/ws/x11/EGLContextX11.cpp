@@ -4,7 +4,7 @@
 
 NS_OPEN_GLSP_EGL()
 
-EGLContextX11::EGLContextX11(EGLDisplayBase &dpy)
+EGLContextX11::EGLContextX11(EGLDisplayBase &dpy):
 	EGLContextBase(dpy)
 {
 }

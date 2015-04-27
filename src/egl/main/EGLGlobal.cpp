@@ -1,9 +1,13 @@
 #include "EGLGlobal.h"
 
+#include <algorithm>
+#include "EGLDisplayBase.h"
+#include "EGLDisplayX11.h"
+
 NS_OPEN_GLSP_EGL()
 
 // TODO: add other platforms support
-EGLGlobal::EGLGlobal()
+EGLGlobal::EGLGlobal():
 	mCurrentDisplay(NULL),
 	mNativePlatform(EGL_PLATFORM_X11_KHR)
 {
@@ -11,7 +15,7 @@ EGLGlobal::EGLGlobal()
 
 bool EGLGlobal::validateDisplay(EGLDisplayBase *dpy)
 {
-	EGLDisplayList::iterator it = mDisplayList.find(dpy);
+	EGLDisplayList::iterator it = std::find(mDisplayList.begin(), mDisplayList.end(), dpy);
 
 	return (it != mDisplayList.end());
 }
@@ -25,7 +29,7 @@ EGLDisplayBase* EGLGlobal::getDisplay(void *nativeDpy)
 		it != mDisplayList.end();
 		it++)
 	{
-		if((*it)->isDisplayMatch(dpy, platformType))
+		if((*it)->isDisplayMatch(nativeDpy, platformType))
 		{
 			pDisp = *it;
 			break;

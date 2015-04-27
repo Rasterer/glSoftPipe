@@ -2,6 +2,8 @@
 
 #include "PipeStage.h"
 
+NS_OPEN_GLSP_OGL()
+
 class Batch;
 
 class FaceCuller: public PipeStage
@@ -21,6 +23,8 @@ public:
 	};
 
 	FaceCuller();
+	virtual ~FaceCuller() { }
+
 	virtual void emit(void *data);
 	virtual void finalize();
 
@@ -35,3 +39,5 @@ private:
 	face_t mCullFace;
 	bool mCullEnabled;
 };
+
+NS_CLOSE_GLSP_OGL()

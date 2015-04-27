@@ -2,13 +2,23 @@
 
 #include <vector>
 
+#include "khronos/EGL/egl.h"
+#include "common/glsp_defs.h"
+#include "common/IEGLBridge.h"
+
+
 NS_OPEN_GLSP_EGL()
+
+class EGLDisplayBase;
+class EGLContextBase;
+class EGLSurfaceBase;
+class EGLConfigBase;
 
 enum ResourceType
 {
-	EGL_CONTEXT_TYPE = 0,
-	EGL_SURFACE_TYPE = 1,
-	EGL_MAX_RESOURCE = 2
+	KEGL_CONTEXT_TYPE = 0,
+	KEGL_SURFACE_TYPE = 1,
+	KEGL_MAX_RESOURCE = 2
 };
 
 class EGLResourceBase
@@ -20,21 +30,14 @@ public:
 	{
 	}
 		
-	virtual ~EGLResourceBase();
+	virtual ~EGLResourceBase() { }
 
-	ResourceType    getResourceType() const { return mType; }
-	EGLDisplayBase& getDisplay()      const { return mDisplay; }
+	ResourceType     getResourceType() const { return mType; }
+	const EGLDisplayBase& getDisplay() const { return mDisplay; }
 
 private:
 	const EGLDisplayBase  &mDisplay;
-	const ResourceType     mType
-};
-
-struct IEGLBridge
-{
-	void* (*createGC)(void *EglCtx, int major, int minor);
-	bool  (*swapBuffers)();
-	bool  (*getBuffers)(void *EglCtx, BufferHandle *handle);
+	const ResourceType     mType;
 };
 
 class EGLDisplayBase
@@ -63,21 +66,26 @@ public:
 	bool validateResource(EGLResourceBase *res);
 	void attachResource(EGLResourceBase *res);
 
+	void bindContext(EGLContextBase *ctx);
+	EGLContextBase* getCurrentContext() const { return mCurrentContext; }
+
 	bool isDisplayMatch(void *nativeDpy, EGLenum platformType) const
 	{
 		return (platformType == mNativePlatform) &&
 				  (nativeDpy == mNativeDisplay);
 	}
 
-	void*   getNativeDisplay() const { return mNativeDisplay; }
-	IEGLBridge* getEGLBridge() const { return &mBridge; }
+	void* getNativeDisplay() const { return mNativeDisplay; }
+	const IEGLBridge* getEGLBridge() const { return &mBridge; }
+
+	void getEGLVersion(EGLint *major, EGLint *minor) const;
 
 private:
 	typedef std::vector<EGLResourceBase *> EGLResourceList;
 
-	EGLResourceList mResourceList[EGL_MAX_RESOURCE];
+	EGLResourceList mResourceList[KEGL_MAX_RESOURCE];
 
-	IEGLBridge mBridge;
+	glsp::IEGLBridge mBridge;
 
 	EGLContextBase *mCurrentContext;
 

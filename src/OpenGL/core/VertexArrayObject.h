@@ -3,6 +3,8 @@
 #include "NameSpace.h"
 #include "BufferObject.h"
 
+NS_OPEN_GLSP_OGL()
+
 #define MAX_VERTEX_ATTRIBS 16
 
 struct VertexAttribState
@@ -46,3 +48,5 @@ private:
 	VertexArrayObject	*mActiveVAO;
 	VertexArrayObject	mDefaultVAO;
 };
+
+NS_CLOSE_GLSP_OGL()

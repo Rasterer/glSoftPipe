@@ -1,7 +1,17 @@
 #pragma once
 
+#define _XSERVER64
+
+#include <xf86drm.h>
 #include <xcb/xcb.h>
 #include "EGLSurfaceBase.h"
+
+extern "C" {
+	#include <intel_bufmgr.h>
+	#include <i915_drm.h>
+	#include <drm_fourcc.h>
+}
+
 
 NS_OPEN_GLSP_EGL()
 
@@ -11,13 +21,17 @@ public:
 	EGLSurfaceX11(EGLDisplayBase &dpy, EGLenum type);
 	virtual ~EGLSurfaceX11();
 
-	virtual bool initSurface();
+	virtual bool initSurface(EGLDisplayBase *dpy, EGLNativeWindowType win);
 
 	virtual bool swapBuffers();
 
+	virtual bool getBuffers(void **addr, int *width, int *height);
+
 private:
-	xcb_window_t   mXWindow;
-	xcb_gcontext_t mXContext;
+	::xcb_drawable_t mXDrawable;
+	::xcb_gcontext_t mXContext;
+
+	::drm_intel_bo  *mCurrentBO;
 };
 
 NS_CLOSE_GLSP_EGL()

@@ -1,14 +1,18 @@
 #pragma once
 
+#include <vector>
 #include <boost/serialization/singleton.hpp>
 
+#include <khronos/EGL/egl.h>
 #include <khronos/EGL/eglext.h>
+#include <common/glsp_defs.h>
 
 NS_OPEN_GLSP_EGL()
 
 class EGLGlobal;
+class EGLDisplayBase;
 
-typedef singleton<EGLGlobal> EGLGlobalSingleton;
+typedef boost::serialization::singleton<EGLGlobal> EGLGlobalSingleton;
 
 class EGLGlobal
 {

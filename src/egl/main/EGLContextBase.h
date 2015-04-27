@@ -1,6 +1,7 @@
 #pragma once
 
 #include "khronos/EGL/egl.h"
+#include "common/glsp_defs.h"
 #include "EGLDisplayBase.h"
 
 NS_OPEN_GLSP_EGL()
@@ -15,11 +16,16 @@ public:
 
 	bool initContext();
 
-	void bindSurface(EGLSurfaceBase *read, EGLSurfaceBase *write)
+	void bindSurface(EGLSurfaceBase *read, EGLSurfaceBase *draw)
 	{
-		mSurfaceWrite = write;
-		mSurfaceRead  = read;
+		mSurfaceRead = read;
+		mSurfaceDraw = draw;
 	}
+
+	EGLSurfaceBase* getDrawSurface() const { return mSurfaceDraw; }
+	EGLSurfaceBase* getReadSurface() const { return mSurfaceRead; }
+
+	void* getClientGC() const { return mClientGC; }
 
 private:
 	void *mClientGC;
@@ -28,7 +34,7 @@ private:
 	EGLint     mClientVersionMajor;
 	EGLint     mClientVersionMinor;
 
-	EGLSurfaceBase *mSurfaceWrite;
+	EGLSurfaceBase *mSurfaceDraw;
 	EGLSurfaceBase *mSurfaceRead;
 };
 

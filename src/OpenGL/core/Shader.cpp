@@ -1,12 +1,14 @@
 #include "Shader.h"
+
 #include "GLContext.h"
 #include "DataFlow.h"
 #include "DrawEngine.h"
 #include "Rasterizer.h"
-#include "khronos/glcorearb.h"
+#include "khronos/GL/glcorearb.h"
 
-using namespace std;
-using namespace glm;
+
+using glm::vec4;
+using glm::mat4;
 
 GLAPI GLuint APIENTRY glCreateShader (GLenum type)
 {
@@ -79,6 +81,9 @@ GLAPI GLint APIENTRY glGetAttribLocation (GLuint program, const GLchar *name)
 	__GET_CONTEXT();
 	return gc->mPM.GetAttribLocation(gc, program, name);
 }
+
+
+NS_OPEN_GLSP_OGL()
 
 // vertex shader cache
 Shader::Shader()
@@ -216,7 +221,7 @@ void FragmentShader::compile()
 {
 }
 
-// TODO: Inherit PixelShader to do concrete implementation
+// Inherit PixelShader to do concrete implementation
 void FragmentShader::execute(fsInput& in, fsOutput& out)
 {
 	GLSP_UNREFERENCED_PARAM(in);
@@ -445,3 +450,5 @@ int ProgramMachine::GetAttribLocation(GLContext *gc, unsigned program, const cha
 
 	return pProg->getVS()->GetInRegLocation(name);
 }
+
+NS_CLOSE_GLSP_OGL()

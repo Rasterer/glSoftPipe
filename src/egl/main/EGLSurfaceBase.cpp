@@ -3,7 +3,7 @@
 NS_OPEN_GLSP_EGL()
 
 EGLSurfaceBase::EGLSurfaceBase(EGLDisplayBase &dpy, EGLenum type):
-	EGLResourceBase(dpy, EGL_SURFACE_TYPE),
+	EGLResourceBase(dpy, KEGL_SURFACE_TYPE),
 	mType(type)
 {
 }

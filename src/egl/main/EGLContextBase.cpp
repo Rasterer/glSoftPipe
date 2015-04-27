@@ -3,9 +3,9 @@
 NS_OPEN_GLSP_EGL()
 
 EGLContextBase::EGLContextBase(EGLDisplayBase &dpy):
-	EGLResourceBase(dpy, EGL_CONTEXT_TYPE),
+	EGLResourceBase(dpy, KEGL_CONTEXT_TYPE),
 	mClientGC(NULL),
-	mSurfaceWrite(NULL),
+	mSurfaceDraw(NULL),
 	mSurfaceRead(NULL)
 {
 }
@@ -37,7 +37,7 @@ EGLContextBase::~EGLContextBase()
 		switch(mClientAPI)
 		{
 			case EGL_OPENGL_API:
-				glDestroyContext(mClientGC);
+				getDisplay().getEGLBridge()->destroyGC(mClientGC);
 				break;
 
 			default:

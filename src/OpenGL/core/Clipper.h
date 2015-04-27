@@ -4,6 +4,8 @@
 #include "PipeStage.h"
 #include "DataFlow.h"
 
+NS_OPEN_GLSP_OGL()
+
 class Batch;
 class vertex_data;
 
@@ -11,6 +13,8 @@ class Clipper: public PipeStage
 {
 public:
 	Clipper();
+	virtual ~Clipper() { }
+
 	virtual void emit(void *data);
 	virtual void finalize();
 	void vertexLerp(vsOutput &new_vert,
@@ -26,3 +30,5 @@ private:
 	// TODO: Add support for used defined clip planes
 	glm::vec4 mPlanes[6];
 };
+
+NS_CLOSE_GLSP_OGL()

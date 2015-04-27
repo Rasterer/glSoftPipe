@@ -3,8 +3,10 @@
 #include <xcb/xcb.h>
 
 #include "EGLContextBase.h"
+#include "common/glsp_defs.h"
 
-namespace glsp {
+
+NS_OPEN_GLSP_EGL()
 
 class EGLDisplayBase;
 
@@ -13,6 +15,8 @@ class EGLContextX11: public EGLContextBase
 public:
 	EGLContextX11(EGLDisplayBase &dpy);
 	virtual ~EGLContextX11() { }
+
+public:
 };
 
-} //namespace glsp
+NS_CLOSE_GLSP_EGL()

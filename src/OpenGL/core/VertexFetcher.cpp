@@ -1,11 +1,15 @@
 #include "VertexFetcher.h"
+
+#include <cstring>
 #include <iostream>
-#include "khronos/glcorearb.h"
 #include "DataFlow.h"
 #include "GLContext.h"
 #include "DrawEngine.h"
 #include "VertexArrayObject.h"
-#include "glsp_defs.h"
+#include "common/glsp_defs.h"
+#include "khronos/GL/glcorearb.h"
+
+NS_OPEN_GLSP_OGL()
 
 using glm::vec4;
 
@@ -21,7 +25,6 @@ VertexCachedFetcher::VertexCachedFetcher():
 
 void VertexCachedFetcher::emit(void *data)
 {
-	std::cout << "jzb: VertexCachedAssembler 0" << endl;
 	DrawContext *dc = static_cast<DrawContext *>(data);
 
 	fetchVertex(dc);
@@ -38,9 +41,9 @@ void VertexCachedFetcher::fetchVertex(DrawContext *dc)
 	BufferObject *pIBO = gc->mBOM.getBoundBuffer(GL_ELEMENT_ARRAY_BUFFER);
 	Batch * bat = NULL;
 
-	std::cout << "jzb: VertexCachedAssembler begin" << endl;
-
-	assert(dc->mIndexSize == sizeof(unsigned int));
+	if(dc->mDrawType == DrawContext::kElementDraw)
+		// TODO: add other index type support
+		assert(dc->mIndexSize == sizeof(unsigned int));
 
 	if(pIBO)
 		iBuf = (unsigned int *)((char *)pIBO->mAddr + (ptrdiff_t)iBuf);
@@ -48,7 +51,14 @@ void VertexCachedFetcher::fetchVertex(DrawContext *dc)
 	// OPT: Too many copies 
 	for(int i = 0; i < dc->mCount; i++)
 	{
-		unsigned int idx = iBuf[dc->mFirst + i];
+		unsigned int idx;
+
+		if(dc->mDrawType == DrawContext::kElementDraw)
+			idx = iBuf[dc->mFirst + i];
+		else if(dc->mDrawType == DrawContext::kArrayDraw)
+			idx = i;
+		else
+			assert(false);
 
 		if(!bat)
 		{
@@ -91,7 +101,7 @@ void VertexCachedFetcher::fetchVertex(DrawContext *dc)
 						src = reinterpret_cast<char *>(vas.mOffset);
 						src = src + stride * idx;
 					}
-					memcpy(&attrib, src, vas.mAttribSize);
+					std::memcpy(&attrib, src, vas.mAttribSize);
 				}
 				else // TODO: Impl accessing non-enabled attributes
 				{
@@ -112,7 +122,6 @@ void VertexCachedFetcher::fetchVertex(DrawContext *dc)
 			bat = NULL;
 		}
 	}
-	std::cout << "jzb: VertexCachedAssembler end" << endl;
 
 	if(bat)
 	{
@@ -123,3 +132,5 @@ void VertexCachedFetcher::fetchVertex(DrawContext *dc)
 void VertexCachedFetcher::finalize()
 {
 }
+
+NS_CLOSE_GLSP_OGL()

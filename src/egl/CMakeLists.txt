@@ -3,12 +3,59 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 SET(EGLMAIN_SRC
 	main/eglApi.cpp
 	main/EGLGlobal.cpp
+	main/EGLDisplayBase.cpp
+	main/EGLContextBase.cpp
+	main/EGLSurfaceBase.cpp
+	main/EGLConfigBase.cpp
+)
+
+SET(EGLX11_SRC
+	ws/x11/EGLDisplayX11.cpp
+	ws/x11/EGLContextX11.cpp
+	ws/x11/EGLSurfaceX11.cpp
 )
 
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
 
-ADD_LIBRARY(glsp SHARED ${PIPELINE_SRC})
+ADD_LIBRARY(glsp_egl SHARED ${EGLMAIN_SRC} ${EGLX11_SRC})
+ADD_DEPENDENCIES(glsp_egl glsp_ogl)
 
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/egl/main)
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/egl/ws/x11)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/include)
 
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DPRIMITIVE_OWNS_VERTICES")
+# drm
+FIND_PACKAGE(DRM)
+IF(DRM_FOUND)
+	MESSAGE(STATUS      "Looking for drm - found")
+ELSE(DRM_FOUND)
+	MESSAGE(FETAL_ERROR "Looking for drm - not found")
+ENDIF(DRM_FOUND)
+
+# drm intel
+FIND_PACKAGE(DRMIntel)
+IF(DRM_INTEL_FOUND)
+	MESSAGE(STATUS      "Looking for drm_intel - found")
+ELSE(DRM_INTEL_FOUND)
+	MESSAGE(FETAL_ERROR "Looking for drm_intel - not found")
+ENDIF(DRM_INTEL_FOUND)
+
+# XCB
+FIND_PACKAGE(XCB)
+IF(XCB_FOUND)
+	MESSAGE(STATUS "Looking for XCB - found")
+ELSE(XCB_FOUND)
+	MESSAGE(STATUS "Looking for XCB - not found")
+ENDIF(XCB_FOUND)
+
+INCLUDE_DIRECTORIES(${DRM_INCLUDE_PATH}
+					${DRM_INTEL_INCLUDE_PATH}
+					${XCB_INCLUDE_PATH}
+					${XLIB_XCB_INCLUDE_PATH})
+
+TARGET_LINK_LIBRARIES(glsp_egl
+					  ${DRM_LIBRARY}
+					  ${DRM_INTEL_LIBRARY}
+					  ${XCB_LIBRARY}
+					  ${XLIB_XCB_LIBRARY}
+					  ${XCB_DRI2_LIBRARY})

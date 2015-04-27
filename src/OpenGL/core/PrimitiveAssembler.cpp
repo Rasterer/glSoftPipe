@@ -2,7 +2,8 @@
 #include "DataFlow.h"
 #include "DrawEngine.h"
 
-#include "iostream" //jzb
+
+NS_OPEN_GLSP_OGL()
 
 PrimitiveAssembler::PrimitiveAssembler():
 	PipeStage("Primitive Assembly", DrawEngine::getDrawEngine())
@@ -13,13 +14,10 @@ PrimitiveAssembler::PrimitiveAssembler():
 void PrimitiveAssembler::emit(void *data)
 {
 	Batch *bat = static_cast<Batch *>(data);
-	std::cout << "jzb: PA emit begin" << std::endl;
 
 	assemble(bat);
 
 	// TODO: free Batch.mIndex memory?
-	std::cout << "jzb: PA emit end" << std::endl;
-	
 	getNextStage()->emit(bat);
 }
 
@@ -58,3 +56,5 @@ void PrimitiveAssembler::assemble(Batch *bat)
 void PrimitiveAssembler::finalize()
 {
 }
+
+NS_CLOSE_GLSP_OGL()

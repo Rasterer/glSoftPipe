@@ -3,7 +3,8 @@
 #include "DrawEngine.h"
 #include "utils.h"
 
-#include "iostream" //jzb
+
+NS_OPEN_GLSP_OGL()
 
 using namespace std;
 using namespace glm;
@@ -32,7 +33,6 @@ void Clipper::emit(void *data)
 // TODO: guard-band clipping
 void Clipper::clipping(Batch *bat)
 {
-	std::cout << "jzb: clipper emit begin" << std::endl;
 	PrimBatch out;
 	PrimBatch &in = bat->mPrims;
 #if PRIMITIVE_OWNS_VERTICES
@@ -41,7 +41,6 @@ void Clipper::clipping(Batch *bat)
 	unordered_set<vsOutput *> need_free;
 #endif
 
-	std::cout << "jzb: clipper in size " << in.size() << std::endl;
 	for(PrimBatch::iterator it = in.begin(); it != in.end(); it++)
 	{
 		// Two round robin intermediate boxes
@@ -69,7 +68,6 @@ void Clipper::clipping(Batch *bat)
 
 			vertNum[dst] = 0;
 
-			//std::cout << "jzb: clip0: vertnum " << vertNum[src] << std::endl;
 			for(int j = 0; j < vertNum[src]; j++)
 			{
 				int k = (j + 1) % vertNum[src];
@@ -120,7 +118,6 @@ void Clipper::clipping(Batch *bat)
 
 		assert(vertNum[src] >= 3 && vertNum[src] <= 6);
 		
-		//std::cout << "jzb: clip1: vertnum " << vertNum[src] << std::endl;
 		// Triangulation
 		for(int i = 1; i < vertNum[src] - 1; i++)
 		{
@@ -170,3 +167,5 @@ void Clipper::vertexLerp(vsOutput &new_vert,
 void Clipper::finalize()
 {
 }
+
+NS_CLOSE_GLSP_OGL()

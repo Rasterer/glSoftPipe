@@ -1,16 +1,19 @@
 #pragma once
 
-#include <iostream> //jzb
-#include <typeinfo>
-#include <string>
-#include <cstring>
-#include <vector>
 #include <map>
+#include <string>
+#include <typeinfo>
+#include <vector>
+
 #include <glm/glm.hpp>
-#include "glsp_defs.h"
+
+#include "common/glsp_defs.h"
 #include "NameSpace.h"
 #include "PipeStage.h"
 #include "DataFlow.h"
+
+
+NS_OPEN_GLSP_OGL()
 
 class GLContext;
 class Uniform;
@@ -18,9 +21,9 @@ class Shader;
 class VertexInfo;
 
 typedef std::vector<Uniform> uniform_v;
-typedef std::map<string, int> UniformMap;
+typedef std::map<std::string, int> UniformMap;
 typedef std::vector<VertexInfo> var_v;
-typedef std::map<string, int> VarMap;
+typedef std::map<std::string, int> VarMap;
 
 // APP should use these two macros to define its own variables(name and type)
 // for vertex shader varying: To make life easy, glPosition should come first!
@@ -46,9 +49,12 @@ typedef std::map<string, int> VarMap;
 class ShaderFactory
 {
 public:
+	ShaderFactory() { }
 	virtual ~ShaderFactory() {};
+
 	virtual Shader *createVertexShader() = 0;
 	virtual void DeleteVertexShader(Shader *pVS) = 0;
+
 	virtual Shader *createFragmentShader() = 0;
 	virtual void DeleteFragmentShader(Shader *pFS) = 0;
 };
@@ -65,9 +71,9 @@ public:
 	};
 
 	Shader();
+	virtual ~Shader() { }
 
 	virtual void compile() = 0;
-	virtual ~Shader() {}
 
 	static ShaderType OGLShaderTypeToInternal(unsigned type);
 
@@ -81,15 +87,15 @@ public:
 	const char **getSource() const { return mSource; }
 
 	template <class T>
-	void declareUniform(const string &name, T *constant);
+	void declareUniform(const std::string &name, T *constant);
 
-	void declareInput(const string &name, const type_info &type);
-	int resolveInput(const string &name, const type_info &type);
-	void declareOutput(const string &name, const type_info &type);
-	int resolveOutput(const string &name, const type_info &type);
+	void declareInput(const std::string &name, const std::type_info &type);
+	int resolveInput(const std::string &name, const std::type_info &type);
+	void declareOutput(const std::string &name, const std::type_info &type);
+	int resolveOutput(const std::string &name, const std::type_info &type);
 
-	int GetInRegLocation(const string &name);
-	size_t getInRegsNum() const { return mInRegs.size(); }
+	int GetInRegLocation(const std::string &name);
+	size_t getInRegsNum()  const { return mInRegs.size(); }
 	size_t getOutRegsNum() const { return mOutRegs.size(); }
 
 private:
@@ -105,7 +111,7 @@ private:
 };
 
 template <class T>
-void Shader::declareUniform(const string &name, T *constant)
+void Shader::declareUniform(const std::string &name, T *constant)
 {
 	mUniformBlock.push_back(Uniform(constant, name));
 }
@@ -113,27 +119,29 @@ void Shader::declareUniform(const string &name, T *constant)
 // Per vertex variable: attribute or varying
 struct VertexInfo
 {
-	VertexInfo(const string &name, const type_info &type);
+	VertexInfo(const std::string &name, const std::type_info &type);
+	~VertexInfo() { }
 
-	const string mName;
-	const type_info &mType;
+	const std::string mName;
+	const std::type_info &mType;
 };
 
 struct Uniform
 {
 	template <class T>
-	Uniform(T *val, const string &name);
+	Uniform(T *val, const std::string &name);
+	~Uniform() { }
 
 	template <class T>
 	void setVal(const T *val);
 
 	void *mPtr;
-	const string mName;
-	const type_info &mType;
+	const std::string mName;
+	const std::type_info &mType;
 };
 
 template <class T>
-Uniform::Uniform(T *val, const string &name):
+Uniform::Uniform(T *val, const std::string &name):
 	mPtr(static_cast<void *>(val)),
 	mName(name),
 	mType(typeid(T))
@@ -154,6 +162,7 @@ class VertexShader: public Shader,
 {
 public:
 	VertexShader();
+	virtual ~VertexShader() { }
 
 	virtual void emit(void *data);
 	virtual void finalize();
@@ -167,12 +176,12 @@ protected:
 private:
 };
 
-// TODO: rework
 class FragmentShader: public Shader,
 					  public PipeStage
 {
 public:
 	FragmentShader();
+	virtual ~FragmentShader() { }
 
 	virtual void emit(void *data);
 	virtual void finalize();
@@ -187,13 +196,14 @@ class Program: public NameItem
 {
 public:
 	Program();
+	virtual ~Program() { }
 
 	VertexShader *getVS() const { return mVertexShader; }
 	FragmentShader *getFS() const { return mFragmentShader; }
 
 	void AttachShader(Shader *pShader);
 	void LinkProgram();
-	int GetUniformLocation(const string &name);
+	int  GetUniformLocation(const std::string &name);
 
 	template <class T>
 	void UniformValue(int location, int count, bool transpose, const T *value);
@@ -224,17 +234,22 @@ class ProgramMachine
 {
 public:
 	ProgramMachine();
+	~ProgramMachine() { }
+
 	unsigned CreateShader(GLContext *gc, unsigned type);
 	void DeleteShader(GLContext *gc, unsigned shader);
+
 	unsigned CreateProgram(GLContext *gc);
 	void DeleteProgram(GLContext *gc, unsigned program);
+
 	void ShaderSource(GLContext *gc, unsigned shader, int count, const char *const*string, const int *length);
 	void CompileShader(GLContext *gc, unsigned shader);
 	void AttachShader(GLContext *gc, unsigned program, unsigned shader);
 	void LinkProgram(GLContext *gc, unsigned program);
 	void UseProgram(GLContext *gc, unsigned program);
-	int  GetUniformLocation(GLContext *gc, unsigned program, const char *name);
-	int  GetAttribLocation(GLContext *gc, unsigned program, const char *name);
+
+	int GetUniformLocation(GLContext *gc, unsigned program, const char *name);
+	int GetAttribLocation(GLContext *gc, unsigned program, const char *name);
 
 	template <class T>
 	void UniformValue(GLContext *gc, int location, int count, bool transpose, const T *value);
@@ -262,3 +277,5 @@ void ProgramMachine::UniformValue(GLContext *gc, int location, int count, bool t
 
 	pProg->UniformValue(location, count, transpose, value);
 }
+
+NS_CLOSE_GLSP_OGL()

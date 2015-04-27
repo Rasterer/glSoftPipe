@@ -5,7 +5,8 @@
 #include <list>
 #include <unordered_map>
 
-#include <iostream> //jzb
+
+NS_OPEN_GLSP_OGL()
 
 typedef std::vector<glm::vec4> RegArray;
 
@@ -110,3 +111,5 @@ struct Batch
 	// point back to the mDC
 	DrawContext	   *mDC;
 };
+
+NS_CLOSE_GLSP_OGL()

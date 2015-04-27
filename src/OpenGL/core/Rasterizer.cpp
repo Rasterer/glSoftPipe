@@ -1,8 +1,10 @@
 #include "Rasterizer.h"
 #include "DrawEngine.h"
+#include "GLContext.h"
 #include "utils.h"
 
-#include "iostream" //jzb
+
+NS_OPEN_GLSP_OGL()
 
 Rasterizer::Rasterizer():
 	PipeStage("Rasterizing", DrawEngine::getDrawEngine())
@@ -11,7 +13,6 @@ Rasterizer::Rasterizer():
 
 void Rasterizer::emit(void *data)
 {
-	std::cout << "jzb: Rasterizer emit begin" << std::endl;
 	Batch *bat = static_cast<Batch *>(data);
 
 	rasterizing(bat);
@@ -41,7 +42,6 @@ vec3 ScanlineRasterizer::triangle::calculateBC(float xp, float yp)
 	const vec4& v1 = mPrim->mVert[1].position();
 	const vec4& v2 = mPrim->mVert[2].position();
 
-	//cout << "jzb: calculateBC a0 " << ((v1.x - xp) * (v2.y - yp) - (v1.y - yp) * (v2.x - xp)) << endl;
 	float a0 = ((v1.x - xp) * (v2.y - yp) - (v1.y - yp) * (v2.x - xp)) * mPrim->mAreaReciprocal;
 	float a1 = ((v2.x - xp) * (v0.y - yp) - (v2.y - yp) * (v0.x - xp)) * mPrim->mAreaReciprocal;
 
@@ -92,9 +92,9 @@ ScanlineRasterizer::edge* ScanlineRasterizer::triangle::getAdjcentEdge(edge *pEd
 
 ScanlineRasterizer::SRHelper * ScanlineRasterizer::createGET(Batch *bat)
 {
-	DrawContext *dc = bat->mDC;
+	GLContext *gc = bat->mDC->gc;
 	PrimBatch &pb = bat->mPrims;
-	int mYmin = dc->mRT.height;
+	int mYmin = gc->mRT.height;
 	int mYmax = 0;
 
 	SRHelper *hlp = new SRHelper();
@@ -248,7 +248,7 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 {
 	ActiveEdgeTable &aet = hlp->mAET;
 	vector<span> vSpans;
-	const RenderTarget& rt = bat->mDC->mRT;
+	const RenderTarget& rt = bat->mDC->gc->mRT;
 	char *colorBuffer = (char *)rt.pColorBuffer;
 	Rasterizer::fs_in_out &fsio = hlp->mFsio;
 	
@@ -273,7 +273,6 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 
 	for(vector<span>::iterator it = vSpans.begin(); it < vSpans.end(); it++)
 	{
-		std::cout << "jzb: span " << it->xleft << " " << it->xright << std::endl;
 		// top-left filling convention
 		for(int x = ceil(it->xleft - 0.5f); x < ceil(it->xright - 0.5f); x++)
 		{
@@ -310,11 +309,6 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 			}
 			else
 			{
-				std::cout << "jzb: depth " << x << " " << y << std::endl;
-				std::cout << "jzb: depth " << depth << " " << rt.pDepthBuffer[index] << std::endl;
-				std::cout << "jzb: bc x " << bc.x << std::endl;
-				std::cout << "jzb: bc y " << bc.y << std::endl;
-				std::cout << "jzb: bc z " << bc.z << std::endl;
 			}
 		}
 	}
@@ -387,3 +381,5 @@ void ScanlineRasterizer::finalize()
 void Rasterizer::finalize()
 {
 }
+
+NS_CLOSE_GLSP_OGL()

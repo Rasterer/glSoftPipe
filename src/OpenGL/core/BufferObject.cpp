@@ -1,11 +1,13 @@
-#include <iostream>
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
-#include "khronos/glcorearb.h"
-#include "glsp_defs.h"
+#include <iostream>
+
+#include "khronos/GL/glcorearb.h"
+#include "common/glsp_defs.h"
 #include "BufferObject.h"
 #include "GLContext.h"
+
 
 using namespace std;
 
@@ -32,6 +34,8 @@ GLAPI void APIENTRY glBufferData (GLenum target, GLsizeiptr size, const void *da
 	__GET_CONTEXT();
 	gc->mBOM.BufferData(gc, target, size, data, usage);
 }
+
+NS_OPEN_GLSP_OGL()
 
 BufferObject::BufferObject():
 	mSize(0),
@@ -178,3 +182,5 @@ int BufferObjectMachine::TargetToIndex(GLenum target)
 
 	return -1;
 }
+
+NS_CLOSE_GLSP_OGL()

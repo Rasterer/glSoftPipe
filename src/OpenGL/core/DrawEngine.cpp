@@ -1,16 +1,15 @@
 #include "DrawEngine.h"
 
-#include "khronos/glcorearb.h"
+#include "khronos/GL/glcorearb.h"
 #include "GLContext.h"
 #include "VertexFetcher.h"
 #include "Rasterizer.h"
-#include "iostream" //jzb
 
-extern int OffscreenFileGen(const size_t width, const size_t height, const std::string &map, const void *pixels);
+#include <iostream> //jzb
+using namespace std;//jzb
 
-NS_OPEN_GLSP_OGL()
-
-using namespace std; //jzb
+using glsp::ogl::DrawEngine;
+using glsp::ogl::DrawContext;
 
 GLAPI void APIENTRY glDrawArrays (GLenum mode, GLint first, GLsizei count)
 {
@@ -41,8 +40,6 @@ GLAPI void APIENTRY glDrawElements (GLenum mode, GLsizei count, GLenum type, con
 
 	DrawEngine *de = &DrawEngine::getDrawEngine();
 
-	de->init(); //jzb
-
 	DrawContext *dc = new DrawContext();
 
 	dc->gc = gc;
@@ -54,24 +51,42 @@ GLAPI void APIENTRY glDrawElements (GLenum mode, GLsizei count, GLenum type, con
 	dc->mIndexSize = (type == GL_UNSIGNED_INT)? 4: ((type == GL_UNSIGNED_SHORT)? 2: 1);
 	dc->mIndices = indices;
 
-	cout << "jzb: glDrawElements: 0" << endl;
 	if(!de->validateState(dc))
 		return;
 
-	cout << "jzb: glDrawElements: 1" << endl;
 	de->prepareToDraw(dc);
-	cout << "jzb: glDrawElements: 2" << endl;
 	de->emit(dc);
-
-	de->SwapBuffers(dc);
-	cout << "jzb: glDrawElements: 3" << endl;
 }
 
-DrawEngine::DrawEngine():
-	mVertexFetcher(new VertexCachedFetcher()),
-	mRast(new ScanlineRasterizer()),
-	mFirstStage(NULL)
+NS_OPEN_GLSP_OGL()
+
+namespace {
+
+bool swapBuffers()
 {
+	return DrawEngine::getDrawEngine().SwapBuffers();
+}
+
+} //namespace
+
+DrawEngine::DrawEngine():
+	mFirstStage(NULL),
+	mpEGLDisplay(NULL),
+	mpBridge(NULL)
+{
+}
+
+DrawEngine::~DrawEngine()
+{
+	deinitTLS();
+
+	delete mVertexFetcher;
+	delete mPrimAsbl;
+	delete mClipper;
+	delete mDivider;
+	delete mMapper;
+	delete mCuller;
+	delete mRast;
 }
 
 // TODO(done): connect all the pipeline stages
@@ -81,20 +96,50 @@ void DrawEngine::init(void *dpy, IEGLBridge *bridge)
 	mpEGLDisplay = dpy;
 
 	assert(bridge->getBuffers);
-	bridge->createGC = glsp::ogl::CreateContext;
+
+	bridge->createGC    = CreateContext;
+	bridge->destroyGC   = DestroyContext;
+	bridge->makeCurrent = setCurrentContext;
+	bridge->swapBuffers = swapBuffers;
+
+	initTLS();
 
 	mpBridge = bridge;
 
+	initPipeline();
+
+}
+
+void DrawEngine::initPipeline()
+{
+	mVertexFetcher = new VertexCachedFetcher();
+	mPrimAsbl      = new PrimitiveAssembler();
+	mClipper       = new Clipper();
+	mDivider       = new PerspectiveDivider();
+	mMapper        = new ScreenMapper();
+	mCuller        = new FaceCuller();
+	mRast          = new ScanlineRasterizer();
+
+	assert(mVertexFetcher &&
+		   mPrimAsbl      &&
+		   mClipper       &&
+		   mDivider       &&
+		   mMapper        &&
+		   mCuller        &&
+		   mRast
+		   );
 
 	setFirstStage(mVertexFetcher);
 
-	mPrimAsbl.setNextStage(&mClipper);
-	mClipper.setNextStage(&mDivider);
-	mDivider.setNextStage(&mMapper);
-	mMapper.setNextStage(&mCuller);
-	mCuller.setNextStage(mRast);
+
+	mPrimAsbl->setNextStage(mClipper);
+	mClipper ->setNextStage(mDivider);
+	mDivider ->setNextStage(mMapper);
+	mMapper  ->setNextStage(mCuller);
+	mCuller  ->setNextStage(mRast);
 }
 
+// OPT: use dirty flag to optimize
 bool DrawEngine::validateState(DrawContext *dc)
 {
 	// TODO: some validation work
@@ -102,7 +147,6 @@ bool DrawEngine::validateState(DrawContext *dc)
 	VertexArrayObject *pVAO = gc->mVAOM.getActiveVAO();
 	BufferObject *pElementBO = gc->mBOM.getBoundBuffer(GL_ELEMENT_ARRAY_BUFFER);
 
-	// TODO: auto indices
 	for(size_t i = 0; i < MAX_VERTEX_ATTRIBS; ++i)
 	{
 		if(pVAO->mAttribEnables & (1 << i))
@@ -121,39 +165,42 @@ bool DrawEngine::validateState(DrawContext *dc)
 	}
 
 	// link the shaders to the pipeline
-	VertexShader *pVS = gc->mPM.getCurrentProgram()->getVS();
+	VertexShader *pVS   = gc->mPM.getCurrentProgram()->getVS();
 	FragmentShader *pFS = gc->mPM.getCurrentProgram()->getFS();
 
 	mVertexFetcher->setNextStage(pVS);
-	pVS->setNextStage(&mPrimAsbl);
+	pVS->setNextStage(mPrimAsbl);
 	mRast->setNextStage(pFS);
-
-	// TODO: use real view port state
-	mMapper.setViewPort(0, 0, 1280, 720);
 
 	return true;
 }
 
-void DrawEngine::beginFrame(DrawContext *dc)
+void DrawEngine::beginFrame(GLContext *gc)
 {
 	// TODO: use info from GLContext(fbo or egl surface)
-	dc->mRT.width = 1280;
-	dc->mRT.height = 720;
-	dc->mRT.pColorBuffer = malloc(dc->mRT.width * dc->mRT.height * 4);
-	dc->mRT.pDepthBuffer = (float *)malloc(dc->mRT.width * dc->mRT.height * sizeof(float));
-	dc->mRT.pStencilBuffer = NULL;
-
-	for(int i = 0; i < dc->mRT.width * dc->mRT.height * 4; i += 4)
+	if(!mpBridge->getBuffers(gc->mpEGLContext,
+						 &gc->mRT.pColorBuffer,
+						 &gc->mRT.width,
+						 &gc->mRT.height))
 	{
-		*((unsigned char *)dc->mRT.pColorBuffer + i) = 0;
-		*((unsigned char *)dc->mRT.pColorBuffer + i + 1) = 0;
-		*((unsigned char *)dc->mRT.pColorBuffer + i + 2) = 0;
-		*((unsigned char *)dc->mRT.pColorBuffer + i + 3) = 255;
+		return;
 	}
 
-	for(int i = 0; i < dc->mRT.width * dc->mRT.height; i++)
+	gc->mRT.pDepthBuffer = (float *)malloc(gc->mRT.width * gc->mRT.height * sizeof(float));
+	gc->mRT.pStencilBuffer = NULL;
+
+	// TODO: move to glClear()
+	for(int i = 0; i < gc->mRT.width * gc->mRT.height * 4; i += 4)
 	{
-		*(dc->mRT.pDepthBuffer + i) = 1.0f;
+		*((unsigned char *)gc->mRT.pColorBuffer + i) = 0;
+		*((unsigned char *)gc->mRT.pColorBuffer + i + 1) = 0;
+		*((unsigned char *)gc->mRT.pColorBuffer + i + 2) = 0;
+		*((unsigned char *)gc->mRT.pColorBuffer + i + 3) = 255;
+	}
+
+	for(int i = 0; i < gc->mRT.width * gc->mRT.height; i++)
+	{
+		*(gc->mRT.pDepthBuffer + i) = 1.0f;
 	}
 }
 
@@ -163,29 +210,62 @@ void DrawEngine::prepareToDraw(DrawContext *dc)
 
 	if(!gc->mbInFrame)
 	{
-		beginFrame(dc);
+		beginFrame(gc);
+	}
+
+	// TODO(done): use real view port state
+	if(!(gc->mEmitFlag & EMIT_FLAG_VIEWPORT))
+	{
+		cout << "jzb: non EMIT_FLAG_VIEWPORT" << endl;
+		mMapper->setViewPort(0, 0,
+							 gc->mRT.width,
+							 gc->mRT.height);
+	}
+	else
+	{
+		// FIXME: how to draw if viewport exceed the buffer boundary
+		int w = gc->mState.mViewport.width;
+		int h = gc->mState.mViewport.height;
+
+		if((gc->mState.mViewport.x + gc->mState.mViewport.width) >
+			gc->mRT.width)
+			w = gc->mRT.width - gc->mState.mViewport.x;
+
+		if((gc->mState.mViewport.y + gc->mState.mViewport.height) >
+			gc->mRT.height)
+			h = gc->mRT.height - gc->mState.mViewport.y;
+
+
+		mMapper->setViewPort(gc->mState.mViewport.x,
+							 gc->mState.mViewport.y,
+							 w, h);
 	}
 }
 
 void DrawEngine::emit(DrawContext *dc)
 {
-	cout << "jzb: emit: 0" << endl;
 	getFirstStage()->emit(dc);
-	cout << "jzb: emit: 1" << endl;
 }
 
-void DrawEngine::SwapBuffers(DrawContext *dc)
+bool DrawEngine::SwapBuffers()
 {
-	OffscreenFileGen(1280, 720, "RGBA", dc->mRT.pColorBuffer);
+	__GET_CONTEXT();
 
-	free(dc->mRT.pColorBuffer);
-	free(dc->mRT.pDepthBuffer);
-	dc->mRT.pColorBuffer = NULL;
-	dc->mRT.pDepthBuffer = NULL;
-	dc->mRT.pStencilBuffer = NULL;
+	gc->mbInFrame = false;
+
+	free(gc->mRT.pDepthBuffer);
+	gc->mRT.pColorBuffer = NULL;
+	gc->mRT.pDepthBuffer = NULL;
+	gc->mRT.pStencilBuffer = NULL;
+
+	return true;
 }
 
-DrawEngine DrawEngine::DE;
+
+NS_CLOSE_GLSP_OGL()
+
+
+namespace glsp {
 
 bool iglCreateScreen(void *dpy, IEGLBridge *bridge)
 {
@@ -196,4 +276,4 @@ bool iglCreateScreen(void *dpy, IEGLBridge *bridge)
 	return true;
 }
 
-NS_CLOSE_GLSP_OGL()
+} //namespace glsp

@@ -1,89 +1,120 @@
-#include "khronos/egl.h"
-#include "core/GLContext.h"
-#include "core/DrawEngine.h"
+#include "khronos/EGL/egl.h"
+#include "EGLGlobal.h"
+#include "EGLDisplayBase.h"
+#include "EGLContextBase.h"
+#include "EGLSurfaceBase.h"
+#include "EGLConfigBase.h"
 
-namespace {
 
-pthread_key_t TLSKey;
-
-void initTLS()
-{
-	pthread_key_create(&TLSKey, NULL);
-}
-
-void deinitTLS()
-{
-	pthread_key_delete(TLSKey);
-}
-
-struct EGLGlobal
-{
-	EGLDisplayBase *disp[MAX_PLATFORM_NUM];
-} gEGLGlobal;
-
-} //namespace
+using glsp::egl::EGLGlobal;
+using glsp::egl::EGLDisplayBase;
+using glsp::egl::EGLContextBase;
+using glsp::egl::EGLSurfaceBase;
+using glsp::egl::EGLConfigBase;
 
 EGLAPI EGLDisplay EGLAPIENTRY eglGetDisplay (EGLNativeDisplayType display_id)
 {
-	return (EGLDisplay)0;
+	EGLDisplayBase *pDisp = EGLGlobal::getEGLGloabl().getDisplay(display_id);
+
+	return (EGLDisplay)pDisp;
 }
 
 EGLAPI EGLBoolean EGLAPIENTRY eglInitialize (EGLDisplay dpy, EGLint *major, EGLint *minor)
 {
-	GLSP_UNREFERENCED_PARAM(dpy);
+	EGLDisplayBase *pDisp = static_cast<EGLDisplayBase *>(dpy);
+	EGLGlobal      *pGlob = &EGLGlobal::getEGLGloabl();
 
-	initTLS();
+	if(pGlob->validateDisplay(pDisp))
+	{
+		bool ret = pDisp->initDisplay();
 
-	if(!major)
-		*major = 1;
+		pDisp->getEGLVersion(major, minor);
 
-	if(!minor)
-		*major = 5;
-
-	return EGL_TRUE;
+		return ret;
+	}
+	else
+	{
+		return false;
+	}
 }
 
 EGLAPI EGLContext EGLAPIENTRY eglCreateContext (EGLDisplay dpy, EGLConfig config, EGLContext share_context, const EGLint *attrib_list)
 {
-	// TODO: utilize this params
-	GLSP_UNREFERENCED_PARAM(dpy);
-	GLSP_UNREFERENCED_PARAM(config);
-	GLSP_UNREFERENCED_PARAM(share_context);
-	GLSP_UNREFERENCED_PARAM(attrib_list);
+	EGLDisplayBase *pDisp = static_cast<EGLDisplayBase *>(dpy);
+	EGLContextBase *pCtx  = static_cast<EGLContextBase *>(share_context);
+	EGLConfigBase  *pConf = static_cast<EGLConfigBase *>(config);
+	EGLGlobal      *pGlob = &EGLGlobal::getEGLGloabl();
 
-	return CreateContext();
+	if(!pGlob->validateDisplay(pDisp))
+	{
+		return (EGLContext)NULL;
+	}
+
+	EGLContextBase *ctx = pDisp->createContext(pConf, pCtx, attrib_list);
+
+	return (EGLContext)ctx;
 }
 
 EGLAPI EGLSurface EGLAPIENTRY eglCreateWindowSurface (EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list)
 {
+	EGLDisplayBase *pDisp = static_cast<EGLDisplayBase *>(dpy);
+	EGLConfigBase  *pConf = static_cast<EGLConfigBase *>(config);
+	EGLGlobal      *pGlob = &EGLGlobal::getEGLGloabl();
+
+	if(!pGlob->validateDisplay(pDisp))
+	{
+		return (EGLSurface)NULL;
+	}
+
+	EGLSurfaceBase *sur = pDisp->createWindowSurface(pConf, win, attrib_list);
+
+	return (EGLSurface)sur;
 }
 
 EGLAPI EGLBoolean EGLAPIENTRY eglMakeCurrent (EGLDisplay dpy, EGLSurface draw, EGLSurface read, EGLContext ctx)
 {
-	GLSP_UNREFERENCED_PARAM(dpy);
-	GLSP_UNREFERENCED_PARAM(draw);
-	GLSP_UNREFERENCED_PARAM(read);
+	EGLDisplayBase *pDisp = static_cast<EGLDisplayBase *>(dpy);
+	EGLSurfaceBase *pDraw = static_cast<EGLSurfaceBase *>(draw);
+	EGLSurfaceBase *pRead = static_cast<EGLSurfaceBase *>(read);
+	EGLContextBase *pCtx  = static_cast<EGLContextBase *>(ctx);
+	EGLGlobal      *pGlob = &EGLGlobal::getEGLGloabl();
 
-	MakeCurrent(static_cast<GLContext *>(ctx));
+	if(!pGlob->validateDisplay(pDisp))
+	{
+		return EGL_FALSE;
+	}
+
+	pDisp->bindContext(pCtx);
+	pCtx->bindSurface(pRead, pDraw);
 
 	return EGL_TRUE;
 }
 
 EGLAPI EGLBoolean EGLAPIENTRY eglSwapBuffers (EGLDisplay dpy, EGLSurface surface)
 {
-	GLSP_UNREFERENCED_PARAM(dpy);
-	GLSP_UNREFERENCED_PARAM(surface);
+	EGLDisplayBase *pDisp = static_cast<EGLDisplayBase *>(dpy);
+	EGLSurfaceBase *pSur  = static_cast<EGLSurfaceBase *>(surface);
+	EGLGlobal      *pGlob = &EGLGlobal::getEGLGloabl();
 
-	SwapBuffers();
+	if(!pGlob->validateDisplay(pDisp))
+	{
+		return EGL_FALSE;
+	}
 
-	return EGL_TRUE;
+	return pSur->swapBuffers();
 }
 
 EGLAPI EGLBoolean EGLAPIENTRY eglTerminate (EGLDisplay dpy)
 {
-	GLSP_UNREFERENCED_PARAM(dpy);
+	EGLDisplayBase *pDisp = static_cast<EGLDisplayBase *>(dpy);
+	EGLGlobal      *pGlob = &EGLGlobal::getEGLGloabl();
 
-	deinitTLS();
+	if(!pGlob->validateDisplay(pDisp))
+	{
+		return EGL_FALSE;
+	}
+
+	pGlob->cleanUp();
 
 	return EGL_TRUE;
 }

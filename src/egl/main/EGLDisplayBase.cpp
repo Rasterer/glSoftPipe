@@ -1,26 +1,32 @@
 #include "EGLDisplayBase.h"
 
+#include <algorithm>
+#include <cassert>
+
+#include "EGLContextBase.h"
+#include "EGLSurfaceBase.h"
+
+
+NS_OPEN_GLSP_EGL()
+
 // static routines
 namespace {
 
-bool __eglGetBuffers(void *EglCtx, BufferHandle *handle)
+bool __eglGetBuffers(void *EglCtx, void **addr, int *width, int *height)
 {
 	EGLContextBase *ctx  = static_cast<EGLContextBase *>(EglCtx);
 	EGLSurfaceBase *draw = ctx->getDrawSurface();
 
-	draw->getBuffers(handle);
+	return draw->getBuffers(addr, width, height);
 }
 
 } //namespace
 
 
-NS_OPEN_GLSP_EGL()
-
 EGLDisplayBase::EGLDisplayBase(void *nativeDpy, EGLenum platformType):
-	mNativeDisplay(nativeDpy),
-	mNativePlatform(platformType),
 	mCurrentContext(NULL),
-	mCurrentSurface(NULL)
+	mNativeDisplay(nativeDpy),
+	mNativePlatform(platformType)
 {
 }
 
@@ -29,14 +35,14 @@ bool EGLDisplayBase::initDisplay()
 	mMajorVersion = 1;
 	mMinorVersion = 5;
 
-	mBridge.createGC = __eglGetBuffers;
+	mBridge.getBuffers = __eglGetBuffers;
 
-	return glsp::ogl::iglCreateScreen(this, &mBridge);
+	return glsp::iglCreateScreen(this, &mBridge);
 }
 
 EGLDisplayBase::~EGLDisplayBase()
 {
-	for(ResourceType t = EGL_CONTEXT_TYPE; t < EGL_MAX_RESOURCE; t++)
+	for(int t = KEGL_CONTEXT_TYPE; t < KEGL_MAX_RESOURCE; t++)
 	{
 		for(EGLResourceList::iterator iter = mResourceList[t].begin();
 				iter != mResourceList[t].end();
@@ -45,8 +51,26 @@ EGLDisplayBase::~EGLDisplayBase()
 			delete *iter;
 		}
 
-		mResourceList[t].clear;
+		mResourceList[t].clear();
 	}
+}
+
+void EGLDisplayBase::bindContext(EGLContextBase *ctx)
+{
+	if(mCurrentContext != ctx)
+	{
+		mCurrentContext = ctx;
+		mBridge.makeCurrent(ctx->getClientGC());
+	}
+}
+
+void EGLDisplayBase::getEGLVersion(EGLint *major, EGLint *minor) const
+{
+	if(major)
+		*major = mMajorVersion;
+
+	if(minor)
+		*minor = mMinorVersion;
 }
 
 bool EGLDisplayBase::validateResource(EGLResourceBase *res)
@@ -56,9 +80,11 @@ bool EGLDisplayBase::validateResource(EGLResourceBase *res)
 
 	ResourceType type = res->getResourceType();
 
-	assert(type < EGL_MAX_RESOURCE);
+	assert(type < KEGL_MAX_RESOURCE);
 
-	EGLResourceList::iterator iter = mResourceList[type].find(res);
+	EGLResourceList::iterator iter = std::find(mResourceList[type].begin(),
+											   mResourceList[type].end(),
+											   res);
 
 	return (iter != mResourceList[type].end());
 }

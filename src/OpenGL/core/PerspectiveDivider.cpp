@@ -2,6 +2,8 @@
 #include "DataFlow.h"
 #include "DrawEngine.h"
 
+NS_OPEN_GLSP_OGL()
+
 using glm::vec4;
 PerspectiveDivider::PerspectiveDivider():
 	PipeStage("Perspective Dividing", DrawEngine::getDrawEngine())
@@ -39,3 +41,5 @@ void PerspectiveDivider::dividing(Batch *bat)
 void PerspectiveDivider::finalize()
 {
 }
+
+NS_CLOSE_GLSP_OGL()

@@ -3,6 +3,8 @@
 #include "Shader.h"
 #include "PipeStage.h"
 
+NS_OPEN_GLSP_OGL()
+
 class DrawContext;
 class GLContext;
 
@@ -13,7 +15,7 @@ class VertexFetcher: public PipeStage
 {
 public:
 	VertexFetcher();
-	~VertexFetcher() {}
+	virtual ~VertexFetcher() {}
 protected:
 	// Should be called from PipeStage's emit() method
 	virtual void fetchVertex(DrawContext *dc) = 0;
@@ -23,7 +25,7 @@ class VertexCachedFetcher: public VertexFetcher
 {
 public:
 	VertexCachedFetcher();
-	~VertexCachedFetcher() {}
+	virtual ~VertexCachedFetcher() { }
 
 	virtual void emit(void *data);
 	virtual void finalize();
@@ -31,3 +33,5 @@ public:
 protected:
 	virtual void fetchVertex(DrawContext *dc);
 };
+
+NS_CLOSE_GLSP_OGL()

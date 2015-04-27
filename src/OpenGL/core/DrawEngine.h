@@ -2,26 +2,21 @@
 
 #include <boost/serialization/singleton.hpp>
 
+#include "common/IEGLBridge.h"
 #include "PrimitiveAssembler.h"
 #include "Clipper.h"
 #include "FaceCuller.h"
 #include "PerspectiveDivider.h"
 #include "ScreenMapper.h"
 
+
+NS_OPEN_GLSP_OGL()
+
 using boost::serialization::singleton;
 
 class GLContext;
 class VertexFetcher;
 class Rasterizer;
-
-struct RenderTarget
-{
-	int width;
-	int height;
-	void  *pColorBuffer;
-	float *pDepthBuffer;
-	void  *pStencilBuffer;
-};
 
 struct DrawContext
 {
@@ -37,8 +32,6 @@ struct DrawContext
 	DrawType mDrawType;
 	const void *mIndices;
 	GLContext *gc;
-
-	RenderTarget mRT;
 };
 
 // DrawEngine is the abstraction of GPU pipeline, containing fixed function stages.
@@ -49,15 +42,19 @@ struct DrawContext
 class DrawEngine: public singleton<DrawEngine>
 {
 public:
-	void init();
+	void init(void *dpy, IEGLBridge *bridge);
 	bool validateState(DrawContext *dc);
 	void prepareToDraw(DrawContext *dc);
 	void emit(DrawContext *dc);
-	void SwapBuffers(DrawContext *dc);
+	bool SwapBuffers();
 	void finalize();
 
 	// accessors
-	static DrawEngine& getDrawEngine() { return get_mutable_instance(); }
+	static DrawEngine& getDrawEngine()
+	{
+		return get_mutable_instance();
+	}
+
 	PipeStage   *getFirstStage() const { return mFirstStage; }
 
 	// mutators
@@ -65,18 +62,20 @@ public:
 
 protected:
 	DrawEngine();
-	~DrawEngine() {}
-	void beginFrame(DrawContext *dc);
+	~DrawEngine();
+
+	void beginFrame(GLContext *dc);
+	void initPipeline();
 
 private:
 	// Use pointer member because there may be serveral impls of this components.
 	// And we may need to switch between those dynamically.
 	VertexFetcher*			mVertexFetcher;
-	PrimitiveAssembler		mPrimAsbl;
-	Clipper					mClipper;
-	PerspectiveDivider		mDivider;
-	ScreenMapper			mMapper;
-	FaceCuller				mCuller;
+	PrimitiveAssembler*		mPrimAsbl;
+	Clipper*				mClipper;
+	PerspectiveDivider*		mDivider;
+	ScreenMapper*			mMapper;
+	FaceCuller*				mCuller;
 	Rasterizer*				mRast;
 
 	// TODO(done): Use member pointer may limit the multi-thread use of DrawEngine.
@@ -84,6 +83,9 @@ private:
 	// DrawContext			   *mCtx;
 	PipeStage			   *mFirstStage;
 
-	// implicit singleton
-	static DrawEngine		DE;
+	// EGL related data member
+	void             *mpEGLDisplay;
+	glsp::IEGLBridge *mpBridge;
 };
+
+NS_CLOSE_GLSP_OGL()

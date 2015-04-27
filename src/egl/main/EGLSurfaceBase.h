@@ -10,11 +10,13 @@ public:
 	EGLSurfaceBase(EGLDisplayBase &dpy, EGLenum type);
 	virtual ~EGLSurfaceBase() { }
 
-	virtual bool initSurface() = 0;
+	virtual bool initSurface(EGLDisplayBase *dpy, EGLNativeWindowType win) = 0;
 
 	virtual bool swapBuffers() = 0;
 
-private:
+	virtual bool getBuffers(void **addr, int *width, int *height) = 0;
+
+protected:
 	const EGLenum mType;
 
 	EGLint mWidth;

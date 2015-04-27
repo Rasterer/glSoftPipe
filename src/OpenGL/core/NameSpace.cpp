@@ -1,5 +1,7 @@
-#include <string>
 #include "NameSpace.h"
+#include <string>
+
+NS_OPEN_GLSP_OGL()
 
 NameSpace::NameSpace()
 {
@@ -161,3 +163,5 @@ bool NameSpace::removeObject(NameItem *pNameItem)
 		return false;
 	}
 }
+
+NS_CLOSE_GLSP_OGL()

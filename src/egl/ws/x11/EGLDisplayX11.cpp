@@ -1,10 +1,16 @@
 #include "EGLDisplayX11.h"
 
-#include <X11/Xlib-xcb.h>
+#include <fcntl.h>
+#include <unistd.h>
 
-#include "glsp_defs.h"
+#include <X11/Xlib-xcb.h>
+#include <xcb/dri2.h>
+
 #include "EGLContextX11.h"
-#include "glsp_defs.h"
+#include "EGLSurfaceX11.h"
+#include "common/glsp_defs.h"
+#include "khronos/EGL/egl.h"
+
 
 NS_OPEN_GLSP_EGL()
 
@@ -12,7 +18,7 @@ EGLDisplayX11::EGLDisplayX11(void *nativeDpy, EGLenum platformType):
 	EGLDisplayBase(nativeDpy, platformType),
 	mXCBConn(NULL),
 	mXCBScreen(NULL),
-	mFd(-1),
+	mDrmFd(-1),
 	mDri2Major(0),
 	mDri2Minor(0)
 {
@@ -20,8 +26,11 @@ EGLDisplayX11::EGLDisplayX11(void *nativeDpy, EGLenum platformType):
 
 EGLDisplayX11::~EGLDisplayX11()
 {
-	if(mXConn)
-		xcb_disconnect(mXConn);
+	if(mDrmFd)
+		::close(mDrmFd);
+
+	if(mBufMgr)
+		::drm_intel_bufmgr_destroy(mBufMgr);
 }
 
 bool EGLDisplayX11::initDisplay()
@@ -32,7 +41,7 @@ bool EGLDisplayX11::initDisplay()
 	{
 		// The native display should be a Display opened through Xlib,
 		// which was passed in when eglGetDisplay().
-		Display *dpy = getNativeDisplay();
+		Display *dpy = static_cast<Display *>(getNativeDisplay());
 		xcb_connection_t *c = NULL;
 		
 		if(dpy)
@@ -43,19 +52,19 @@ bool EGLDisplayX11::initDisplay()
 		if(!c || ::xcb_connection_has_error(c))
 			goto err_out;
 
-		mXCBScreen = ::xcb_setup_roots_iterator(xcb_get_setup(mXCBConn)).data;
+		mXCBScreen = ::xcb_setup_roots_iterator(xcb_get_setup(c)).data;
 		mXCBConn   = c;
 	}
 
-	xcb_dri2_connect_cookie_t connect_cookie;
-	xcb_dri2_connect_reply_t *connect;
+	::xcb_dri2_connect_cookie_t connect_cookie;
+	::xcb_dri2_connect_reply_t *connect;
 	connect_cookie = ::xcb_dri2_connect_unchecked(mXCBConn,
 												mXCBScreen->root,
 												XCB_DRI2_DRIVER_TYPE_DRI);
 
-	xcb_dri2_query_version_cookie_t dri2_query_cookie;
-	xcb_dri2_query_version_reply_t *dri2_query;
-	xcb_generic_error_t *error;
+	::xcb_dri2_query_version_cookie_t dri2_query_cookie;
+	::xcb_dri2_query_version_reply_t *dri2_query;
+	::xcb_generic_error_t *error;
 	dri2_query_cookie = ::xcb_dri2_query_version(mXCBConn,
 											   XCB_DRI2_MAJOR_VERSION,
 											   XCB_DRI2_MINOR_VERSION);
@@ -83,19 +92,23 @@ bool EGLDisplayX11::initDisplay()
 	free(connect);
 
 	// use mDriverName & mDeviceName
-	mDrmFd = ::drmOpen("i915", O_RDWR);
+	//mDrmFd = ::drmOpen("i915", NULL);
+	mDrmFd = ::open(device_name, O_RDWR | O_CLOEXEC);
+
 
 	if(mDrmFd < 0)
 		goto err_fd;
 
-	drm_magic_t magic;
+	::drm_magic_t magic;
 	if (::drmGetMagic(mDrmFd, &magic))
 		goto err_fd;
 
-	xcb_dri2_authenticate_reply_t *authenticate;
-	xcb_dri2_authenticate_cookie_t authenticate_cookie;
+	::xcb_dri2_authenticate_reply_t *authenticate;
+	::xcb_dri2_authenticate_cookie_t authenticate_cookie;
 	authenticate_cookie =
-		::xcb_dri2_authenticate_unchecked(mXCBConn, mXCBScreen->root, id);
+		::xcb_dri2_authenticate_unchecked(mXCBConn, mXCBScreen->root, magic);
+	authenticate =
+		::xcb_dri2_authenticate_reply(mXCBConn, authenticate_cookie, NULL);
 
 	if(authenticate == NULL || !authenticate->authenticated)
 		goto err_fd;
@@ -133,6 +146,14 @@ EGLSurfaceBase* EGLDisplayX11::createWindowSurface(
 	// TODO: impl
 	GLSP_UNREFERENCED_PARAM(config);
 	GLSP_UNREFERENCED_PARAM(attrib_list);
+
+	EGLSurfaceBase *pSur = new EGLSurfaceX11(*this, EGL_WINDOW_BIT);
+
+	pSur->initSurface(this, win);
+
+	attachResource(pSur);
+
+	return pSur;
 }
 
 EGLContextBase* EGLDisplayX11::createContext(
@@ -149,6 +170,20 @@ EGLContextBase* EGLDisplayX11::createContext(
 	pCtx->initContext();
 
 	attachResource(pCtx);
+
+	return pCtx;
 }
+
+EGLBoolean EGLDisplayX11::makeCurrent(
+			EGLSurfaceBase *draw,
+			EGLSurfaceBase *read,
+			EGLContextBase *ctx)
+{
+	bindContext(ctx);
+	ctx->bindSurface(read, draw);
+
+	return EGL_TRUE;
+}
+
 
 NS_CLOSE_GLSP_EGL()

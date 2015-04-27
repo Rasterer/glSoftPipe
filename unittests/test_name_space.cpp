@@ -2,6 +2,7 @@
 #include "iostream"
 
 using namespace std;
+using namespace glsp::ogl;
 
 int main(void)
 {

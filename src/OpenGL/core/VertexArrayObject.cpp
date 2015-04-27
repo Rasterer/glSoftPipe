@@ -1,7 +1,9 @@
 #include "VertexArrayObject.h"
+
+#include "khronos/GL/glcorearb.h"
 #include "BufferObject.h"
 #include "GLContext.h"
-#include "khronos/glcorearb.h"
+
 
 GLAPI void APIENTRY glGenVertexArrays (GLsizei n, GLuint *arrays)
 {
@@ -50,6 +52,8 @@ GLAPI void APIENTRY glVertexAttribPointer (GLuint index, GLint size, GLenum type
 	__GET_CONTEXT();
 	gc->mVAOM.VertexAttribPointer(gc, index, size, type, normalized, stride, pointer);
 }
+
+NS_OPEN_GLSP_OGL()
 
 VertexAttribState::VertexAttribState():
 	mAttribSize(0),
@@ -182,3 +186,5 @@ void VAOMachine::VertexAttribPointer(
 	vas.mOffset = reinterpret_cast<unsigned long>(pointer);
 	vas.mBO = gc->mBOM.getBoundBuffer(GL_ARRAY_BUFFER);
 }
+
+NS_CLOSE_GLSP_OGL()

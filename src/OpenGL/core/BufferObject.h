@@ -1,6 +1,9 @@
 #pragma once
 
 #include "NameSpace.h"
+#include "common/glsp_defs.h"
+
+NS_OPEN_GLSP_OGL()
 
 #define ARRAY_BUFFER_INDEX			0
 #define ELEMENT_ARRAY_BUFFER_INDEX	1
@@ -40,3 +43,5 @@ private:
 	NameSpace mNameSpace;
 	BindingPoint mBindings[MAX_BUFOBJ_BINDINGS];
 };
+
+NS_CLOSE_GLSP_OGL()

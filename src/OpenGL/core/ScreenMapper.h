@@ -2,12 +2,16 @@
 
 #include "PipeStage.h"
 
+NS_OPEN_GLSP_OGL()
+
 class Batch;
 
 class ScreenMapper: public PipeStage
 {
 public:
 	ScreenMapper();
+	virtual ~ScreenMapper() { }
+
 	virtual void emit(void *data);
 	virtual void finalize();
 
@@ -23,5 +27,7 @@ private:
 		unsigned int y;
 		unsigned int w;
 		unsigned int h;
-	} mViewPort;
+	} mViewport;
 };
+
+NS_CLOSE_GLSP_OGL()
