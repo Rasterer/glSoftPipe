@@ -3,16 +3,27 @@
 #include "khronos/GL/glcorearb.h"
 #include "GLContext.h"
 
+
+using glsp::ogl::GLContext;
+using glsp::ogl::GLViewport;
+
 GLAPI void APIENTRY glViewport (GLint x, GLint y, GLsizei width, GLsizei height)
 {
 	__GET_CONTEXT();
+	GLViewport &vp = gc->mState.mViewport;
 
-	gc->mState.mViewport.x      = x;
-	gc->mState.mViewport.y      = y;
-	gc->mState.mViewport.width  = width;
-	gc->mState.mViewport.height = height;
+	if(vp.x == y && vp.y == y &&
+		vp.width == width && vp.height == height)
+		return;
 
-	gc->mEmitFlag |= EMIT_FLAG_VIEWPORT;
+	vp.x      = x;
+	vp.y      = y;
+	vp.width  = width;
+	vp.height = height;
+
+	gc->applyViewport();
+
+	return;
 }
 
 
@@ -81,4 +92,14 @@ void GLContext::initGC()
 	mState.mViewport.height = 0;
 }
 
+void GLContext::applyViewport()
+{
+	GLViewport &vp = mState.mViewport;
+
+	vp.xScale = vp.width  / 2;
+	vp.yScale = vp.height / 2;
+
+	vp.xCenter = vp.x + vp.xScale;
+	vp.yCenter = vp.y + vp.yScale;
+}
 NS_CLOSE_GLSP_OGL()

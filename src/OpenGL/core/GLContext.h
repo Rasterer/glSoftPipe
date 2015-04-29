@@ -20,9 +20,14 @@ class DrawEngine;
 
 struct GLViewport
 {
+	// Used to store the params from user
 	int   x, y;
 	int   width, height;
 	float zNear, zFar;
+
+	// Used for internal viewport transform
+	int   xCenter, yCenter;
+	int   xScale, yScale;
 };
 
 struct RenderTarget
@@ -47,9 +52,13 @@ class GLContext
 public:
 	GLContext(void *EglCtx, int major, int minor);
 
-	BufferObjectMachine	mBOM;
-	VAOMachine			mVAOM;
-	ProgramMachine		mPM;
+	void applyViewport();
+
+public:
+	BufferObjectMachine       mBOM;
+	VAOMachine                mVAOM;
+	ProgramMachine            mPM;
+	FrameBufferObjectMachine  mFBM;
 
 	GLStateMachine      mState;
 	unsigned int        mEmitFlag;

@@ -13,7 +13,7 @@ typedef std::vector<glm::vec4> RegArray;
 class ShaderRegisterFile
 {
 public:
-	// getReg() and resize is one pair
+	// getReg() and resize() is one pair
 	void resize(size_t n)
 	{
 		mRegs.resize(n);
@@ -35,7 +35,7 @@ public:
 		return mRegs[0];
 	}
 
-	// reserve() and assemble() is one pair
+	// reserve() and pushReg() is one pair
 	void reserve(size_t n)
 	{
 		mRegs.reserve(n);

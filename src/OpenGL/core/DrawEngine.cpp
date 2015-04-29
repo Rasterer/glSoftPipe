@@ -165,7 +165,7 @@ bool DrawEngine::validateState(DrawContext *dc)
 	}
 
 	// link the shaders to the pipeline
-	VertexShader *pVS   = gc->mPM.getCurrentProgram()->getVS();
+	VertexShader   *pVS = gc->mPM.getCurrentProgram()->getVS();
 	FragmentShader *pFS = gc->mPM.getCurrentProgram()->getFS();
 
 	mVertexFetcher->setNextStage(pVS);
@@ -177,6 +177,7 @@ bool DrawEngine::validateState(DrawContext *dc)
 
 void DrawEngine::beginFrame(GLContext *gc)
 {
+	RenderTarget
 	// TODO: use info from GLContext(fbo or egl surface)
 	if(!mpBridge->getBuffers(gc->mpEGLContext,
 						 &gc->mRT.pColorBuffer,
@@ -185,6 +186,8 @@ void DrawEngine::beginFrame(GLContext *gc)
 	{
 		return;
 	}
+
+	if(gc->mRT.width == )
 
 	gc->mRT.pDepthBuffer = (float *)malloc(gc->mRT.width * gc->mRT.height * sizeof(float));
 	gc->mRT.pStencilBuffer = NULL;
