@@ -94,10 +94,11 @@ ScanlineRasterizer::SRHelper * ScanlineRasterizer::createGET(Batch *bat)
 {
 	GLContext *gc = bat->mDC->gc;
 	PrimBatch &pb = bat->mPrims;
-	int mYmin = gc->mRT.height;
-	int mYmax = 0;
 
 	SRHelper *hlp = new SRHelper();
+
+	hlp->ymin = gc->mRT.height;
+	hlp->ymax = 0;
 
 	hlp->mTri.reserve(pb.size());
 	GlobalEdgeTable &get = hlp->mGET;
@@ -127,25 +128,26 @@ ScanlineRasterizer::SRHelper * ScanlineRasterizer::createGET(Batch *bat)
 
 			if(y0 > y1)
 			{
-				hvert = &(vsout0.position());
-				lvert = &(vsout1.position());
+				hvert  = &(vsout0.position());
+				lvert  = &(vsout1.position());
 				ystart = y1;
 			}
 			else
 			{
-				hvert = &(vsout1.position());
-				lvert = &(vsout0.position());
+				hvert  = &(vsout1.position());
+				lvert  = &(vsout0.position());
 				ystart = y0;
 			}
 
 			// apply top-left filling convention
 			pEdge = new edge(pParent);
-			pEdge->dx = (hvert->x - lvert->x) / (hvert->y - lvert->y);
-			pEdge->x = lvert->x + ((ystart + 0.5f) - lvert->y) * pEdge->dx;
+
+			pEdge->dx   = (hvert->x - lvert->x) / (hvert->y - lvert->y);
+			pEdge->x    = lvert->x + ((ystart + 0.5f) - lvert->y) * pEdge->dx;
 			pEdge->ymax = floor(hvert->y - 0.5f);
 
-			hlp->ymin = std::min(ystart, mYmin);
-			hlp->ymax = std::max(pEdge->ymax, mYmax);
+			hlp->ymin = std::min(ystart, hlp->ymin);
+			hlp->ymax = std::max(pEdge->ymax, hlp->ymax);
 
 			GlobalEdgeTable::iterator iter = get.find(ystart);
 			if(iter == get.end())
@@ -211,11 +213,13 @@ bool ScanlineRasterizer::compareFunc(edge *pEdge1, edge *pEdge2)
 	return (pEdge1->x <= pEdge2->x);
 }
 
-//void ScanlineRasterizer::sortAETbyX()
-//{
-	//sort(mAET.begin(), mAET.end(), (static_cast<bool (*)(edge *, edge *)>(this->compareFunc)));
-	//return;
-//}
+#if 0
+void ScanlineRasterizer::sortAETbyX()
+{
+	sort(mAET.begin(), mAET.end(), (static_cast<bool (*)(edge *, edge *)>(this->compareFunc)));
+	return;
+}
+#endif
 
 // Perspective-correct interpolation
 // Vp/wp = A*(V1/w1) + B*(V2/w2) + C*(V3/w3)
@@ -237,10 +241,10 @@ void ScanlineRasterizer::interpolate(vec3& coeff, Primitive& prim, fsInput& resu
 		const vec4& reg1 = v1.getReg(i);
 		const vec4& reg2 = v2.getReg(i);
 
-		result.getReg(i) = vec4(dot(coeff, vec3(reg0.x, reg1.x, reg2.x)),
-								dot(coeff, vec3(reg0.y, reg1.y, reg2.y)),
-								dot(coeff, vec3(reg0.z, reg1.z, reg2.z)),
-								dot(coeff, vec3(reg0.w, reg1.w, reg2.w)));
+		result.getReg(i) = vec4(dot(coeff, vec3(reg0.x, reg1.x, reg2.x)) * coe,
+								dot(coeff, vec3(reg0.y, reg1.y, reg2.y)) * coe,
+								dot(coeff, vec3(reg0.z, reg1.z, reg2.z)) * coe,
+								dot(coeff, vec3(reg0.w, reg1.w, reg2.w)) * coe);
 	}
 }
 
@@ -249,7 +253,7 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 	ActiveEdgeTable &aet = hlp->mAET;
 	vector<span> vSpans;
 	const RenderTarget& rt = bat->mDC->gc->mRT;
-	char *colorBuffer = (char *)rt.pColorBuffer;
+	unsigned char *colorBuffer = (unsigned char *)rt.pColorBuffer;
 	Rasterizer::fs_in_out &fsio = hlp->mFsio;
 	
 	for(ActiveEdgeTable::iterator it = aet.begin(); it != aet.end(); it++)
@@ -267,7 +271,7 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 		float xright = fmax(pEdge->x, pAdjcentEdge->x);
 		vSpans.push_back(span(xleft, xright, pParent));
 
-		pEdge->bActive = false;
+		pEdge->bActive        = false;
 		pAdjcentEdge->bActive = false;
 	}
 
@@ -302,10 +306,11 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 
 				getNextStage()->emit(&fsio);
 
-				colorBuffer[4 * index+0] = (int)fsio.out.fragcolor().x;
-				colorBuffer[4 * index+1] = (int)fsio.out.fragcolor().y;
-				colorBuffer[4 * index+2] = (int)fsio.out.fragcolor().z;
-				colorBuffer[4 * index+3] = (int)fsio.out.fragcolor().w;
+				colorBuffer[4 * index+2] = (unsigned char)(fsio.out.fragcolor().x * 256);
+				colorBuffer[4 * index+1] = (unsigned char)(fsio.out.fragcolor().y * 256);
+				colorBuffer[4 * index+0] = (unsigned char)(fsio.out.fragcolor().z * 256);
+				//colorBuffer[4 * index+3] = (unsigned char)(fsio.out.fragcolor().w * 256);
+				colorBuffer[4 * index+3] = 255;
 			}
 			else
 			{

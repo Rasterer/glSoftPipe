@@ -15,9 +15,6 @@ public:
 	virtual void emit(void *data);
 	virtual void finalize();
 
-	void setViewPort(int x, int y, int w, int h);
-	void getViewPort(int &x, int &y, int &w, int &h);
-
 private:
 	void viewportTransform(Batch *bat);
 

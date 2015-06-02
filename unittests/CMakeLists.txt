@@ -38,3 +38,13 @@ ADD_DEPENDENCIES(test_shader glsp_egl glsp_ogl)
 
 TARGET_LINK_LIBRARIES(test_name_space glsp_ogl)
 ADD_DEPENDENCIES(test_name_space glsp_ogl)
+
+
+FIND_PACKAGE(ImageMagick COMPONENTS Magick++)
+
+IF(ImageMagick_Magick++_FOUND)
+	INCLUDE_DIRECTORIES(${ImageMagick_INCLUDE_DIRS})
+	TARGET_LINK_LIBRARIES(test_shader ${ImageMagick_LIBRARIES})
+ELSE(ImageMagick_Magick++_FOUND)
+	MESSAGE(FATAL_ERROR "ImageMagick package not found!")
+ENDIF(ImageMagick_Magick++_FOUND)

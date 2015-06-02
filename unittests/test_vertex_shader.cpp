@@ -7,6 +7,7 @@
 #include <X11/Xlib-xcb.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <Magick++.h>
 
 #include "Shader.h"
 
@@ -27,25 +28,36 @@ public:
 	{
 		DECLARE_UNIFORM(mView);
 		DECLARE_UNIFORM(mProj);
+
 		DECLARE_IN (vec3, iPos);
-		DECLARE_OUT(vec4, glPosition);
+		DECLARE_IN(vec2, iTexCoor);
+
+		DECLARE_OUT(vec4, gl_Position);
+		DECLARE_OUT(vec2, oTexCoor);
 	}
 
 	void execute(vsInput &in, vsOutput &out)
 	{
 		//cout << "jzb: before VS" << endl;
 		RESOLVE_IN (vec3, iPos, in);
-		RESOLVE_OUT(vec4, glPosition, out);
-		//cout << "iPos x " << glPosition.x << endl;
-		//cout << "iPos y " << glPosition.y << endl;
-		//cout << "iPos z " << glPosition.z << endl;
+		RESOLVE_IN (vec2, iTexCoor, in);
 
-		glPosition = mProj * mView * vec4(iPos, 1.0f);
+		RESOLVE_OUT(vec4, gl_Position, out);
+		RESOLVE_OUT(vec2, oTexCoor, out);
+
+		cout << "iPos x " << iPos.x << endl;
+		cout << "iPos y " << iPos.y << endl;
+		cout << "iPos z " << iPos.z << endl;
+
+		gl_Position = mProj * mView * vec4(iPos, 1.0f);
+		cout << "gl_color x " << iTexCoor.x << endl;
+		cout << "gl_color y " << iTexCoor.y << endl;
+		oTexCoor = iTexCoor;
 		//cout << "jzb: after VS" << endl;
-		//cout << "glPosition x " << glPosition.x << endl;
-		//cout << "glPosition y " << glPosition.y << endl;
-		//cout << "glPosition z " << glPosition.z << endl;
-		//cout << "glPosition w " << glPosition.w << endl;
+		cout << "gl_Position x " << gl_Position.x << endl;
+		cout << "gl_Position y " << gl_Position.y << endl;
+		cout << "gl_Position z " << gl_Position.z << endl;
+		cout << "gl_Position w " << gl_Position.w << endl;
 	}
 
 private:
@@ -58,9 +70,28 @@ class simpleFragmentShader: public FragmentShader
 public:
 	simpleFragmentShader()
 	{
-		DECLARE_IN(vec4, glPosition);
+		DECLARE_SAMPLER(mSampler);
+
+		DECLARE_IN(vec4, gl_Position);
+		DECLARE_IN(vec2, oTexCoor);
+
 		DECLARE_OUT(vec4, FragColor);
 	}
+
+private:
+	void execute(fsInput &in, fsOutput &out)
+	{
+		RESOLVE_IN(vec4, gl_Position, in);
+		RESOLVE_IN(vec2, oTexCoor, in);
+
+		RESOLVE_OUT(vec4, FragColor, out);
+
+		(void)gl_Position;
+		FragColor = texture2D(mSampler, oTexCoor);
+	}
+
+private:
+	sampler2D mSampler;
 };
 
 class simpleShaderFactory: public ShaderFactory
@@ -93,7 +124,7 @@ void setupXenv()
 {
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
 	xcb_generic_error_t* error;
 
@@ -167,17 +198,39 @@ int main(void)
 
 	ShaderFactory *pFact = new simpleShaderFactory();
 
+	//int iIndex[6] = {0, 1, 2, 3, 4, 5};
 	int iIndex[3] = {0, 1, 2};
-	vec3 iPos[3];
-	iPos[0] = vec3(-1.0f, -1.0f, 0.6f);
-	iPos[1] = vec3(1.0f, -1.0f, 0.6f);
-	iPos[2] = vec3(0.0f, 1.0f, 0.0f);
+
+	struct vertex_color
+	{
+		vec3 iPos;
+		vec2 iTexCoor;
+	//} in[6];
+	} in[3];
+
+	//in[0].iPos = vec3(-2.0f, -1.0f, 0.6f);
+	//in[1].iPos = vec3(1.0f, -1.0f, 0.6f);
+	//in[2].iPos = vec3(0.0f, 1.0f, 0.0f);
+
+	in[0].iPos = vec3(-1.0f, -1.0f, 0.0f);
+	in[1].iPos = vec3(1.0f, -1.0f, 0.0f);
+	in[2].iPos = vec3(0.0f, 1.0f, -1.0f);
+	//in[3].iPos = vec3(-1.0f, 1.0f, 0.0f);
+	//in[4].iPos = vec3(1.0f, 1.0f, 0.0f);
+	//in[5].iPos = vec3(0.0f, -1.0f, -1.0f);
+
+	in[0].iTexCoor = vec2(1.0f, 0.0f);
+	in[1].iTexCoor = vec2(0.0f, 0.0f);
+	in[2].iTexCoor = vec2(0.5f, 1.0f);
+	//in[3].fTexCoor = vec2(255.0f, 255.0f, 0.0f);
+	//in[4].fTexCoor = vec2(0.0f, 255.0f, 255.0f);
+	//in[5].fTexCoor = vec2(255.0f, 0.0f, 255.0f);
 
 	GLuint bo[2];
 	glGenBuffers(2, bo);
 	glBindBuffer(GL_ARRAY_BUFFER, bo[0]);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bo[1]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(iPos), iPos, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(in), in, GL_STATIC_DRAW);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(iIndex), iIndex, GL_STATIC_DRAW);
 
 	GLuint prog = glCreateProgram();
@@ -195,42 +248,65 @@ int main(void)
 	glLinkProgram(prog);
 	glUseProgram(prog);
 
-	GLint viewLocation = glGetUniformLocation(prog, "mView");
-	GLint projLocation = glGetUniformLocation(prog, "mProj");
+	GLint viewLocation    = glGetUniformLocation(prog, "mView");
+	GLint projLocation    = glGetUniformLocation(prog, "mProj");
+	GLint samplerLocation = glGetUniformLocation(prog, "mSampler");
 
 	float xbias = 0.1f;
-	mat4 trans = translate(mat4(1.0f), vec3(xbias, 0.0f, 0.0f));
+	//mat4 trans = translate(mat4(1.0f), vec3(xbias, 0.0f, 0.0f));
 	mat4 view = lookAt(vec3(0.0f, 0.0f, -5.0f),
 					   vec3(0.0f, 0.0f, 1.0f),
 					   vec3(0.0f, 1.0f, 0.0f));
 	mat4 project = perspective((float)M_PI * 30.0f / 180.0f, 16.0f / 9.0f, 1.0f, 10.0f); 
 
-	view = view * trans;
 	glUniformMatrix4fv(viewLocation, 1, false, (float *)&view);
 	glUniformMatrix4fv(projLocation, 1, false, (float *)&project);
+	glUniform1i(samplerLocation, 0);
 
-	int posLocation = glGetAttribLocation(prog, "iPos");
+	int posLocation   = glGetAttribLocation(prog, "iPos");
+	int texCoorLocation = glGetAttribLocation(prog, "iTexCoor");
 	glEnableVertexAttribArray(posLocation);
-	glVertexAttribPointer(posLocation, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(texCoorLocation);
+	glVertexAttribPointer(posLocation, 3, GL_FLOAT, GL_FALSE, sizeof(in[0]), 0);
+	glVertexAttribPointer(texCoorLocation, 2, GL_FLOAT, GL_FALSE, sizeof(in[0]), (const void *)sizeof(vec3));
 
-	//glViewport(640, 360, 1280, 720);
+
+	Magick::InitializeMagick(*argv);
+	Magick::Blob blob;
+	//Magick::Image* pImage = new Magick::Image("test.png");
+	Magick::Image* pImage = new Magick::Image("test.png");
+	pImage->write(&blob, "RGBA");
+	Magick::Image OffscreenImage(pImage->columns(), pImage->rows(), "RGBA", Magick::CharPixel, blob.data());
+	//OffscreenImage.write("output.png");
+
+	//Magick::Image my_image("640x480", "white");
+	//my_image.write("output.png");
+
+	GLuint texobj;
+	glGenTextures(1, &texobj);
+	glBindTexture(GL_TEXTURE_2D, texobj);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pImage->columns(), pImage->rows(), 0, GL_RGBA, GL_UNSIGNED_BYTE, blob.data());
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	//glViewport(640, 360, 640, 360);
 	while(true)
 	{
-		//glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
-		std::this_thread::sleep_for (std::chrono::seconds(1));
+		cout << "draw begin" << endl;
+		std::this_thread::sleep_for (std::chrono::seconds(2));
 
-		xbias += 0.01f;
+		//xbias += 0.01f;
 
-		mat4 trans = translate(mat4(1.0f), vec3(xbias, 0.0f, 0.0f));
-		mat4 view = lookAt(vec3(0.0f, 0.0f, -5.0f),
-						   vec3(0.0f, 0.0f, 1.0f),
-						   vec3(0.0f, 1.0f, 0.0f));
-		mat4 project = perspective((float)M_PI * 30.0f / 180.0f, 16.0f / 9.0f, 1.0f, 10.0f); 
+		//mat4 trans = translate(mat4(1.0f), vec3(xbias, 0.0f, 0.0f));
+		//mat4 view = lookAt(vec3(0.0f, 0.0f, -5.0f),
+						   //vec3(0.0f, 0.0f, 1.0f),
+						   //vec3(0.0f, 1.0f, 0.0f));
+		//mat4 project = perspective((float)M_PI * 30.0f / 180.0f, 16.0f / 9.0f, 1.0f, 10.0f); 
 
-		view = view * trans;
-		glUniformMatrix4fv(viewLocation, 1, false, (float *)&view);
+		//view = view * trans;
+		//glUniformMatrix4fv(viewLocation, 1, false, (float *)&view);
 
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+		//glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		ok = eglSwapBuffers(display, surface);
 	}
 

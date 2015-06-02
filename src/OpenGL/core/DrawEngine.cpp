@@ -5,8 +5,6 @@
 #include "VertexFetcher.h"
 #include "Rasterizer.h"
 
-#include <iostream> //jzb
-using namespace std;//jzb
 
 using glsp::ogl::DrawEngine;
 using glsp::ogl::DrawContext;
@@ -99,7 +97,7 @@ void DrawEngine::init(void *dpy, IEGLBridge *bridge)
 
 	bridge->createGC    = CreateContext;
 	bridge->destroyGC   = DestroyContext;
-	bridge->makeCurrent = setCurrentContext;
+	bridge->makeCurrent = MakeCurrent;
 	bridge->swapBuffers = swapBuffers;
 
 	initTLS();
@@ -143,6 +141,7 @@ void DrawEngine::initPipeline()
 bool DrawEngine::validateState(DrawContext *dc)
 {
 	// TODO: some validation work
+	bool ret = true;
 	GLContext *gc = dc->gc;
 	VertexArrayObject *pVAO = gc->mVAOM.getActiveVAO();
 	BufferObject *pElementBO = gc->mBOM.getBoundBuffer(GL_ELEMENT_ARRAY_BUFFER);
@@ -172,38 +171,49 @@ bool DrawEngine::validateState(DrawContext *dc)
 	pVS->setNextStage(mPrimAsbl);
 	mRast->setNextStage(pFS);
 
-	return true;
+	if(!gc->mTM.validateTextureState(pVS, pFS))
+		ret = false;
+
+	return ret;
 }
 
 void DrawEngine::beginFrame(GLContext *gc)
 {
-	RenderTarget
+	RenderTarget &rt = gc->mRT;
+	GLViewport   &vp = gc->mState.mViewport;
+
 	// TODO: use info from GLContext(fbo or egl surface)
 	if(!mpBridge->getBuffers(gc->mpEGLContext,
-						 &gc->mRT.pColorBuffer,
-						 &gc->mRT.width,
-						 &gc->mRT.height))
+						     &rt.pColorBuffer,
+						     &rt.width,
+						     &rt.height))
 	{
 		return;
 	}
 
-	if(gc->mRT.width == )
-
-	gc->mRT.pDepthBuffer = (float *)malloc(gc->mRT.width * gc->mRT.height * sizeof(float));
-	gc->mRT.pStencilBuffer = NULL;
-
-	// TODO: move to glClear()
-	for(int i = 0; i < gc->mRT.width * gc->mRT.height * 4; i += 4)
+	// window resize, reset the viewport
+	if((rt.width  != vp.width) ||
+	   (rt.height != vp.height))
 	{
-		*((unsigned char *)gc->mRT.pColorBuffer + i) = 0;
-		*((unsigned char *)gc->mRT.pColorBuffer + i + 1) = 0;
-		*((unsigned char *)gc->mRT.pColorBuffer + i + 2) = 0;
-		*((unsigned char *)gc->mRT.pColorBuffer + i + 3) = 255;
+		gc->applyViewport(0, 0, rt.width, rt.height);
 	}
 
-	for(int i = 0; i < gc->mRT.width * gc->mRT.height; i++)
+	rt.pDepthBuffer = (float *)malloc(rt.width * rt.height * sizeof(float));
+	// TODO: impl stencil buffer
+	rt.pStencilBuffer = NULL;
+
+	// TODO: move to glClear()
+	for(int i = 0; i < rt.width * rt.height * 4; i += 4)
 	{
-		*(gc->mRT.pDepthBuffer + i) = 1.0f;
+		*((unsigned char *)rt.pColorBuffer + i) = 0;
+		*((unsigned char *)rt.pColorBuffer + i + 1) = 0;
+		*((unsigned char *)rt.pColorBuffer + i + 2) = 0;
+		*((unsigned char *)rt.pColorBuffer + i + 3) = 255;
+	}
+
+	for(int i = 0; i < rt.width * rt.height; i++)
+	{
+		*(rt.pDepthBuffer + i) = 1.0f;
 	}
 }
 
@@ -216,10 +226,10 @@ void DrawEngine::prepareToDraw(DrawContext *dc)
 		beginFrame(gc);
 	}
 
+#if 0
 	// TODO(done): use real view port state
 	if(!(gc->mEmitFlag & EMIT_FLAG_VIEWPORT))
 	{
-		cout << "jzb: non EMIT_FLAG_VIEWPORT" << endl;
 		mMapper->setViewPort(0, 0,
 							 gc->mRT.width,
 							 gc->mRT.height);
@@ -243,6 +253,7 @@ void DrawEngine::prepareToDraw(DrawContext *dc)
 							 gc->mState.mViewport.y,
 							 w, h);
 	}
+#endif
 }
 
 void DrawEngine::emit(DrawContext *dc)

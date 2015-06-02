@@ -11,6 +11,7 @@
 #include "NameSpace.h"
 #include "PipeStage.h"
 #include "DataFlow.h"
+#include "Texture.h"
 
 
 NS_OPEN_GLSP_OGL()
@@ -32,17 +33,25 @@ typedef std::map<std::string, int> VarMap;
 
 #define RESOLVE_IN(type, attr, input)	\
 	int l_##attr = this->resolveInput(#attr, typeid(type));	\
-	type &attr = reinterpret_cast<type &>(input.getReg(l_##attr));
+	type   &attr = reinterpret_cast<type &>(input.getReg(l_##attr));
 
 #define DECLARE_OUT(type, attr)	\
 	this->declareOutput(#attr, typeid(type));
 
 #define RESOLVE_OUT(type, varying, output)	\
 	int l_##varying = this->resolveOutput(#varying, typeid(type));	\
-	type &varying = reinterpret_cast<type &>(output.getReg(l_##varying));
+	type   &varying = reinterpret_cast<type &>(output.getReg(l_##varying));
 
 #define DECLARE_UNIFORM(uni)	\
 	this->declareUniform(#uni, &uni);
+
+#define DECLARE_SAMPLER(spl)	\
+	this->declareSampler();		\
+	this->declareUniform(#spl, &spl);
+
+typedef unsigned int sampler1D;
+typedef unsigned int sampler2D;
+
 
 // APP need implement this interface
 // and pass its pointer to glShaderSource.
@@ -86,6 +95,22 @@ public:
 	uniform_v & getUniformBlock() { return mUniformBlock; }
 	const char **getSource() const { return mSource; }
 
+	int GetInRegLocation(const std::string &name);
+	size_t getInRegsNum()  const { return mInRegs.size(); }
+
+	int getSamplerNum() const { return mNumSamplers; }
+	unsigned getSamplerUnitID(int i) const;
+
+	bool HasSampler() const { return bHasSampler; }
+	void SetupTextureInfo(unsigned unit, Texture *pTex)
+	{
+		assert(unit < MAX_TEXTURE_UNITS);
+		assert(pTex != NULL);
+
+		mTexs[unit] = pTex;
+	}
+
+protected:
 	template <class T>
 	void declareUniform(const std::string &name, T *constant);
 
@@ -94,9 +119,15 @@ public:
 	void declareOutput(const std::string &name, const std::type_info &type);
 	int resolveOutput(const std::string &name, const std::type_info &type);
 
-	int GetInRegLocation(const std::string &name);
-	size_t getInRegsNum()  const { return mInRegs.size(); }
-	size_t getOutRegsNum() const { return mOutRegs.size(); }
+	void declareSampler();
+	void setHasSampler()    { bHasSampler = true; }
+
+	unsigned getOutRegsNum() const { return mOutRegs.size(); }
+
+	glm::vec4 texture2D(sampler2D sampler, glm::vec2 coord);
+
+private:
+	static int calculateLOD(glm::vec2 coord);
 
 private:
 	ShaderType mType;
@@ -108,6 +139,15 @@ private:
 
 	var_v mOutRegs;
 	VarMap mOutRegsMap;
+
+	// Used to fast access the texture data in sampler2D().
+	// TODO: only sampler2D() support so far
+	Texture* mTexs[MAX_TEXTURE_UNITS];
+
+	static const int kMaxSamplers = 16;
+	bool		bHasSampler;
+	int			mNumSamplers;
+	unsigned	mSamplerLoc[kMaxSamplers];
 };
 
 template <class T>
@@ -133,27 +173,43 @@ struct Uniform
 	~Uniform() { }
 
 	template <class T>
-	void setVal(const T *val);
+	void setVal(const T *val) const;
 
-	void *mPtr;
+	template <class T>
+	void getVal(T *val) const;
+
+	void *const mPtr;
 	const std::string mName;
 	const std::type_info &mType;
 };
 
 template <class T>
 Uniform::Uniform(T *val, const std::string &name):
-	mPtr(static_cast<void *>(val)),
+	mPtr(val),
 	mName(name),
 	mType(typeid(T))
 {
 }
 
 template <class T>
-void Uniform::setVal(const T *val)
+void Uniform::setVal(const T *val) const
 {
-	if(mType == typeid(T))
+	if((mType == typeid(T)) ||
+		((mType == typeid(int) && typeid(T) == typeid(unsigned int)) ||
+		(mType == typeid(unsigned int) && typeid(T) == typeid(int))))
 	{
 		*(static_cast<T *>(mPtr)) = *val;
+	}
+}
+
+template <class T>
+void Uniform::getVal(T *val) const
+{
+	if((mType == typeid(T)) ||
+		((mType == typeid(int) && typeid(T) == typeid(unsigned int)) ||
+		(mType == typeid(unsigned int) && typeid(T) == typeid(int))))
+	{
+		*val = *(static_cast<T *>(mPtr));
 	}
 }
 
@@ -206,7 +262,7 @@ public:
 	int  GetUniformLocation(const std::string &name);
 
 	template <class T>
-	void UniformValue(int location, int count, bool transpose, const T *value);
+	void UniformValue(int location, int count, const T *value);
 
 private:
 	bool validate();
@@ -219,12 +275,12 @@ private:
 	uniform_v mUniformBlock;
 };
 
+// FIXME: add support for arrays
 template <class T>
-void Program::UniformValue(int location, int count, bool transpose, const T *value)
+void Program::UniformValue(int location, int count, const T *value)
 {
 	assert(count == 1);
-	assert(transpose == false);
-	assert(location < mUniformBlock.size());
+	assert((size_t)location < mUniformBlock.size());
 
 	Uniform & u = mUniformBlock[location];
 	u.setVal(value);
@@ -252,7 +308,10 @@ public:
 	int GetAttribLocation(GLContext *gc, unsigned program, const char *name);
 
 	template <class T>
-	void UniformValue(GLContext *gc, int location, int count, bool transpose, const T *value);
+	void UniformMatrix(GLContext *gc, int location, int count, bool transpose, const T *value);
+
+	template <class T>
+	void UniformUif(GLContext *gc, int location, int count, const T *value);
 
 	Program *getCurrentProgram() const { return mCurrentProgram; }
 
@@ -266,8 +325,23 @@ private:
 	Program *mCurrentProgram;
 };
 
+// FIXME: add transpose support
 template <class T>
-void ProgramMachine::UniformValue(GLContext *gc, int location, int count, bool transpose, const T *value)
+void ProgramMachine::UniformMatrix(GLContext *gc, int location, int count, bool transpose, const T *value)
+{
+	GLSP_UNREFERENCED_PARAM(gc);
+
+	assert(transpose == false);
+
+	Program *pProg = getCurrentProgram();
+	if(!pProg)
+		return;
+
+	pProg->UniformValue(location, count, value);
+}
+
+template <class T>
+void ProgramMachine::UniformUif(GLContext *gc, int location, int count, const T *value)
 {
 	GLSP_UNREFERENCED_PARAM(gc);
 
@@ -275,7 +349,7 @@ void ProgramMachine::UniformValue(GLContext *gc, int location, int count, bool t
 	if(!pProg)
 		return;
 
-	pProg->UniformValue(location, count, transpose, value);
+	pProg->UniformValue(location, count, value);
 }
 
 NS_CLOSE_GLSP_OGL()

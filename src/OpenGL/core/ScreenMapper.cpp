@@ -1,6 +1,7 @@
 #include "ScreenMapper.h"
 #include "DataFlow.h"
 #include "DrawEngine.h"
+#include "GLContext.h"
 
 
 NS_OPEN_GLSP_OGL()
@@ -12,21 +13,21 @@ ScreenMapper::ScreenMapper():
 {
 }
 
-void ScreenMapper::setViewPort(int x, int y, int w, int h)
-{
-	mViewport.x = x;
-	mViewport.y = y;
-	mViewport.w = w;
-	mViewport.h = h;
-}
+//void ScreenMapper::setViewPort(int x, int y, int w, int h)
+//{
+	//mViewport.x = x;
+	//mViewport.y = y;
+	//mViewport.w = w;
+	//mViewport.h = h;
+//}
 
-void ScreenMapper::getViewPort(int &x, int &y, int &w, int &h)
-{
-	x = mViewport.x;
-	y = mViewport.y;
-	w = mViewport.w;
-	h = mViewport.h;
-}
+//void ScreenMapper::getViewPort(int &x, int &y, int &w, int &h)
+//{
+	//x = mViewport.x;
+	//y = mViewport.y;
+	//w = mViewport.w;
+	//h = mViewport.h;
+//}
 
 void ScreenMapper::emit(void *data)
 {
@@ -39,7 +40,15 @@ void ScreenMapper::emit(void *data)
 
 void ScreenMapper::viewportTransform(Batch *bat)
 {
-#if PRIMITIVE_OWNS_VERTICES
+	__GET_CONTEXT();
+
+	int xCenter = gc->mState.mViewport.xCenter;
+	int yCenter = gc->mState.mViewport.yCenter;
+	int xScale  = gc->mState.mViewport.xScale;
+	int yScale  = gc->mState.mViewport.yScale;
+
+//#if PRIMITIVE_OWNS_VERTICES
+#if 1
 	PrimBatch &in = bat->mPrims;
 
 	for(PrimBatch::iterator it = in.begin(); it != in.end(); ++it)
@@ -47,8 +56,8 @@ void ScreenMapper::viewportTransform(Batch *bat)
 		for(size_t i = 0; i < 3; ++i)
 		{
 			vec4 &pos = it->mVert[i].position();
-			pos.x = mViewport.x + (pos.x + 1.0f) * mViewport.w / 2.0;
-			pos.y = mViewport.y + (pos.y + 1.0f) * mViewport.h / 2.0;
+			pos.x = xCenter + pos.x * xScale;
+			pos.y = yCenter + pos.y * yScale;
 		}
 	}
 #endif

@@ -1,5 +1,8 @@
 #include "NameSpace.h"
+
+#include <algorithm>
 #include <string>
+#include <utility>
 
 NS_OPEN_GLSP_OGL()
 
@@ -10,6 +13,28 @@ NameSpace::NameSpace()
 	nb.start = 0;
 	nb.end = 0;
 	mNameBlockLists.push_back(nb);
+}
+
+NameSpace::~NameSpace()
+{
+	std::for_each(mNameHashTable.begin(),
+			 mNameHashTable.end(),
+			 // Lambda expression
+			 [](auto item)
+			 {
+			 	if(item.second)
+					delete item.second;
+			 }
+			 );
+#if 0
+	for(NameHashTable_t::iterator it = mNameHashTable.begin();
+		it != mNameHashTable.end();
+		it++)
+	{
+		if(it->second)
+			delete (it->second);
+	}
+#endif
 }
 
 bool NameSpace::genNames(unsigned n, unsigned *pNames)

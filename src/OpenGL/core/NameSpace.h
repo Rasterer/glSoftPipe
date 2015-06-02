@@ -33,7 +33,7 @@ class NameSpace
 {
 public:
 	NameSpace();
-	virtual ~NameSpace() { }
+	virtual ~NameSpace();
 
 	bool genNames(unsigned n, unsigned *pNames);
 	bool deleteNames(unsigned n, const unsigned *pNames);

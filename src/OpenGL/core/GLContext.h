@@ -2,6 +2,7 @@
 
 #include "BufferObject.h"
 #include "VertexArrayObject.h"
+#include "Texture.h"
 #include "Shader.h"
 #include "common/glsp_defs.h"
 
@@ -26,6 +27,8 @@ struct GLViewport
 	float zNear, zFar;
 
 	// Used for internal viewport transform
+	// FIXME: Now use fixed point, need use float point instead?
+	// TODO: depth range
 	int   xCenter, yCenter;
 	int   xScale, yScale;
 };
@@ -39,9 +42,12 @@ struct RenderTarget
 	void  *pStencilBuffer;
 };
 
+#define GLSP_CULL_FACE (0 << 0)
+
 // TODO: add other states
 struct GLStateMachine
 {
+	int        mEnables;
 	GLViewport mViewport;
 };
 
@@ -52,13 +58,16 @@ class GLContext
 public:
 	GLContext(void *EglCtx, int major, int minor);
 
-	void applyViewport();
+	void applyViewport(int x, int y, int width, int height);
 
 public:
 	BufferObjectMachine       mBOM;
 	VAOMachine                mVAOM;
 	ProgramMachine            mPM;
-	FrameBufferObjectMachine  mFBM;
+	TextureMachine            mTM;
+
+	// TODO: impl FBO
+	//FrameBufferObjectMachine  mFBM;
 
 	GLStateMachine      mState;
 	unsigned int        mEmitFlag;
@@ -81,10 +90,9 @@ private:
 
 void initTLS();
 void deinitTLS();
-void setCurrentContext(void *gc);
 GLContext *getCurrentContext();
 void* CreateContext(void *EglCtx, int major, int minor);
 void DestroyContext(void *gc);
-bool MakeCurrent(GLContext *gc);
+void MakeCurrent(void *gc);
 
 NS_CLOSE_GLSP_OGL()

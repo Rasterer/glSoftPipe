@@ -49,22 +49,39 @@ BindingPoint::BindingPoint():
 {
 }
 
-bool BufferObjectMachine::GenBuffers(GLContext *gc, int n, unsigned *buffers)
+BindingPoint::~BindingPoint()
+{
+}
+
+void BufferObjectMachine::GenBuffers(GLContext *gc, int n, unsigned *buffers)
 {
 	GLSP_UNREFERENCED_PARAM(gc);
 
-	return mNameSpace.genNames(n, buffers);
+	if(n < 0)
+		return;
+
+	mNameSpace.genNames(n, buffers);
 }
 
 bool BufferObjectMachine::DeleteBuffers(GLContext *gc, int n, const unsigned *buffers)
 {
-	GLSP_UNREFERENCED_PARAM(gc);
-
 	for(int i = 0; i < n; i++)
 	{
 		BufferObject *pBO = static_cast<BufferObject *>(mNameSpace.retrieveObject(buffers[i]));
 		if(pBO)
 		{
+			BindingPoint *pBP;
+
+			pBP = getBindingPoint(gc, GL_ARRAY_BUFFER);
+
+			if(pBP->mBO == pBO)
+				pBP->mBO = NULL;
+
+			pBP = getBindingPoint(gc, GL_ELEMENT_ARRAY_BUFFER);
+
+			if(pBP->mBO == pBO)
+				pBP->mBO = NULL;
+
 			mNameSpace.removeObject(pBO);
 			delete pBO;
 		}
@@ -75,7 +92,7 @@ bool BufferObjectMachine::DeleteBuffers(GLContext *gc, int n, const unsigned *bu
 
 bool BufferObjectMachine::BindBuffer(GLContext *gc, unsigned target, unsigned buffer)
 {
-	BindingPoint *pBP = getBindingPoing(gc, target);
+	BindingPoint *pBP = getBindingPoint(gc, target);
 
 	if(!pBP)
 		return false;
@@ -111,7 +128,7 @@ bool BufferObjectMachine::BindBuffer(GLContext *gc, unsigned target, unsigned bu
 
 bool BufferObjectMachine::BufferData(GLContext *gc, unsigned target, unsigned size, const void *data, unsigned usage)
 {
-	BindingPoint *pBP = getBindingPoing(gc, target);
+	BindingPoint *pBP = getBindingPoint(gc, target);
 
 	if(!pBP)
 		return false;
@@ -146,7 +163,7 @@ bool BufferObjectMachine::BufferData(GLContext *gc, unsigned target, unsigned si
 BufferObject *BufferObjectMachine::getBoundBuffer(unsigned target)
 {
 	__GET_CONTEXT();
-	BindingPoint *pBP = getBindingPoing(gc, target);
+	BindingPoint *pBP = getBindingPoint(gc, target);
 
 	if(!pBP)
 		return NULL;
@@ -154,7 +171,7 @@ BufferObject *BufferObjectMachine::getBoundBuffer(unsigned target)
 	return pBP->mBO;
 }
 
-BindingPoint *BufferObjectMachine::getBindingPoing(GLContext *gc, unsigned target)
+BindingPoint *BufferObjectMachine::getBindingPoint(GLContext *gc, unsigned target)
 {
 	int targetIndex = TargetToIndex(target);
 

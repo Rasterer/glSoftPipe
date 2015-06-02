@@ -4,10 +4,14 @@
 #include "DataFlow.h"
 #include "DrawEngine.h"
 #include "Rasterizer.h"
+#include "Texture.h"
+#include "SamplerObject.h"
 #include "khronos/GL/glcorearb.h"
 
 
+
 using glm::vec4;
+using glm::vec2;
 using glm::mat4;
 
 GLAPI GLuint APIENTRY glCreateShader (GLenum type)
@@ -70,10 +74,16 @@ GLAPI GLint APIENTRY glGetUniformLocation (GLuint program, const GLchar *name)
 	return gc->mPM.GetUniformLocation(gc, program, name);
 }
 
+GLAPI void APIENTRY glUniform1i (GLint location, GLint v0)
+{
+	__GET_CONTEXT();
+	gc->mPM.UniformUif(gc, location, 1, &v0);
+}
+
 GLAPI void APIENTRY glUniformMatrix4fv (GLint location, GLsizei count, GLboolean transpose, const GLfloat *value)
 {
 	__GET_CONTEXT();
-	gc->mPM.UniformValue(gc, location, count, transpose, reinterpret_cast<const mat4 *>(value));
+	gc->mPM.UniformMatrix(gc, location, count, transpose, reinterpret_cast<const mat4 *>(value));
 }
 
 GLAPI GLint APIENTRY glGetAttribLocation (GLuint program, const GLchar *name)
@@ -86,9 +96,11 @@ GLAPI GLint APIENTRY glGetAttribLocation (GLuint program, const GLchar *name)
 NS_OPEN_GLSP_OGL()
 
 // vertex shader cache
-Shader::Shader()
+Shader::Shader():
+	mSource(NULL),
+	bHasSampler(false),
+	mNumSamplers(0)
 {
-	mSource = NULL;
 }
 
 Shader::ShaderType Shader::OGLShaderTypeToInternal(unsigned type)
@@ -141,6 +153,15 @@ int Shader::resolveOutput(const string &name, const type_info &type)
 	return -1;
 }
 
+void Shader::declareSampler()
+{
+	assert(mNumSamplers < kMaxSamplers);
+	mSamplerLoc[mNumSamplers++] = mUniformBlock.size();
+
+	if(!bHasSampler)
+		bHasSampler = true;
+}
+
 int Shader::GetInRegLocation(const string &name)
 {
 	VarMap::iterator it = mInRegsMap.find(name);
@@ -149,6 +170,63 @@ int Shader::GetInRegLocation(const string &name)
 		return it->second;
 	else
 		return -1;
+}
+
+unsigned Shader::getSamplerUnitID(int i) const
+{
+	unsigned unit;
+	mUniformBlock[mSamplerLoc[i]].getVal(&unit);
+	return unit;
+}
+
+static inline vec4 BiLinearInterpolate(float scaleX, float scaleY, vec4 lb, vec4 lt, vec4 rb, vec4 rt)
+{
+	return (lb *= ((1.0 - scaleX) * (1.0f - scaleY))) +
+		   (lt *= ((1.0 - scaleX) * scaleY)) +
+		   (rb *= (scaleX * (1.0f - scaleY))) +
+		   (rt *= (scaleX * scaleY));
+}
+
+// Calculate the "Level of Detail"
+// TODO: calculate the partial derivatives
+int Shader::calculateLOD(vec2 coord)
+{
+	return 0;
+}
+
+vec4 Shader::texture2D(sampler2D sampler, vec2 coord)
+{
+	int lvl = calculateLOD(coord);
+	TextureMipmap *pMipmap = mTexs[sampler]->getMipmap(0, lvl);
+	const SamplerObject &so = mTexs[sampler]->getSamplerObject();
+
+	int x, y;
+	float TexSpaceX = coord.x * pMipmap->mWidth;
+	float TexSpaceY = coord.y * pMipmap->mHeight;
+	vec4 *pAddr = static_cast<vec4 *>(pMipmap->mMem.addr);
+
+	if(so.eMagFilter == GL_NEAREST)
+	{
+		x = (int)floor(TexSpaceX);
+		y = (int)floor(TexSpaceY);
+
+		return pAddr[(pMipmap->mHeight - y - 1) * pMipmap->mWidth + x];
+	}
+	else //GL_LINEAR
+	{
+		x = (int)floor(TexSpaceX - 0.5f);
+		y = (int)floor(TexSpaceY - 0.5f);
+
+		vec4 lb = pAddr[(pMipmap->mHeight - y - 1) * pMipmap->mWidth + x];
+		vec4 lt = pAddr[(pMipmap->mHeight - y) * pMipmap->mWidth + x];
+		vec4 rb = pAddr[(pMipmap->mHeight - y - 1) * pMipmap->mWidth + x + 1];
+		vec4 rt = pAddr[(pMipmap->mHeight - y) * pMipmap->mWidth + x];
+
+		float scaleX = TexSpaceX - 0.5f - x;
+		float scaleY = TexSpaceY - 0.5f - y;
+
+		return BiLinearInterpolate(scaleX, scaleY, lb, lt, rb, rt);
+	}
 }
 
 VertexInfo::VertexInfo(const string &name, const type_info &type):

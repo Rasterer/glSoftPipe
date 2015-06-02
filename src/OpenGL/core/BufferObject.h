@@ -24,6 +24,7 @@ struct BufferObject: public NameItem
 struct BindingPoint
 {
 	BindingPoint();
+	~BindingPoint();
 
 	BufferObject *mBO;
 };
@@ -31,14 +32,14 @@ struct BindingPoint
 class BufferObjectMachine
 {
 public:
-	bool GenBuffers(GLContext *gc, int n, unsigned *buffers);
+	void GenBuffers(GLContext *gc, int n, unsigned *buffers);
 	bool DeleteBuffers(GLContext *gc, int n, const unsigned *buffers);
 	bool BindBuffer(GLContext *gc, unsigned target, unsigned buffer);
 	bool BufferData(GLContext *gc, unsigned target, unsigned size, const void *data, unsigned usage);
 	BufferObject *getBoundBuffer(unsigned target);
 
 private:
-	BindingPoint *getBindingPoing(GLContext *gc, unsigned target);
+	BindingPoint *getBindingPoint(GLContext *gc, unsigned target);
 	int TargetToIndex(unsigned target);
 	NameSpace mNameSpace;
 	BindingPoint mBindings[MAX_BUFOBJ_BINDINGS];

@@ -9,6 +9,7 @@ SET(PIPELINE_SRC
 	DrawEngine.cpp
 	VertexFetcher.cpp
 	Shader.cpp
+	Texture.cpp
 	PrimitiveAssembler.cpp
 	Clipper.cpp
 	PerspectiveDivider.cpp

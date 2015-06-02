@@ -9,13 +9,13 @@ namespace glsp {			\
 namespace egl {
 
 #define NS_CLOSE_GLSP_EGL()	\
-} /* namespace glsp */		\
-} /* namespace egl */		
+} /* namespace egl  */		\
+} /* namespace glsp */		
 
 #define NS_OPEN_GLSP_OGL()	\
 namespace glsp {			\
 namespace ogl {
 
 #define NS_CLOSE_GLSP_OGL()	\
-} /* namespace glsp */		\
-} /* namespace ogl */		
+} /* namespace ogl  */		\
+} /* namespace glsp */		

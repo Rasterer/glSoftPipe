@@ -15,13 +15,8 @@ GLAPI void APIENTRY glViewport (GLint x, GLint y, GLsizei width, GLsizei height)
 	if(vp.x == y && vp.y == y &&
 		vp.width == width && vp.height == height)
 		return;
-
-	vp.x      = x;
-	vp.y      = y;
-	vp.width  = width;
-	vp.height = height;
-
-	gc->applyViewport();
+	else
+		gc->applyViewport(x, y, width, height);
 
 	return;
 }
@@ -41,12 +36,12 @@ void deinitTLS()
 	pthread_key_delete(TLSKey);
 }
 
-void setCurrentContext(void *gc)
+static void setCurrentContext(void *gc)
 {
 	pthread_setspecific(TLSKey, gc);
 }
 
-GLContext * getCurrentContext()
+GLContext* getCurrentContext()
 {
 	return (GLContext *)pthread_getspecific(TLSKey);
 }
@@ -68,10 +63,9 @@ void DestroyContext(void *_gc)
 	delete _del;
 }
 
-bool MakeCurrent(GLContext *gc)
+void MakeCurrent(void *gc)
 {
 	__SET_CONTEXT(gc);
-	return true;
 }
 
 GLContext::GLContext(void *EglCtx, int major, int minor):
@@ -86,15 +80,17 @@ GLContext::GLContext(void *EglCtx, int major, int minor):
 
 void GLContext::initGC()
 {
-	mState.mViewport.x      = 0;
-	mState.mViewport.y      = 0;
-	mState.mViewport.width  = 0;
-	mState.mViewport.height = 0;
+	applyViewport(0, 0, 0, 0);
 }
 
-void GLContext::applyViewport()
+void GLContext::applyViewport(int x, int y, int width, int height)
 {
 	GLViewport &vp = mState.mViewport;
+
+	vp.x      = x;
+	vp.y      = y;
+	vp.width  = width;
+	vp.height = height;
 
 	vp.xScale = vp.width  / 2;
 	vp.yScale = vp.height / 2;
@@ -102,4 +98,6 @@ void GLContext::applyViewport()
 	vp.xCenter = vp.x + vp.xScale;
 	vp.yCenter = vp.y + vp.yScale;
 }
+
+
 NS_CLOSE_GLSP_OGL()
