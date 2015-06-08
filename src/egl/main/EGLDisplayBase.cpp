@@ -82,9 +82,9 @@ bool EGLDisplayBase::validateResource(EGLResourceBase *res)
 
 	assert(type < KEGL_MAX_RESOURCE);
 
-	EGLResourceList::iterator iter = std::find(mResourceList[type].begin(),
-											   mResourceList[type].end(),
-											   res);
+	auto iter = std::find(mResourceList[type].begin(),
+						  mResourceList[type].end(),
+						  res);
 
 	return (iter != mResourceList[type].end());
 }

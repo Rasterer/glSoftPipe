@@ -6,6 +6,9 @@
 
 NS_OPEN_GLSP_OGL()
 
+using glm::vec3;
+using glm::vec4;
+
 Rasterizer::Rasterizer():
 	PipeStage("Rasterizing", DrawEngine::getDrawEngine())
 {
@@ -27,6 +30,33 @@ int Rasterizer::onRasterizing(Batch *bat)
 {
 	return 0;
 }
+
+void Rasterizer::finalize()
+{
+}
+
+
+class ScanlineRasterizer::triangle
+{
+public:
+	triangle(Primitive *prim):
+		mActiveEdge0(NULL),
+		mActiveEdge1(NULL),
+		mPrim(prim)
+	{
+	}
+	~triangle() {}
+
+	vec3 calculateBC(float xp, float yp);
+	void setActiveEdge(edge *pEdge);
+	void unsetActiveEdge(edge *pEdge);
+	edge* getAdjcentEdge(edge *pEdge);
+
+	// There can be at most two edges in AET at the same time
+	edge *mActiveEdge0;
+	edge *mActiveEdge1;
+	Primitive *mPrim;
+};
 
 // Calculate the barycentric coodinates of point P in this triangle
 //
@@ -90,7 +120,59 @@ ScanlineRasterizer::edge* ScanlineRasterizer::triangle::getAdjcentEdge(edge *pEd
 	assert(0);
 }
 
-ScanlineRasterizer::SRHelper * ScanlineRasterizer::createGET(Batch *bat)
+class ScanlineRasterizer::edge
+{
+public:
+	edge(triangle *pParent):
+		mParent(pParent),
+		bActive(false) 
+	{
+	}
+	~edge() {}
+
+	float x;
+	float dx;
+	int ymax;
+	triangle *mParent;
+	bool bActive;
+};
+
+
+class ScanlineRasterizer::span
+{
+public:
+	span(float x1, float x2, triangle *pParent):
+		xleft(x1),
+		xright(x2),
+		mParent(pParent)
+	{
+	}
+	~span() {}
+
+	float xleft;
+	float xright;
+	triangle *mParent;
+};
+
+class ScanlineRasterizer::SRHelper
+{
+public:
+	int ymin;
+	int ymax;
+	std::vector<triangle *> mTri;
+
+	typedef std::unordered_map<int, std::vector<edge *> > GlobalEdgeTable;
+	typedef std::list<edge *> ActiveEdgeTable;
+	// global edges table
+	GlobalEdgeTable mGET;
+	// active edges table
+	ActiveEdgeTable mAET;
+
+	// used in following stages, e.g. fragment shader, merge.
+	Rasterizer::fs_in_out mFsio;
+};
+
+ScanlineRasterizer::SRHelper* ScanlineRasterizer::createGET(Batch *bat)
 {
 	GLContext *gc = bat->mDC->gc;
 	PrimBatch &pb = bat->mPrims;
@@ -101,10 +183,10 @@ ScanlineRasterizer::SRHelper * ScanlineRasterizer::createGET(Batch *bat)
 	hlp->ymax = 0;
 
 	hlp->mTri.reserve(pb.size());
-	GlobalEdgeTable &get = hlp->mGET;
+	auto &get = hlp->mGET;
 
 	//TODO: clipping
-	for(PrimBatch::iterator it = pb.begin(); it != pb.end(); it++)
+	for(auto it = pb.begin(); it != pb.end(); it++)
 	{
 		Primitive &prim = *it;
 
@@ -149,7 +231,7 @@ ScanlineRasterizer::SRHelper * ScanlineRasterizer::createGET(Batch *bat)
 			hlp->ymin = std::min(ystart, hlp->ymin);
 			hlp->ymax = std::max(pEdge->ymax, hlp->ymax);
 
-			GlobalEdgeTable::iterator iter = get.find(ystart);
+			auto iter = get.find(ystart);
 			if(iter == get.end())
 				//get.insert(pair<int, vector<edge *> >(ystart, vector<edge *>()));
 				get[ystart] = vector<edge *>();
@@ -163,22 +245,23 @@ ScanlineRasterizer::SRHelper * ScanlineRasterizer::createGET(Batch *bat)
 
 void ScanlineRasterizer::activateEdgesFromGET(SRHelper *hlp, int y)
 {
-	GlobalEdgeTable &get = hlp->mGET;
-	ActiveEdgeTable &aet = hlp->mAET;
-	GlobalEdgeTable::iterator it = get.find(y);
+	auto &get = hlp->mGET;
+	auto &aet = hlp->mAET;
+	auto it = get.find(y);
 
 	if(it != get.end())
 	{
-		vector<edge *> &vGET = it->second;
+		auto &vGET = it->second;
 		
-		for(vector<edge *>::iterator it = vGET.begin(); it != vGET.end(); it++)
-		{
-			(*it)->mParent->setActiveEdge(*it);
-			aet.push_back(*it);
-		}
+		std::for_each(vGET.begin(), vGET.end(),
+					[&aet](edge *pEdge)
+					{
+						pEdge->mParent->setActiveEdge(pEdge);
+						aet.push_back(pEdge);
+					});
 	}
 
-	for(ActiveEdgeTable::iterator it = aet.begin(); it != aet.end(); it++)
+	for(auto it = aet.begin(); it != aet.end(); it++)
 	{
 		(*it)->bActive = true;
 	}
@@ -189,8 +272,8 @@ void ScanlineRasterizer::activateEdgesFromGET(SRHelper *hlp, int y)
 // Remove unvisible edges from AET.
 void ScanlineRasterizer::removeEdgeFromAET(SRHelper *hlp, int y)
 {
-	ActiveEdgeTable &aet = hlp->mAET;
-	ActiveEdgeTable::iterator it = aet.begin();
+	auto &aet = hlp->mAET;
+	auto it   = aet.begin();
 
 	while(it != aet.end())
 	{
@@ -250,13 +333,13 @@ void ScanlineRasterizer::interpolate(vec3& coeff, Primitive& prim, fsInput& resu
 
 void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 {
-	ActiveEdgeTable &aet = hlp->mAET;
+	auto &aet = hlp->mAET;
 	vector<span> vSpans;
 	const RenderTarget& rt = bat->mDC->gc->mRT;
 	unsigned char *colorBuffer = (unsigned char *)rt.pColorBuffer;
-	Rasterizer::fs_in_out &fsio = hlp->mFsio;
+	auto &fsio = hlp->mFsio;
 	
-	for(ActiveEdgeTable::iterator it = aet.begin(); it != aet.end(); it++)
+	for(auto it = aet.begin(); it != aet.end(); it++)
 	{
 		if((*it)->bActive != true)
 			continue;
@@ -275,7 +358,7 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 		pAdjcentEdge->bActive = false;
 	}
 
-	for(vector<span>::iterator it = vSpans.begin(); it < vSpans.end(); it++)
+	for(auto it = vSpans.begin(); it < vSpans.end(); it++)
 	{
 		// top-left filling convention
 		for(int x = ceil(it->xleft - 0.5f); x < ceil(it->xright - 0.5f); x++)
@@ -323,7 +406,7 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 
 void ScanlineRasterizer::advanceEdgesInAET(SRHelper *hlp)
 {
-	for(ActiveEdgeTable::iterator it = hlp->mAET.begin(); it != hlp->mAET.end(); it++)
+	for(auto it = hlp->mAET.begin(); it != hlp->mAET.end(); it++)
 	{
 		(*it)->x += (*it)->dx;
 	}
@@ -348,9 +431,9 @@ void ScanlineRasterizer::finalize(SRHelper *hlp)
 {
 	hlp->mAET.clear();
 
-	for(GlobalEdgeTable::iterator it = hlp->mGET.begin(); it != hlp->mGET.end(); it++)
+	for(auto it = hlp->mGET.begin(); it != hlp->mGET.end(); it++)
 	{
-		for(vector<edge *>::iterator iter = it->second.begin(); iter < it->second.end(); iter++)
+		for(auto iter = it->second.begin(); iter < it->second.end(); iter++)
 		{
 			delete *iter;
 		}
@@ -358,7 +441,7 @@ void ScanlineRasterizer::finalize(SRHelper *hlp)
 	}
 	hlp->mGET.clear();
 
-	for(vector<triangle *>::iterator it = hlp->mTri.begin(); it < hlp->mTri.end(); it++)
+	for(auto it = hlp->mTri.begin(); it < hlp->mTri.end(); it++)
 		delete *it;
 
 	hlp->mTri.clear();
@@ -374,16 +457,12 @@ int ScanlineRasterizer::onRasterizing(Batch *bat)
 
 	scanConversion(hlp, bat);
 
-	finalize();
+	finalize(hlp);
 
 	return 0;
 }
 
 void ScanlineRasterizer::finalize()
-{
-}
-
-void Rasterizer::finalize()
 {
 }
 

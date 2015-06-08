@@ -17,15 +17,13 @@ NameSpace::NameSpace()
 
 NameSpace::~NameSpace()
 {
-	std::for_each(mNameHashTable.begin(),
-			 mNameHashTable.end(),
+	std::for_each(mNameHashTable.begin(), mNameHashTable.end(),
 			 // Lambda expression
 			 [](auto item)
 			 {
 			 	if(item.second)
 					delete item.second;
-			 }
-			 );
+			 });
 #if 0
 	for(NameHashTable_t::iterator it = mNameHashTable.begin();
 		it != mNameHashTable.end();
@@ -39,12 +37,13 @@ NameSpace::~NameSpace()
 
 bool NameSpace::genNames(unsigned n, unsigned *pNames)
 {
-	NameBlockList_t::iterator iter = mNameBlockLists.begin();
+	auto iter = mNameBlockLists.begin();
+	unsigned end;
 
 	while(iter != mNameBlockLists.end())
 	{
-		NameBlockList_t::iterator next = std::next(iter, 1);
-		unsigned end = iter->end + n;
+		auto next = std::next(iter, 1);
+		end = iter->end + n;
 
 		// wrap happen, just return false
 		if(end < iter->end)
@@ -69,20 +68,20 @@ bool NameSpace::genNames(unsigned n, unsigned *pNames)
 		}
 	}
 
-	for(size_t i = 0; i < n; i++)
-		pNames[i] = iter->end - (n - i) + 1;
+	for(unsigned i = 0; i < n; i++)
+		pNames[i] = end - (n - i) + 1;
 
 	return true;
 }
 
 bool NameSpace::deleteNames(unsigned n, const unsigned *pNames)
 {
-	for(size_t i = 0; i < n; i++)
+	for(unsigned i = 0; i < n; i++)
 	{
-		NameBlockList_t::iterator iter = mNameBlockLists.begin();
-
 		if(!pNames[i])
 			continue;
+
+		auto iter = mNameBlockLists.begin();
 
 		while(iter != mNameBlockLists.end())
 		{
@@ -92,6 +91,7 @@ bool NameSpace::deleteNames(unsigned n, const unsigned *pNames)
 			iter++;
 		}
 
+		// This name doesn't exist in this namespace
 		if(iter == mNameBlockLists.end())
 			continue;
 
@@ -123,21 +123,21 @@ bool NameSpace::deleteNames(unsigned n, const unsigned *pNames)
 bool NameSpace::validate(unsigned name)
 {
 	if(!name)
-		return NULL;
+		return false;
 
 	NameBlockList_t::const_iterator iter = mNameBlockLists.begin();
 	while(iter != mNameBlockLists.end())
 	{
 		if(name <= iter->end)
-			return &(*iter);
+			return true;
 
 		iter++;
 	}
 
-	return NULL;
+	return false;
 }
 
-NameItem * NameSpace::retrieveObject(unsigned name)
+NameItem* NameSpace::retrieveObject(unsigned name)
 {
 	NameHashTable_t::const_iterator iter = mNameHashTable.find(name);
 	
@@ -154,6 +154,7 @@ NameItem * NameSpace::retrieveObject(unsigned name)
 bool NameSpace::insertObject(NameItem *pNameItem)
 {
 	unsigned name = pNameItem->getName();
+
 	if(!validate(name))
 		return false;
 
@@ -161,6 +162,7 @@ bool NameSpace::insertObject(NameItem *pNameItem)
 	
 	if(iter != mNameHashTable.end())
 	{
+		// already exist
 		return false;
 	}
 	else
@@ -173,6 +175,7 @@ bool NameSpace::insertObject(NameItem *pNameItem)
 bool NameSpace::removeObject(NameItem *pNameItem)
 {
 	unsigned name = pNameItem->getName();
+
 	if(!validate(name))
 		return false;
 

@@ -26,9 +26,10 @@ void PrimitiveAssembler::emit(void *data)
 // 2. Primitive owns vertex
 void PrimitiveAssembler::assemble(Batch *bat)
 {
-	vsOutput_v &out = bat->mVsOut;
-	IBuffer_v &index = bat->mIndexBuf;
-	PrimBatch &pb = bat->mPrims;
+	vsOutput_v   &out   = bat->mVsOut;
+	IBuffer_v    &index = bat->mIndexBuf;
+	PrimBatch    &pb    = bat->mPrims;
+	
 	IBuffer_v::iterator it = index.begin();
 
 	assert(index.size() % 3 == 0);

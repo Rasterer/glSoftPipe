@@ -25,8 +25,8 @@ private:
 
 struct NameBlock
 {
-	unsigned start;
-	unsigned end;
+	unsigned start;	// included
+	unsigned end;	// included
 };
 
 class NameSpace
@@ -39,7 +39,7 @@ public:
 	bool deleteNames(unsigned n, const unsigned *pNames);
 
 	bool validate(unsigned name);
-	NameItem *retrieveObject(unsigned name);
+	NameItem* retrieveObject(unsigned name);
 
 	bool insertObject(NameItem *pNameItem);
 	bool removeObject(NameItem *pNameItem);

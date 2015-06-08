@@ -128,12 +128,15 @@ err_fd:
 
 	mDeviceName.clear();
 	mDriverName.clear();
+
 err_version:
 	mDri2Minor = 0;
 	mDri2Major = 0;
+
 err_conn:
 	mXCBScreen = NULL;
 	mXCBConn   = NULL;
+
 err_out:
 	return false;
 }

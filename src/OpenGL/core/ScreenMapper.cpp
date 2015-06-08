@@ -51,7 +51,7 @@ void ScreenMapper::viewportTransform(Batch *bat)
 #if 1
 	PrimBatch &in = bat->mPrims;
 
-	for(PrimBatch::iterator it = in.begin(); it != in.end(); ++it)
+	for(auto it = in.begin(); it != in.end(); ++it)
 	{
 		for(size_t i = 0; i < 3; ++i)
 		{

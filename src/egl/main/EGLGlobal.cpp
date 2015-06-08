@@ -25,7 +25,7 @@ EGLDisplayBase* EGLGlobal::getDisplay(void *nativeDpy)
 	EGLDisplayBase *pDisp = NULL;
 	EGLenum platformType = getPlatformType();
 
-	for(EGLDisplayList::iterator it = mDisplayList.begin();
+	for(auto it = mDisplayList.begin();
 		it != mDisplayList.end();
 		it++)
 	{
@@ -57,7 +57,7 @@ EGLDisplayBase* EGLGlobal::getDisplay(void *nativeDpy)
 
 void EGLGlobal::cleanUp()
 {
-	for(EGLDisplayList::iterator it = mDisplayList.begin();
+	for(auto it = mDisplayList.begin();
 		it != mDisplayList.end();
 		it++)
 	{

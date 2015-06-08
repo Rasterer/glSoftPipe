@@ -508,6 +508,8 @@ void TextureMachine::DeleteTextures(GLContext *gc, int n, const unsigned *textur
 			delete pTex;
 		}
 	}
+
+	mNameSpace.deleteNames(n, textures);
 }
 
 void TextureMachine::BindTexture(GLContext *const gc, unsigned target, unsigned texture)

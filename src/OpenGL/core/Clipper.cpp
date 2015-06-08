@@ -41,7 +41,7 @@ void Clipper::clipping(Batch *bat)
 	unordered_set<vsOutput *> need_free;
 #endif
 
-	for(PrimBatch::iterator it = in.begin(); it != in.end(); it++)
+	for(auto it = in.begin(); it != in.end(); it++)
 	{
 		// Two round robin intermediate boxes
 		// One src, one dst
@@ -139,7 +139,7 @@ void Clipper::clipping(Batch *bat)
 
 #if PRIMITIVE_REFS_VERTICES
 	// OPT: more decent with smart pointer or ref count?
-	for(unordered_set<vsOutput *>::iterator iter = need_free.begin(); iter != need_free.end(); ++iter)
+	for(auto iter = need_free.begin(); iter != need_free.end(); ++iter)
 	{
 		delete (*iter);
 	}

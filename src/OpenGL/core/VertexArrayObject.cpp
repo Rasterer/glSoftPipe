@@ -92,6 +92,7 @@ void VAOMachine::DeleteVertexArrays(GLContext *gc, int n, const unsigned *arrays
 		if(pVAO)
 		{
 			mNameSpace.removeObject(pVAO);
+			delete pVAO;
 		}
 	}
 

@@ -35,10 +35,13 @@ void VertexCachedFetcher::emit(void *data)
 void VertexCachedFetcher::fetchVertex(DrawContext *dc)
 {
 	GLContext *gc = dc->gc;
+
 	const unsigned int *iBuf = static_cast<const unsigned int *>(dc->mIndices);
+
 	VertexArrayObject *pVAO = gc->mVAOM.getActiveVAO();
-	VertexShader *pVS = gc->mPM.getCurrentProgram()->getVS();
-	BufferObject *pIBO = gc->mBOM.getBoundBuffer(GL_ELEMENT_ARRAY_BUFFER);
+	VertexShader      *pVS  = gc->mPM.getCurrentProgram()->getVS();
+	BufferObject      *pIBO = gc->mBOM.getBoundBuffer(GL_ELEMENT_ARRAY_BUFFER);
+
 	Batch * bat = NULL;
 
 	if(dc->mDrawType == DrawContext::kElementDraw)
