@@ -252,25 +252,19 @@ void VertexShader::execute(vsInput &in, vsOutput &out)
 void VertexShader::emit(void *data)
 {
 	Batch *bat = static_cast<Batch *>(data);
-	vsCache &in = bat->mVertexCache;
+	vsInput_v   &in = bat->mVertexCache;
 	vsOutput_v &out = bat->mVsOut;
 
 	out.resize(in.size());
 
 	for(size_t i = 0; i < in.size(); i++)
 	{
-#if PRIMITIVE_REFS_VERTICES
-		out[i] = new vsOutput();
-		execute(in[i], *out[i]);
-
-#elif PRIMITIVE_OWNS_VERTICES
 		out[i].resize(getOutRegsNum());
 		execute(in[i], out[i]);
-#endif
 	}
 
 	// Free the memory in Batch.mVertexCache to avoid large memory occupy
-	vsCache().swap(in);
+	vsInput_v().swap(in);
 	vsCacheIndex().swap(bat->mCacheIndex);
 
 	getNextStage()->emit(bat);

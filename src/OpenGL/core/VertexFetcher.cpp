@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <iostream>
+#include <unordered_map>
 #include "DataFlow.h"
 #include "GLContext.h"
 #include "DrawEngine.h"
@@ -36,6 +37,10 @@ void VertexCachedFetcher::fetchVertex(DrawContext *dc)
 {
 	GLContext *gc = dc->gc;
 
+	// First int is the vertex index from IBO.
+	// Second int is the vertex index in vertex cache.
+	std::unordered_map<int, int> cacheIndex;
+
 	const unsigned int *iBuf = static_cast<const unsigned int *>(dc->mIndices);
 
 	VertexArrayObject *pVAO = gc->mVAOM.getActiveVAO();
@@ -69,8 +74,7 @@ void VertexCachedFetcher::fetchVertex(DrawContext *dc)
 			bat->mDC = dc;
 		}
 
-		vsCache & cache = bat->mVertexCache;
-		vsCacheIndex & cacheIndex = bat->mCacheIndex;
+		vsInput_v &cache = bat->mVertexCache;
 		vsCacheIndex::iterator it = cacheIndex.find(idx);
 
 		if(it != cacheIndex.end())
@@ -122,6 +126,7 @@ void VertexCachedFetcher::fetchVertex(DrawContext *dc)
 		if((i % 3 == 2) && (cache.size() >= VERTEX_CACHE_EMIT_THRESHHOLD))
 		{
 			getNextStage()->emit(bat);
+			cacheIndex.clear();
 			bat = NULL;
 		}
 	}

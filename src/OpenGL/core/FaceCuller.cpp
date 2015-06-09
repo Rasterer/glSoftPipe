@@ -29,9 +29,8 @@ void FaceCuller::emit(void *data)
 // OPT: get stage states from gc?
 void FaceCuller::culling(Batch *bat)
 {
-#if PRIMITIVE_OWNS_VERTICES
-	PrimBatch &in = bat->mPrims;
-	PrimBatch::iterator it = in.begin();
+	Primlist &in = bat->mPrims;
+	Primlist::iterator it = in.begin();
 
 	while(it != in.end())
 	{
@@ -67,7 +66,6 @@ void FaceCuller::culling(Batch *bat)
 		}
 		++it;
 	}
-#endif
 }
 
 void FaceCuller::finalize()

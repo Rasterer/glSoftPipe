@@ -28,26 +28,20 @@ void PrimitiveAssembler::assemble(Batch *bat)
 {
 	vsOutput_v   &out   = bat->mVsOut;
 	IBuffer_v    &index = bat->mIndexBuf;
-	PrimBatch    &pb    = bat->mPrims;
-	
-	IBuffer_v::iterator it = index.begin();
+	Primlist     &pl    = bat->mPrims;
 
 	assert(index.size() % 3 == 0);
-	pb.resize(index.size() / 3);
+	pl.resize(index.size() / 3);
 
-	PrimBatch::iterator iter = pb.begin();
-
-	while(it != index.end())
+	for(auto iter = pl.begin(), auto it = index.begin(); it != index.end(); it += 3, iter++)
 	{
 		Primitive &tri = *iter;
 
-		tri.mType = Primitive::TRIANGLE;
-		tri.mVert[0] = out[*(it + 0)];
-		tri.mVert[1] = out[*(it + 1)];
-		tri.mVert[2] = out[*(it + 2)];
-
-		it += 3;
-		iter++;
+		tri.mType		= Primitive::TRIANGLE;
+		tri.mVertNum	= 3;
+		tri.mVert[0]	= out[*(it + 0)];
+		tri.mVert[1]	= out[*(it + 1)];
+		tri.mVert[2]	= out[*(it + 2)];
 	}
 
 	vsOutput_v().swap(out);

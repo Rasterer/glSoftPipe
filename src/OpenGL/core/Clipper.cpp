@@ -33,15 +33,11 @@ void Clipper::emit(void *data)
 // TODO: guard-band clipping
 void Clipper::clipping(Batch *bat)
 {
-	PrimBatch out;
-	PrimBatch &in = bat->mPrims;
-#if PRIMITIVE_OWNS_VERTICES
+	Primlist out;
+	Primlist &pl = bat->mPrims;
 	vsOutput tmp[ARRAY_SIZE(mPlanes) * 3];
-#elif PRIMITIVE_REFS_VERTICES
-	unordered_set<vsOutput *> need_free;
-#endif
 
-	for(auto it = in.begin(); it != in.end(); it++)
+	for(auto it = pl.begin(); it != pl.end(); it++)
 	{
 		// Two round robin intermediate boxes
 		// One src, one dst
@@ -83,11 +79,8 @@ void Clipper::clipping(Batch *bat)
 
 					if(dist[1] < 0.0f)
 					{
-#if PRIMITIVE_OWNS_VERTICES
 						vsOutput *new_vert = &tmp[tmpnr++];
-#elif PRIMITIVE_REFS_VERTICES
-						vsOutput *new_vert = new vsOutput(*rr[src][j]);
-#endif
+
 						vertexLerp(*new_vert, *rr[src][j], *rr[src][k], dist[0] / (dist[0] - dist[1]));
 						rr[dst][vertNum[dst]] = new_vert;
 						++vertNum[dst];
@@ -95,12 +88,8 @@ void Clipper::clipping(Batch *bat)
 				}
 				else if(dist[1] >= 0.0f)
 				{
-#if PRIMITIVE_OWNS_VERTICES
 					vsOutput *new_vert = &tmp[tmpnr++];
-#elif PRIMITIVE_REFS_VERTICES
-					need_free.insert(rr[src][j]);
-					vsOutput *new_vert = new vsOutput(*rr[src][j]);
-#endif
+
 					vertexLerp(*new_vert, *rr[src][k], *rr[src][j], dist[1] / (dist[0] - dist[1]));
 					rr[dst][vertNum[dst]] = new_vert;
 					++vertNum[dst];
@@ -124,28 +113,16 @@ void Clipper::clipping(Batch *bat)
 			Primitive prim;
 
 			prim.mType = Primitive::TRIANGLE;
-#if PRIMITIVE_OWNS_VERTICES
+
 			prim.mVert[0] = *rr[src][0];
 			prim.mVert[1] = *rr[src][i];
 			prim.mVert[2] = *rr[src][i+1];
-#elif PRIMITIVE_REFS_VERTICES
-			prim.mVert[0] = rr[src][0];
-			prim.mVert[1] = rr[src][i];
-			prim.mVert[2] = rr[src][i+1];
-#endif
+
 			out.push_back(prim);
 		}
 	}
 
-#if PRIMITIVE_REFS_VERTICES
-	// OPT: more decent with smart pointer or ref count?
-	for(auto iter = need_free.begin(); iter != need_free.end(); ++iter)
-	{
-		delete (*iter);
-	}
-#endif
-
-	in.swap(out);
+	pl.swap(out);
 }
 
 // vertex linear interpolation

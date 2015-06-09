@@ -1,19 +1,46 @@
 #pragma once
 
-#include <iostream>
-#include <vector>
-#include <list>
-#include <unordered_map>
-#include <algorithm>
-#include <cmath>
-#include <cfloat>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "Shader.h"
 
+
 NS_OPEN_GLSP_OGL()
 
 using namespace std;
+
+/* The wrapper for the whole rasterizer stages.
+ * Also responsible for resource life management.
+ */
+class RasterizerWrapper: public PipeStage
+{
+	friend class DrawEngine;
+
+public:
+	RasterizerWrapper();
+	~RasterizerWrapper();
+
+	void SetupPipeStages();
+	virtual void emit(void *data);
+	virtual void finalize();
+
+private:
+	PipeStage* getFirstStage() const { return mFirstStage; }
+	void setFirstStage(PipeStage *stage) { mFirstStage = stage; }
+
+	PipeStage *mFirstStage;
+
+	PipeStage *mpRasterizer; // scan conversion
+	PipeStage *mpInterpolate;
+	PipeStage *mpFS;
+	PipeStage *mpOwnershipTest;
+	PipeStage *mpScissorTest;
+	PipeStage *mpAlphaTest;
+	PipeStage *mpStencilTest;
+	PipeStage *mpDepthTest;
+	PipeStage *mpBlender;
+	PipeStage *mpDither;
+};
 
 class Rasterizer: public PipeStage
 {
@@ -23,52 +50,41 @@ public:
 
 	virtual void emit(void *data);
 	virtual void finalize();
-	void rasterizing(Batch *bat);
 
 	struct fs_in_out
 	{
 		fsInput in;
 		fsOutput out;
 	};
+
+	class Gradience;
+
 protected:
-	virtual int onRasterizing(Batch *bat);
+	virtual void onRasterizing(Batch *bat) = 0;
 };
 
-// active edge table implementation
-// TODO: tile-based implementation
-class ScanlineRasterizer: public Rasterizer
+
+/* Optimized incremental interpolate */
+
+class Interpolater: public PipeStage
 {
 public:
-	ScanlineRasterizer(): Rasterizer()
-	{
-	}
+	Interpolater() { }
+	~Interpolater() { }
 
-	virtual ~ScanlineRasterizer() { }
-
-protected:
-	virtual int onRasterizing(Batch *bat);
+	// PipeStage interfaces
+	virtual void emit(void *data);
 	virtual void finalize();
 
-private:
-	class edge;
-	class triangle;
-	class span;
-	class SRHelper;
+	// Should be invoked before onInterpolating
+	virtual void CalculateRadiences(Primitive &prim) = 0;
 
-	static bool compareFunc(edge *pEdge1, edge *pEdge2);
-
-	SRHelper* createGET(Batch *bat);
-	void scanConversion(SRHelper *hlp, Batch *bat);
-	void activateEdgesFromGET(SRHelper *hlp, int y);
-	void removeEdgeFromAET(SRHelper *hlp, int y);
-	//void sortAETbyX();
-
-	// perspective-correct interpolation
-	void interpolate(glm::vec3 &coeff, Primitive& prim, fsInput& result);
-	void traversalAET(SRHelper *hlp, Batch *bat, int y);
-	void advanceEdgesInAET(SRHelper *hlp);
-
-	void finalize(SRHelper *hlp);
+protected:
+	virtual void onInterpolating(const vsOutput &vo,
+								 const Gradience &grad;
+								 float stepx, float stepy,
+								 fsInput &result) = 0;
 };
+
 
 NS_CLOSE_GLSP_OGL()

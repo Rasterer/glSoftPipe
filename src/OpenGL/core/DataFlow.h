@@ -3,12 +3,9 @@
 #include <glm/glm.hpp>
 #include <vector>
 #include <list>
-#include <unordered_map>
 
 
 NS_OPEN_GLSP_OGL()
-
-typedef std::vector<glm::vec4> RegArray;
 
 class ShaderRegisterFile
 {
@@ -26,11 +23,20 @@ public:
 
 	// glPosition and FragColor are both in the first location,
 	// which can be treat as a union.
-	glm::vec4 & position()
+	glm::vec4& position()
 	{
 		return mRegs[0];
 	}
-	glm::vec4 & fragcolor()
+	glm::vec4& fragcolor()
+	{
+		return mRegs[0];
+	}
+
+	const glm::vec4& position() const
+	{
+		return mRegs[0];
+	}
+	const glm::vec4& fragcolor() const
 	{
 		return mRegs[0];
 	}
@@ -52,6 +58,7 @@ public:
 	}
 
 private:
+	typedef std::vector<glm::vec4> RegArray;
 	RegArray mRegs;
 };
 
@@ -67,46 +74,46 @@ struct Primitive
 	{
 		POINT = 0,
 		LINE,
-		TRIANGLE
+		TRIANGLE,
+		MAX_PRIM_TYPE
 	};
 	
 	PrimType mType;
 
-#if PRIMITIVE_REFS_VERTICES
-	vsOutput *mVert[3];
-#elif PRIMITIVE_OWNS_VERTICES
-	vsOutput mVert[3];
-#endif
+	int mVertNum;
+	vsOutput mVert[MAX_PRIM_TYPE];
+
 	float mAreaReciprocal;
+
+	std::vector<glm::vec4> mGradiences;
 };
 
 typedef std::vector<int> IBuffer_v;
-typedef std::unordered_map<int, int> vsCacheIndex;
-typedef std::vector<vsInput> vsCache;
-typedef std::list<Primitive> PrimBatch;
-
-//#if PRIMITIVE_REFS_VERTICES
-#if 0
-typedef std::vector<vsOutput *> vsOutput_v;
-#elif 1
+typedef std::vector<vsInput> vsInput_v;
+typedef std::list<Primitive> Primlist;
 typedef std::vector<vsOutput> vsOutput_v;
-#endif
+
 
 // TODO: comment
 // Batch represents a batch of data flow to be passed through the whole pipeline
 // It's hard to give a decent name to each member based on their repective usages.
 // Here is rough explanation:
-// Input Assembly: read data from VBO, produce mVertexCache & mIndexBuf.
+// Vertex Fetch: read data from VBO, produce mVertexCache & mIndexBuf.
 // Vertex Shading: consumer mVertexCache, produce mVsOut
 // Primitive Assembly: consumer mIndexBuf & mVsOut, produce mPrims
 // Clipping ~ Viewport transform: consumer mPrims, produce mPrims
-struct Batch
+class Batch
 {
-	vsCache			mVertexCache;
-	vsCacheIndex	mCacheIndex;
+public:
+	MergePrim(Batch &rhs)
+	{
+		mPrims.splice(mPrims.end(), rhs.mPrims)
+	}
+
+	vsInput_v		mVertexCache;
 	vsOutput_v		mVsOut;
 	IBuffer_v		mIndexBuf;
-	PrimBatch		mPrims;
+	Primlist		mPrims;
 
 	// point back to the mDC
 	DrawContext	   *mDC;

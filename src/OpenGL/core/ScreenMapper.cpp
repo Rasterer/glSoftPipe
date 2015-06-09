@@ -13,22 +13,6 @@ ScreenMapper::ScreenMapper():
 {
 }
 
-//void ScreenMapper::setViewPort(int x, int y, int w, int h)
-//{
-	//mViewport.x = x;
-	//mViewport.y = y;
-	//mViewport.w = w;
-	//mViewport.h = h;
-//}
-
-//void ScreenMapper::getViewPort(int &x, int &y, int &w, int &h)
-//{
-	//x = mViewport.x;
-	//y = mViewport.y;
-	//w = mViewport.w;
-	//h = mViewport.h;
-//}
-
 void ScreenMapper::emit(void *data)
 {
 	Batch *bat = static_cast<Batch *>(data);
@@ -47,9 +31,7 @@ void ScreenMapper::viewportTransform(Batch *bat)
 	int xScale  = gc->mState.mViewport.xScale;
 	int yScale  = gc->mState.mViewport.yScale;
 
-//#if PRIMITIVE_OWNS_VERTICES
-#if 1
-	PrimBatch &in = bat->mPrims;
+	Primlist &in = bat->mPrims;
 
 	for(auto it = in.begin(); it != in.end(); ++it)
 	{
@@ -60,7 +42,6 @@ void ScreenMapper::viewportTransform(Batch *bat)
 			pos.y = yCenter + pos.y * yScale;
 		}
 	}
-#endif
 }
 
 void ScreenMapper::finalize()

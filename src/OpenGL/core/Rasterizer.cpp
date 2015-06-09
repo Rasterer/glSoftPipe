@@ -1,4 +1,12 @@
 #include "Rasterizer.h"
+
+#include <iostream>
+#include <vector>
+#include <list>
+#include <unordered_map>
+#include <algorithm>
+#include <cmath>
+#include <cfloat>	
 #include "DrawEngine.h"
 #include "GLContext.h"
 #include "utils.h"
@@ -9,32 +17,155 @@ NS_OPEN_GLSP_OGL()
 using glm::vec3;
 using glm::vec4;
 
+RasterizerWrapper::RasterizerWrapper():
+	PipeStage("Rasterizier Wrapper", DrawEngine::getDrawEngine()),
+	mpRasterizer(new ScanlineRasterizer),
+	mpInterpolate(new PerspectiveCorrectInterpolater),
+	// RasterizerWrapper doesn't own FS,
+	// will be linked in when draw validate.
+	mpFS(NULL),
+	mpOwnershipTest(new OwnershipTester),
+	mpScissorTest(new ScissorTester),
+	mpAlphaTest(new AlphaTester),
+	mpStencilTest(new StencilTester),
+	mpDepthTest(new ZTester),
+	mpBlender(new Blender),
+	mpDither(new Dither)
+{
+	setFirstStage(mpRasterizer);
+
+	Interpolater *interp = dynamic_cast<Interpolater *>(mpInterpolate);
+	assert(interp);
+
+	mpRasterizer->SetInterpolater(mpInterpolate);
+}
+
+RasterizerWrapper::~RasterizerWrapper()
+{
+	delete mpDither;
+	delete mpBlender;
+	delete mpDepthTest;
+	delete mpStencilTest;
+	delete mpAlphaTest;
+	delete mpScissorTest;
+	delete mpOwnershipTest;
+	delete mpInterpolate;
+	delete mpRasterizer;
+}
+
+void RasterizerWrapper::emit(void *data)
+{
+	Batch *bat = static_cast<Batch *>(data);
+	Primlist &pl = bat->mPrims;
+		
+	Interpolater *interp = dynamic_cast<Interpolater *>(mpInterpolate);
+	assert(interp);
+
+	getFirstStage()->emit(bat);
+}
+
+void RasterizerWrapper::finalize()
+{
+}
+
+void Interpolater::emit(void *data)
+{
+	onInterpolating();
+}
+
+void Interpolater::finalize()
+{
+}
+
 Rasterizer::Rasterizer():
 	PipeStage("Rasterizing", DrawEngine::getDrawEngine())
 {
 }
 
-void Rasterizer::emit(void *data)
+Rasterizer::emit(void *data)
 {
 	Batch *bat = static_cast<Batch *>(data);
 
-	rasterizing(bat);
-}
-
-void Rasterizer::rasterizing(Batch *bat)
-{
 	onRasterizing(bat);
-}
-
-int Rasterizer::onRasterizing(Batch *bat)
-{
-	return 0;
 }
 
 void Rasterizer::finalize()
 {
 }
 
+
+// active edge table implementation
+// TODO: tile-based implementation
+class ScanlineRasterizer: public Rasterizer
+{
+public:
+	ScanlineRasterizer(): Rasterizer()
+	{
+	}
+
+	virtual ~ScanlineRasterizer() { }
+
+	void SetInterpolater(Interpolater *interp)
+	{
+		mpInterpolate = interp;
+	}
+
+protected:
+	virtual int onRasterizing(Batch *bat);
+
+private:
+	class edge;
+	class triangle;
+	class span;
+	class SRHelper;
+
+	static bool compareFunc(edge *pEdge1, edge *pEdge2);
+
+	SRHelper* createGET(Batch *bat);
+	void scanConversion(SRHelper *hlp, Batch *bat);
+	void activateEdgesFromGET(SRHelper *hlp, int y);
+	void removeEdgeFromAET(SRHelper *hlp, int y);
+	//void sortAETbyX();
+
+	// perspective-correct interpolation
+	void interpolate(glm::vec3 &coeff, Primitive& prim, fsInput& result);
+	void traversalAET(SRHelper *hlp, Batch *bat, int y);
+	void advanceEdgesInAET(SRHelper *hlp);
+
+	void finalize(SRHelper *hlp);
+
+	// Used to calculate gradiences.
+	Interpolater *mpInterpolate;
+};
+
+class ScanlineRasterizer::Gradience
+{
+public:
+	Gradience(Primitive &prim);
+	~Gradience() { }
+
+	float mOneOverZStarts[Primitive::MAX_PRIM_TYPE];
+	std::vector<vec4>	mStarts[Primitive::MAX_PRIM_TYPE];
+
+	std::vector<vec4>	mGradiences;
+	Primitive		   *mPrim;
+};
+
+// TBC
+ScanlineRasterizer::Gradience::Gradience(Primitive &prim)
+{
+	for(int i = 0; i < prim.mVertNum; i++)
+	{
+		mOneOverZStarts[i] = 1.0f / prim.mVert[i].position().w;
+		size_t size = prim.mVert[i].getRegsNum() - 1;
+		mStarts[i].resize(size);
+
+		for(size_t j = 0; j < size; j++)
+		{
+			mStarts[i][j] = prim.mVert[i].getReg(j+1);
+		}
+	}
+}
 
 class ScanlineRasterizer::triangle
 {
@@ -52,6 +183,7 @@ public:
 	void unsetActiveEdge(edge *pEdge);
 	edge* getAdjcentEdge(edge *pEdge);
 
+private:
 	// There can be at most two edges in AET at the same time
 	edge *mActiveEdge0;
 	edge *mActiveEdge1;
@@ -175,18 +307,18 @@ public:
 ScanlineRasterizer::SRHelper* ScanlineRasterizer::createGET(Batch *bat)
 {
 	GLContext *gc = bat->mDC->gc;
-	PrimBatch &pb = bat->mPrims;
+	Primlist  &pl = bat->mPrims;
 
 	SRHelper *hlp = new SRHelper();
 
 	hlp->ymin = gc->mRT.height;
 	hlp->ymax = 0;
 
-	hlp->mTri.reserve(pb.size());
+	hlp->mTri.reserve(pl.size());
 	auto &get = hlp->mGET;
 
 	//TODO: clipping
-	for(auto it = pb.begin(); it != pb.end(); it++)
+	for(auto it = pl.begin(); it != pl.end(); it++)
 	{
 		Primitive &prim = *it;
 
@@ -198,7 +330,6 @@ ScanlineRasterizer::SRHelper* ScanlineRasterizer::createGET(Batch *bat)
 			vsOutput &vsout0 = prim.mVert[i];
 			vsOutput &vsout1 = prim.mVert[(i + 1) % 3];
 			const vec4 *hvert, *lvert;
-			edge *pEdge;
 			int ystart;
 
 			int y0 = floor(vsout0.position().y + 0.5f);
@@ -222,7 +353,7 @@ ScanlineRasterizer::SRHelper* ScanlineRasterizer::createGET(Batch *bat)
 			}
 
 			// apply top-left filling convention
-			pEdge = new edge(pParent);
+			edge *pEdge = new edge(pParent);
 
 			pEdge->dx   = (hvert->x - lvert->x) / (hvert->y - lvert->y);
 			pEdge->x    = lvert->x + ((ystart + 0.5f) - lvert->y) * pEdge->dx;
@@ -238,6 +369,8 @@ ScanlineRasterizer::SRHelper* ScanlineRasterizer::createGET(Batch *bat)
 
 			get[ystart].push_back(pEdge);
 		}
+
+		mpInterpolate->CalculateRadiences()
 	}
 
 	return hlp;
@@ -254,7 +387,7 @@ void ScanlineRasterizer::activateEdgesFromGET(SRHelper *hlp, int y)
 		auto &vGET = it->second;
 		
 		std::for_each(vGET.begin(), vGET.end(),
-					[&aet](edge *pEdge)
+					[&aet] (edge *pEdge)
 					{
 						pEdge->mParent->setActiveEdge(pEdge);
 						aet.push_back(pEdge);
@@ -334,7 +467,7 @@ void ScanlineRasterizer::interpolate(vec3& coeff, Primitive& prim, fsInput& resu
 void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 {
 	auto &aet = hlp->mAET;
-	vector<span> vSpans;
+	std::vector<span> vSpans;
 	const RenderTarget& rt = bat->mDC->gc->mRT;
 	unsigned char *colorBuffer = (unsigned char *)rt.pColorBuffer;
 	auto &fsio = hlp->mFsio;
@@ -462,8 +595,23 @@ int ScanlineRasterizer::onRasterizing(Batch *bat)
 	return 0;
 }
 
-void ScanlineRasterizer::finalize()
+class PerspectiveCorrectInterpolater: public Interpolater
 {
-}
+public:
+	PerspectiveCorrectInterpolater() { }
+	~PerspectiveCorrectInterpolater() { }
 
+	virtual void CalculateRadiences(Primitive &prim);
+
+private:
+	virtual void onInterpolating(const vsOutput &vo,
+								 const Gradience &grad;
+								 float stepx, float stepy,
+								 fsInput &result);
+};
+
+void PerspectiveCorrectInterpolater::CalculateRadiences(Primitive &prim)
+{
+
+}
 NS_CLOSE_GLSP_OGL()
