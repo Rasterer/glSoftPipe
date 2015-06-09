@@ -68,6 +68,24 @@ void RasterizerWrapper::finalize()
 {
 }
 
+class Rasterizer::Gradience
+{
+public:
+	Gradience(const Primitive &prim, Interpolater *interp);
+	~Gradience() { }
+
+	std::vector<vec4>	mStarts[Primitive::MAX_PRIM_TYPE];
+
+	std::vector<vec4>	mGradiences;
+	const Primitive	   &mPrim;
+};
+
+Rasterizer::Gradience::Gradience(Primitive &prim, Interpolater *interp):
+	mPrim(prim)
+{
+	interp->CalculateRadiences(this);
+}
+
 void Interpolater::emit(void *data)
 {
 	onInterpolating();
@@ -137,35 +155,6 @@ private:
 	// Used to calculate gradiences.
 	Interpolater *mpInterpolate;
 };
-
-class ScanlineRasterizer::Gradience
-{
-public:
-	Gradience(Primitive &prim);
-	~Gradience() { }
-
-	float mOneOverZStarts[Primitive::MAX_PRIM_TYPE];
-	std::vector<vec4>	mStarts[Primitive::MAX_PRIM_TYPE];
-
-	std::vector<vec4>	mGradiences;
-	Primitive		   *mPrim;
-};
-
-// TBC
-ScanlineRasterizer::Gradience::Gradience(Primitive &prim)
-{
-	for(int i = 0; i < prim.mVertNum; i++)
-	{
-		mOneOverZStarts[i] = 1.0f / prim.mVert[i].position().w;
-		size_t size = prim.mVert[i].getRegsNum() - 1;
-		mStarts[i].resize(size);
-
-		for(size_t j = 0; j < size; j++)
-		{
-			mStarts[i][j] = prim.mVert[i].getReg(j+1);
-		}
-	}
-}
 
 class ScanlineRasterizer::triangle
 {
@@ -601,7 +590,7 @@ public:
 	PerspectiveCorrectInterpolater() { }
 	~PerspectiveCorrectInterpolater() { }
 
-	virtual void CalculateRadiences(Primitive &prim);
+	virtual void CalculateRadiences(Rasterizer::Gradience *grad);
 
 private:
 	virtual void onInterpolating(const vsOutput &vo,
@@ -610,8 +599,29 @@ private:
 								 fsInput &result);
 };
 
-void PerspectiveCorrectInterpolater::CalculateRadiences(Primitive &prim)
+// TBC
+void PerspectiveCorrectInterpolater::CalculateRadiences(Rasterizer::Gradience *pGrad)
 {
+	const Primitive &prim = pGrad->mPrim;
 
+	for(int i = 0; i < prim.mVertNum; i++)
+	{
+		size_t size = prim.mVert[i].getRegsNum();
+		mStarts[i].resize(size);
+
+		const float ZReciprocal = 1.0f / prim.mVert[i].position().w;
+		mStarts[i][0] = prim.mVert[i].getReg(0);
+		mStarts[i][0].w = ZReciprocal;
+
+		mGradiences[0].x = 1.0f;
+		mGradiences[0].y = 1.0f;
+		mGradiences[0].z = 1.0f;
+
+		for(size_t j = 1; j < size; j++)
+		{
+			mStarts[i][j] = prim.mVert[i].getReg(j) * ZReciprocal;
+		}
+	}
 }
+
 NS_CLOSE_GLSP_OGL()

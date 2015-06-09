@@ -17,22 +17,11 @@ NameSpace::NameSpace()
 
 NameSpace::~NameSpace()
 {
-	std::for_each(mNameHashTable.begin(), mNameHashTable.end(),
-			 // Lambda expression
-			 [](auto item)
-			 {
-			 	if(item.second)
-					delete item.second;
-			 });
-#if 0
-	for(NameHashTable_t::iterator it = mNameHashTable.begin();
-		it != mNameHashTable.end();
-		it++)
+	for(auto it = mNameHashTable.begin(); it != mNameHashTable.end(); it++)
 	{
 		if(it->second)
 			delete (it->second);
 	}
-#endif
 }
 
 bool NameSpace::genNames(unsigned n, unsigned *pNames)

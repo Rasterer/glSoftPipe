@@ -15,7 +15,12 @@ public:
 	{
 		mRegs.resize(n);
 	}
-	glm::vec4 & getReg(int location)
+	glm::vec4& getReg(int location)
+	{
+		assert(location < (int)mRegs.size());
+		return mRegs[location];
+	}
+	const glm::vec4& getReg(int location) const
 	{
 		assert(location < (int)mRegs.size());
 		return mRegs[location];
@@ -105,7 +110,7 @@ typedef std::vector<vsOutput> vsOutput_v;
 class Batch
 {
 public:
-	MergePrim(Batch &rhs)
+	void MergePrim(Batch &rhs)
 	{
 		mPrims.splice(mPrims.end(), rhs.mPrims)
 	}

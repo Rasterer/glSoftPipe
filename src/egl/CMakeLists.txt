@@ -1,19 +1,7 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
-SET(EGLMAIN_SRC
-	main/eglApi.cpp
-	main/EGLGlobal.cpp
-	main/EGLDisplayBase.cpp
-	main/EGLContextBase.cpp
-	main/EGLSurfaceBase.cpp
-	main/EGLConfigBase.cpp
-)
-
-SET(EGLX11_SRC
-	ws/x11/EGLDisplayX11.cpp
-	ws/x11/EGLContextX11.cpp
-	ws/x11/EGLSurfaceX11.cpp
-)
+AUX_SOURCE_DIRECTORY(./main EGLMAIN_SRC)
+AUX_SOURCE_DIRECTORY(./ws/X11 EGLX11_SRC)
 
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
 
