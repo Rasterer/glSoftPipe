@@ -52,14 +52,7 @@ public:
 	virtual void finalize();
 
 	class Gradience;
-
-	struct fs_in_out
-	{
-		fsInput in;
-		fsOutput out;
-
-		const Gradience &mGrad;
-	};
+	class fs_in_out;
 
 protected:
 	virtual void onRasterizing(Batch *bat) = 0;
@@ -82,10 +75,11 @@ public:
 	virtual void CalculateRadiences(Primitive &prim) = 0;
 
 protected:
-	virtual void onInterpolating(const vsOutput &vo,
-								 const Gradience &grad;
+	virtual void onInterpolating(const fsInput &in,
+								 const fsInput &gradX;
+								 const fsInput &gradY;
 								 float stepx, float stepy,
-								 fsInput &result) = 0;
+								 fsInput &out) = 0;
 };
 
 

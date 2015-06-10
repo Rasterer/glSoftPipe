@@ -10,6 +10,11 @@ NS_OPEN_GLSP_OGL()
 class ShaderRegisterFile
 {
 public:
+	ShaderRegisterFile() = default;
+	ShaderRegisterFile(const ShaderRegisterFile&) = default;
+	ShaderRegisterFile& operator=(const ShaderRegisterFile&) = default;
+	~ShaderRegisterFile() = default;
+
 	// getReg() and resize() is one pair
 	void resize(size_t n)
 	{
@@ -60,6 +65,38 @@ public:
 	size_t getRegsNum() const
 	{
 		return mRegs.size();
+	}
+
+	size_t size() const
+	{
+		return mRegs.size();
+	}
+
+	glm::vec4& operator[](int idx)
+	{
+		return getReg(idx);
+	}
+	const glm::vec4& operator[](int idx) const
+	{
+		return getReg(idx);
+	}
+
+	ShaderRegisterFile operator+(const ShaderRegisterFile &rhs)
+	{
+		assert(getRegsNum() == rhs.getRegsNum())
+
+		for(size_t i = 0; i < getRegsNum(); i++)
+		{
+			mRegs[i] = rhs[i];
+		}
+	}
+
+	ShaderRegisterFile operator*(const float scalar)
+	{
+		for(size_t i = 0; i < getRegsNum(); i++)
+		{
+			mRegs[i] = rhs[i];
+		}
 	}
 
 private:

@@ -74,11 +74,11 @@ public:
 	Gradience(const Primitive &prim, Interpolater *interp);
 	~Gradience() = default;
 
-	fsInput	mStarts[Primitive::MAX_PRIM_TYPE];
+	const fsInput	mStarts[Primitive::MAX_PRIM_TYPE];
 
 	// X/Y partial derivatives
-	fsInput	mGradiencesX;
-	fsInput	mGradiencesY;
+	const fsInput	mGradiencesX;
+	const fsInput	mGradiencesY;
 
 	const Primitive	&mPrim;
 };
@@ -511,7 +511,8 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 		int x = ceil(it->xleft - 0.5f);
 
 		mpInterpolate->onInterpolating(fsio.mGrad.mStarts[0],
-									   fsio.mGrad,
+									   fsio.mGrad.mGradiencesX,
+									   fsio.mGrad.mGradiencesY,
 									   x + 0.5f - pos0.x,
 									   y + 0.5f - pos0.y,
 									   fsio.in);
@@ -625,13 +626,15 @@ public:
 	PerspectiveCorrectInterpolater() = default;
 	~PerspectiveCorrectInterpolater() = default;
 
+	// Should be invoked before onInterpolating()
 	virtual void CalculateRadiences(Rasterizer::Gradience *grad);
 
 private:
-	virtual void onInterpolating(const vsOutput &vo,
-								 const Gradience &grad;
-								 float stepx, float stepy,
-								 fsInput &result);
+	virtual void onInterpolating(const fsInput &in,
+								 const fsInput &gradX;
+								 const fsInput &gradY;
+								 float stepX, float stepY,
+								 fsInput &out);
 };
 
 void PerspectiveCorrectInterpolater::CalculateRadiences(Rasterizer::Gradience *pGrad)
@@ -647,12 +650,12 @@ void PerspectiveCorrectInterpolater::CalculateRadiences(Rasterizer::Gradience *p
 		mGradiencesY[i].resize(size);
 
 		const float ZReciprocal = 1.0f / prim.mVert[i].position().w;
-		mStarts[i][0] = prim.mVert[i].getReg(0);
+		mStarts[i][0] = prim.mVert[i][0];
 		mStarts[i][0].w = ZReciprocal;
 
 		for(size_t j = 1; j < size; j++)
 		{
-			mStarts[i][j] = prim.mVert[i].getReg(j) * ZReciprocal;
+			mStarts[i][j] = prim.mVert[i][j] * ZReciprocal;
 		}
 	}
 
@@ -699,6 +702,29 @@ void PerspectiveCorrectInterpolater::CalculateRadiences(Rasterizer::Gradience *p
 	}
 
 #undef GRADIENCE_EQUATION
+}
+
+virtual void PerspectiveCorrectInterpolater::onInterpolating(
+											const fsInput &in,
+							 				const fsInput &gradX;
+							 				const fsInput &gradY;
+							 				float stepX, float stepY,
+							 				fsInput &out)
+{
+	// OPT: performance issue with operator overloading?
+	//out = in + gradX * stepX + gradY * stepY;
+	size_t size = in.size();
+
+	assert(gradX.size() == size);
+	assert(gradY.size() == size);
+
+	for(size_t i = 0; i < size; ++i)
+	{
+		out[i] = in[i] + gradX[i] * stepX + gradY[i] * stepY;
+	}
+
+	// WIP, *= operator overload impl
+	out *= out[0].w;
 }
 
 NS_CLOSE_GLSP_OGL()
