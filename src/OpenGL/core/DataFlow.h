@@ -73,6 +73,7 @@ typedef ShaderRegisterFile vsOutput;
 typedef ShaderRegisterFile fsInput;
 typedef ShaderRegisterFile fsOutput;
 
+// TODO: add operator =
 struct Primitive
 {
 	enum PrimType
@@ -88,9 +89,9 @@ struct Primitive
 	int mVertNum;
 	vsOutput mVert[MAX_PRIM_TYPE];
 
+	// The reciprocal of the directed area of a triangle.
+	// FIXME: primitive may be not a triangle.
 	float mAreaReciprocal;
-
-	std::vector<glm::vec4> mGradiences;
 };
 
 typedef std::vector<int> IBuffer_v;

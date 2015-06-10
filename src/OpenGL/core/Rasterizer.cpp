@@ -72,12 +72,15 @@ class Rasterizer::Gradience
 {
 public:
 	Gradience(const Primitive &prim, Interpolater *interp);
-	~Gradience() { }
+	~Gradience() = default;
 
-	std::vector<vec4>	mStarts[Primitive::MAX_PRIM_TYPE];
+	fsInput	mStarts[Primitive::MAX_PRIM_TYPE];
 
-	std::vector<vec4>	mGradiences;
-	const Primitive	   &mPrim;
+	// X/Y partial derivatives
+	fsInput	mGradiencesX;
+	fsInput	mGradiencesY;
+
+	const Primitive	&mPrim;
 };
 
 Rasterizer::Gradience::Gradience(Primitive &prim, Interpolater *interp):
@@ -85,6 +88,21 @@ Rasterizer::Gradience::Gradience(Primitive &prim, Interpolater *interp):
 {
 	interp->CalculateRadiences(this);
 }
+
+class Rasterizer::fs_in_out
+{
+public:
+	fs_in_out(const Gradience &grad):
+		mGrad(grad)
+	{
+	}
+	~fs_in_out() = default;
+
+	fsInput in;
+	fsOutput out;
+
+	const Gradience &mGrad;
+};
 
 void Interpolater::emit(void *data)
 {
@@ -159,13 +177,14 @@ private:
 class ScanlineRasterizer::triangle
 {
 public:
-	triangle(Primitive *prim):
+	triangle(const Primitive &prim, Interpolater *interp):
 		mActiveEdge0(NULL),
 		mActiveEdge1(NULL),
+		mGrad(prim, interp),
 		mPrim(prim)
 	{
 	}
-	~triangle() {}
+	~triangle() = default;
 
 	vec3 calculateBC(float xp, float yp);
 	void setActiveEdge(edge *pEdge);
@@ -176,7 +195,9 @@ private:
 	// There can be at most two edges in AET at the same time
 	edge *mActiveEdge0;
 	edge *mActiveEdge1;
-	Primitive *mPrim;
+
+	const Rasterizer::Gradience mGrad;
+	const Primitive &mPrim;
 };
 
 // Calculate the barycentric coodinates of point P in this triangle
@@ -278,6 +299,9 @@ public:
 class ScanlineRasterizer::SRHelper
 {
 public:
+	SRHelper() = default;
+	~SRHelper() = default;
+
 	int ymin;
 	int ymax;
 	std::vector<triangle *> mTri;
@@ -309,22 +333,20 @@ ScanlineRasterizer::SRHelper* ScanlineRasterizer::createGET(Batch *bat)
 	//TODO: clipping
 	for(auto it = pl.begin(); it != pl.end(); it++)
 	{
-		Primitive &prim = *it;
-
-		triangle *pParent = new triangle(&prim);
+		triangle *pParent = new triangle(*it, mpInterpolate);
 		hlp->mTri.push_back(pParent);
 
-		for(size_t i = 0; i < 3; i++)
+		for(int i = 0; i < 3; i++)
 		{
-			vsOutput &vsout0 = prim.mVert[i];
-			vsOutput &vsout1 = prim.mVert[(i + 1) % 3];
+			vsOutput &vsout0 = it->mVert[i];
+			vsOutput &vsout1 = it->mVert[(i + 1) % 3];
 			const vec4 *hvert, *lvert;
 			int ystart;
 
 			int y0 = floor(vsout0.position().y + 0.5f);
 			int y1 = floor(vsout1.position().y + 0.5f);
 
-			// regarding horizontal edge, just discard this edge and use the other 2 edges
+			// regarding horizontal edge, just discard it and use the other 2 edges
 			if(y0 == y1)
 				continue;
 
@@ -358,8 +380,6 @@ ScanlineRasterizer::SRHelper* ScanlineRasterizer::createGET(Batch *bat)
 
 			get[ystart].push_back(pEdge);
 		}
-
-		mpInterpolate->CalculateRadiences()
 	}
 
 	return hlp;
@@ -369,7 +389,7 @@ void ScanlineRasterizer::activateEdgesFromGET(SRHelper *hlp, int y)
 {
 	auto &get = hlp->mGET;
 	auto &aet = hlp->mAET;
-	auto it = get.find(y);
+	auto it   = get.find(y);
 
 	if(it != get.end())
 	{
@@ -459,7 +479,7 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 	std::vector<span> vSpans;
 	const RenderTarget& rt = bat->mDC->gc->mRT;
 	unsigned char *colorBuffer = (unsigned char *)rt.pColorBuffer;
-	auto &fsio = hlp->mFsio;
+//	auto &fsio = hlp->mFsio;
 	
 	for(auto it = aet.begin(); it != aet.end(); it++)
 	{
@@ -480,18 +500,33 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 		pAdjcentEdge->bActive = false;
 	}
 
+
 	for(auto it = vSpans.begin(); it < vSpans.end(); it++)
 	{
-		// top-left filling convention
-		for(int x = ceil(it->xleft - 0.5f); x < ceil(it->xright - 0.5f); x++)
-		{
-			int index = (rt.height - y - 1) * rt.width + x;
-			triangle *pParent = it->mParent;
-			Primitive *prim = pParent->mPrim;
+		const triangle &tri = it->mParent;
+		const Primitive  &prim = tri->mPrim;
 
-			const vec4& pos0 = prim->mVert[0].position();
-			const vec4& pos1 = prim->mVert[1].position();
-			const vec4& pos2 = prim->mVert[2].position();
+		fs_in_out fsio(tri.mGrad);
+
+		int x = ceil(it->xleft - 0.5f);
+
+		mpInterpolate->onInterpolating(fsio.mGrad.mStarts[0],
+									   fsio.mGrad,
+									   x + 0.5f - pos0.x,
+									   y + 0.5f - pos0.y,
+									   fsio.in);
+
+		// top-left filling convention
+		for(; x < ceil(it->xright - 0.5f); x++)
+		{
+			getNextStage()->emit(&fsio);
+			int index = (rt.height - y - 1) * rt.width + x;
+
+			const vec4& pos0 = prim.mVert[0].position();
+			const vec4& pos1 = prim.mVert[1].position();
+			const vec4& pos2 = prim.mVert[2].position();
+
+
 
 			// There is no need to do perspective-correct for z.
 			vec3 bc = pParent->calculateBC(x + 0.5f, y + 0.5f);
@@ -587,8 +622,8 @@ int ScanlineRasterizer::onRasterizing(Batch *bat)
 class PerspectiveCorrectInterpolater: public Interpolater
 {
 public:
-	PerspectiveCorrectInterpolater() { }
-	~PerspectiveCorrectInterpolater() { }
+	PerspectiveCorrectInterpolater() = default;
+	~PerspectiveCorrectInterpolater() = default;
 
 	virtual void CalculateRadiences(Rasterizer::Gradience *grad);
 
@@ -599,29 +634,71 @@ private:
 								 fsInput &result);
 };
 
-// TBC
 void PerspectiveCorrectInterpolater::CalculateRadiences(Rasterizer::Gradience *pGrad)
 {
 	const Primitive &prim = pGrad->mPrim;
-
+	
+	size_t size = prim.mVert[0].getRegsNum();
+	
 	for(int i = 0; i < prim.mVertNum; i++)
 	{
-		size_t size = prim.mVert[i].getRegsNum();
 		mStarts[i].resize(size);
+		mGradiencesX[i].resize(size);
+		mGradiencesY[i].resize(size);
 
 		const float ZReciprocal = 1.0f / prim.mVert[i].position().w;
 		mStarts[i][0] = prim.mVert[i].getReg(0);
 		mStarts[i][0].w = ZReciprocal;
-
-		mGradiences[0].x = 1.0f;
-		mGradiences[0].y = 1.0f;
-		mGradiences[0].z = 1.0f;
 
 		for(size_t j = 1; j < size; j++)
 		{
 			mStarts[i][j] = prim.mVert[i].getReg(j) * ZReciprocal;
 		}
 	}
+
+	const vec4 &pos0 = it->mVert[0].position();
+	const vec4 &pos1 = it->mVert[1].position();
+	const vec4 &pos2 = it->mVert[2].position();
+
+	const float y1y2 = (pos1.y - pos2.y) * prim.mAreaReciprocal;
+	const float y2y0 = (pos2.y - pos0.y) * prim.mAreaReciprocal;
+	const float y0y1 = (pos0.y - pos1.y) * prim.mAreaReciprocal;
+
+	const float x2x1 = (pos2.x - pos1.x) * prim.mAreaReciprocal;
+	const float x0x2 = (pos0.x - pos2.x) * prim.mAreaReciprocal;
+	const float x1x0 = (pos1.x - pos0.x) * prim.mAreaReciprocal;
+
+#define GRADIENCE_EQUATION(i, c)	\
+	mGradiencesX[i].c = y1y2 * mStarts[0][i].c +	\
+						y2y0 * mStarts[1][i].c +	\
+						y0y1 * mStarts[2][i].c;		\
+	mGradiencesY[i].c = x2x1 * mStarts[0][i].c +	\
+						x0x2 * mStarts[1][i].c +	\
+						x1x0 * mStarts[2][i].c;
+
+	mGradiencesX[0].x = 1.0f;
+	mGradiencesX[0].y = 0.0f;
+	mGradiencesX[0].z = y1y2 * pos0.z +
+						y2y0 * pos1.z +
+						y0y1 * pos2.z;
+
+	mGradiencesY[0].x = 0.0f;
+	mGradiencesY[0].y = 1.0f;
+	mGradiencesY[0].z = x2x1 * pos0.z +
+						x0x2 * pos1.z +
+						x1x0 * pos2.z;
+
+	GRADIENCE_EQUATION(0, w);
+
+	for(size_t i = 1; i < size; i++)
+	{
+		GRADIENCE_EQUATION(i, x);
+		GRADIENCE_EQUATION(i, y);
+		GRADIENCE_EQUATION(i, z);
+		GRADIENCE_EQUATION(i, w);
+	}
+
+#undef GRADIENCE_EQUATION
 }
 
 NS_CLOSE_GLSP_OGL()

@@ -46,18 +46,20 @@ class Rasterizer: public PipeStage
 {
 public:
 	Rasterizer();
-	virtual ~Rasterizer() { }
+	virtual ~Rasterizer() = default;
 
 	virtual void emit(void *data);
 	virtual void finalize();
+
+	class Gradience;
 
 	struct fs_in_out
 	{
 		fsInput in;
 		fsOutput out;
-	};
 
-	class Gradience;
+		const Gradience &mGrad;
+	};
 
 protected:
 	virtual void onRasterizing(Batch *bat) = 0;
@@ -69,8 +71,8 @@ protected:
 class Interpolater: public PipeStage
 {
 public:
-	Interpolater() { }
-	~Interpolater() { }
+	Interpolater() = default;
+	virtual ~Interpolater() = default;
 
 	// PipeStage interfaces
 	virtual void emit(void *data);

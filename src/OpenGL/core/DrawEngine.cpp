@@ -116,7 +116,7 @@ void DrawEngine::initPipeline()
 	mDivider       = new PerspectiveDivider();
 	mMapper        = new ScreenMapper();
 	mCuller        = new FaceCuller();
-	mRast          = new ScanlineRasterizer();
+	mRast          = new RasterizerWrapper();
 
 	assert(mVertexFetcher &&
 		   mPrimAsbl      &&

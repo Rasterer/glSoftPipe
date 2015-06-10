@@ -29,42 +29,24 @@ void FaceCuller::emit(void *data)
 // OPT: get stage states from gc?
 void FaceCuller::culling(Batch *bat)
 {
-	Primlist &in = bat->mPrims;
-	Primlist::iterator it = in.begin();
+	Primlist &pl = bat->mPrims;
+	Primlist::iterator it = pl.begin();
 
-	while(it != in.end())
+	assert(mCullEnabled);
+
+	while(it != pl.end())
 	{
-		vec4 &pos0 = it->mVert[0].position();
-		vec4 &pos1 = it->mVert[1].position();
-		vec4 &pos2 = it->mVert[2].position();
+		orient_t orient = (it->mAreaReciprocal > 0)? CCW: CW;
+		face_t face = (mOrient == orient)? FRONT: BACK;
 
-		float ex = pos1.x - pos0.x;
-		float ey = pos1.y - pos0.y;
-		float fx = pos2.x - pos0.x;
-		float fy = pos2.y - pos0.y;
-		float area = ex * fy - ey * fx;
-
-		if(abs(area) > 1.0f)
+		if((mCullFace & face) != 0)
 		{
-			orient_t orient = (area > 0)? CCW: CW;
-			face_t face = (mOrient == orient)? FRONT: BACK;
-
-			if(mCullEnabled && (mCullFace & face) != 0)
-			{
-				it = in.erase(it);
-				continue;
-			}
-			else
-			{
-				it->mAreaReciprocal = 1.0f / area;
-			}
+			it = pl.erase(it);
 		}
 		else
 		{
-			it = in.erase(it);
-			continue;
+			it++;
 		}
-		++it;
 	}
 }
 
