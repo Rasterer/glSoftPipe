@@ -42,7 +42,20 @@ struct RenderTarget
 	void  *pStencilBuffer;
 };
 
-#define GLSP_CULL_FACE (0 << 0)
+
+/* NOTE:
+ * No alpha test now in core profile.
+ * Replaced by discard instruction in fragment shader.
+ */
+
+#define GLSP_CULL_FACE				(1 << 0)
+#define GLSP_MULTISAMPLE			(1 << 1)
+#define GLSP_SCISSOR_TEST			(1 << 2)
+#define GLSP_STENCIL_TEST			(1 << 3)
+#define GLSP_DEPTH_TEST				(1 << 4)
+#define GLSP_DEPTH_TEST				(1 << 5)
+#define GLSP_BLEND					(1 << 6)
+#define GLSP_DITHER					(1 << 7)
 
 // TODO: add other states
 struct GLStateMachine

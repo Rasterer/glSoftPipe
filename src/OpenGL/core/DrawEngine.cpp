@@ -30,6 +30,9 @@ GLAPI void APIENTRY glDrawArrays (GLenum mode, GLint first, GLsizei count)
 
 	de->prepareToDraw(dc);
 	de->emit(dc);
+
+	delete dc;
+	gc->mDC = NULL;
 }
 
 GLAPI void APIENTRY glDrawElements (GLenum mode, GLsizei count, GLenum type, const void *indices)
@@ -54,6 +57,9 @@ GLAPI void APIENTRY glDrawElements (GLenum mode, GLsizei count, GLenum type, con
 
 	de->prepareToDraw(dc);
 	de->emit(dc);
+
+	delete dc;
+	gc->mDC = NULL;
 }
 
 NS_OPEN_GLSP_OGL()
@@ -105,7 +111,6 @@ void DrawEngine::init(void *dpy, IEGLBridge *bridge)
 	mpBridge = bridge;
 
 	initPipeline();
-
 }
 
 void DrawEngine::initPipeline()
@@ -133,8 +138,27 @@ void DrawEngine::initPipeline()
 	mPrimAsbl->setNextStage(mClipper);
 	mClipper ->setNextStage(mDivider);
 	mDivider ->setNextStage(mMapper);
-	mMapper  ->setNextStage(mCuller);
-	mCuller  ->setNextStage(mRast);
+}
+
+void DrawEngine::linkPipeStages(GLContext *gc)
+{
+	int enables = gc->mState.mEnables;
+	VertexShader *pVS = gc->mPM.getCurrentProgram()->getVS();
+
+	mVertexFetcher->setNextStage(pVS);
+	pVS->setNextStage(mPrimAsbl);
+
+	if(enables & GLSP_CULL_FACE)
+	{
+		mMapper->setNextStage(mCuller);
+		mCuller->setNextStage(mRast);
+	}
+	else
+	{
+		mMapper->setNextStage(mRast);
+	}
+
+	mRast->linkPipeStages(gc);
 }
 
 // OPT: use dirty flag to optimize
@@ -166,10 +190,6 @@ bool DrawEngine::validateState(DrawContext *dc)
 	// link the shaders to the pipeline
 	VertexShader   *pVS = gc->mPM.getCurrentProgram()->getVS();
 	FragmentShader *pFS = gc->mPM.getCurrentProgram()->getFS();
-
-	mVertexFetcher->setNextStage(pVS);
-	pVS->setNextStage(mPrimAsbl);
-	mRast->setNextStage(pFS);
 
 	if(!gc->mTM.validateTextureState(pVS, pFS))
 		ret = false;
@@ -225,6 +245,8 @@ void DrawEngine::prepareToDraw(DrawContext *dc)
 	{
 		beginFrame(gc);
 	}
+
+	linkPipeStages(gc);
 
 #if 0
 	// TODO(done): use real view port state

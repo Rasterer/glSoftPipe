@@ -81,6 +81,8 @@ GLContext::GLContext(void *EglCtx, int major, int minor):
 void GLContext::initGC()
 {
 	applyViewport(0, 0, 0, 0);
+
+	mState.mEnables = 0;
 }
 
 void GLContext::applyViewport(int x, int y, int width, int height)

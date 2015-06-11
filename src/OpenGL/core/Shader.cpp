@@ -275,18 +275,19 @@ void VertexShader::finalize()
 }
 
 FragmentShader::FragmentShader():
-	PipeStage("Fragment Shading", DrawEngine::getDrawEngine())
+	PipeStage("Fragment Shading", DrawEngine::getDrawEngine()):
+	bHasDiscard(false)
 {
 }
 
 void FragmentShader::emit(void *data)
 {
-	Rasterizer::fs_in_out *fsio = static_cast<Rasterizer::fs_in_out *>(data);
+	Fsio *pFsio = static_cast<Fsio *>(data);
 
-	fsio->out.resize(getOutRegsNum());
-	execute(fsio->in, fsio->out);
+	pFsio->out.resize(getOutRegsNum());
+	execute(pFsio->in, pFsio->out);
 
-	//getNextStage()->emit(hlp);
+	getNextStage()->emit(pFsio);
 }
 
 void FragmentShader::compile()

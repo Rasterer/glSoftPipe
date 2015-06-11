@@ -17,6 +17,8 @@ NS_OPEN_GLSP_OGL()
 using glm::vec3;
 using glm::vec4;
 
+const RenderTarget *gRT = NULL;
+
 RasterizerWrapper::RasterizerWrapper():
 	PipeStage("Rasterizier Wrapper", DrawEngine::getDrawEngine()),
 	mpRasterizer(new ScanlineRasterizer),
@@ -30,10 +32,9 @@ RasterizerWrapper::RasterizerWrapper():
 	mpStencilTest(new StencilTester),
 	mpDepthTest(new ZTester),
 	mpBlender(new Blender),
-	mpDither(new Dither)
+	mpDither(new Dither),
+	mDC(NULL)
 {
-	setFirstStage(mpRasterizer);
-
 	Interpolater *interp = dynamic_cast<Interpolater *>(mpInterpolate);
 	assert(interp);
 
@@ -53,11 +54,60 @@ RasterizerWrapper::~RasterizerWrapper()
 	delete mpRasterizer;
 }
 
+void RasterizerWrapper::initPipeline()
+{
+	setNextStage(mpRasterizer);
+}
+
+void RasterizerWrapper::linkPipeStages(GLContext *gc)
+{
+	int enables = gc->mState.mEnables;
+	FragmentShader *pFS = gc->mPM.getCurrentProgram()->getFS();
+
+	PipeStage *last;
+
+	if(enables & GLSP_DEPTH_TEST)
+	{
+		// enable early Z
+		if(pFS->getDiscardFlag() &&
+			!(enables & GLSP_SCISSOR_TEST) &&
+			!(enables & GL_STENCIL_TEST))
+		{
+			mpRasterizer ->setNextStage(mpDepthTest);
+			mpDepthTest  ->setNextStage(mpInterpolate);
+			mpInterpolate->setNextStage(pFS);
+		}
+		else
+		{
+			mpRasterizer ->setNextStage(mpInterpolate);
+			mpInterpolate->setNextStage(pFS);
+
+			if(enables & GLSP_SCISSOR_TEST)
+				last = pFS->setNextStage(mpScissorTest);
+
+			if((enables & GL_STENCIL_TEST))
+				last = last->setNextStage(mpStencilTest);
+
+			last = last->setNextStage(mpDepthTest);
+		}
+	}
+	else
+	{
+		mpRasterizer ->setNextStage(mpInterpolate);
+		last = mpInterpolate->setNextStage(pFS);
+	}
+
+	last = last->setNextStage(mpBlender);
+
+	if(enables & GLSP_DITHER)
+		last = last->setNextStage(mpDither);
+}
+
 void RasterizerWrapper::emit(void *data)
 {
 	Batch *bat = static_cast<Batch *>(data);
-	Primlist &pl = bat->mPrims;
-		
+	gRT = &bat->mDC->gc->mRT;
+
 	Interpolater *interp = dynamic_cast<Interpolater *>(mpInterpolate);
 	assert(interp);
 
@@ -68,47 +118,10 @@ void RasterizerWrapper::finalize()
 {
 }
 
-class Rasterizer::Gradience
-{
-public:
-	Gradience(const Primitive &prim, Interpolater *interp);
-	~Gradience() = default;
-
-	const fsInput	mStarts[Primitive::MAX_PRIM_TYPE];
-
-	// X/Y partial derivatives
-	const fsInput	mGradiencesX;
-	const fsInput	mGradiencesY;
-
-	const Primitive	&mPrim;
-};
-
-Rasterizer::Gradience::Gradience(Primitive &prim, Interpolater *interp):
-	mPrim(prim)
-{
-	interp->CalculateRadiences(this);
-}
-
-class Rasterizer::fs_in_out
-{
-public:
-	fs_in_out() = default;
-	~fs_in_out() = default;
-
-	int x, y;
-	fsInput in;
-	fsOutput out;
-
-	const Gradience *mpGrad;
-
-	// used to indicate if in is already interpolated or not
-	bool bValid;
-};
-
 void Interpolater::emit(void *data)
 {
-	Rasterizer::fs_in_out *pFsio = static_cast<Rasterizer::fs_in_out *>(data);
-	const Rasterizer::Gradience &grad = pFsio->mGrad;
+	Fsio *pFsio = static_cast<Fsio *>(data);
+	const Gradience &grad = pFsio->mGrad;
 
 	if(!pFsio->bValid)
 	{
@@ -138,7 +151,6 @@ Rasterizer::emit(void *data)
 void Rasterizer::finalize()
 {
 }
-
 
 // active edge table implementation
 // TODO: tile-based implementation
@@ -187,10 +199,10 @@ private:
 class ScanlineRasterizer::triangle
 {
 public:
-	triangle(const Primitive &prim, Interpolater *interp):
+	triangle(const Primitive &prim):
 		mActiveEdge0(NULL),
 		mActiveEdge1(NULL),
-		mGrad(prim, interp),
+		mGrad(prim),
 		mPrim(prim)
 	{
 	}
@@ -206,7 +218,7 @@ private:
 	edge *mActiveEdge0;
 	edge *mActiveEdge1;
 
-	const Rasterizer::Gradience mGrad;
+	const Gradience mGrad;
 	const Primitive &mPrim;
 };
 
@@ -322,9 +334,6 @@ public:
 	GlobalEdgeTable mGET;
 	// active edges table
 	ActiveEdgeTable mAET;
-
-	// used in following stages, e.g. fragment shader, merge.
-	Rasterizer::fs_in_out mFsio;
 };
 
 ScanlineRasterizer::SRHelper* ScanlineRasterizer::createGET(Batch *bat)
@@ -343,8 +352,10 @@ ScanlineRasterizer::SRHelper* ScanlineRasterizer::createGET(Batch *bat)
 	//TODO: clipping
 	for(auto it = pl.begin(); it != pl.end(); it++)
 	{
-		triangle *pParent = new triangle(*it, mpInterpolate);
+		triangle *pParent = new triangle(*it);
 		hlp->mTri.push_back(pParent);
+
+		mpInterpolate->CalculateRadiences(&pParent->mGrad);
 
 		for(int i = 0; i < 3; i++)
 		{
@@ -487,8 +498,8 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 {
 	auto &aet = hlp->mAET;
 	std::vector<span> vSpans;
-	const RenderTarget& rt = bat->mDC->gc->mRT;
-	unsigned char *colorBuffer = (unsigned char *)rt.pColorBuffer;
+//	const RenderTarget& rt = bat->mDC->gc->mRT;
+//	unsigned char *colorBuffer = (unsigned char *)rt.pColorBuffer;
 //	auto &fsio = hlp->mFsio;
 	
 	for(auto it = aet.begin(); it != aet.end(); it++)
@@ -515,7 +526,7 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 	}
 
 
-	fs_in_out fsio;
+	Fsio fsio;
 	fsio.y = y;
 
 	for(auto it = vSpans.begin(); it < vSpans.end(); it++)
@@ -660,7 +671,7 @@ public:
 	~PerspectiveCorrectInterpolater() = default;
 
 	// Should be invoked before onInterpolating()
-	virtual void CalculateRadiences(Rasterizer::Gradience *grad);
+	virtual void CalculateRadiences(Gradience *grad);
 
 private:
 	virtual void onInterpolating(const fsInput &in,
@@ -671,7 +682,7 @@ private:
 };
 
 // Use the gradience to store partial derivatives of c/z
-void PerspectiveCorrectInterpolater::CalculateRadiences(Rasterizer::Gradience *pGrad)
+void PerspectiveCorrectInterpolater::CalculateRadiences(Gradience *pGrad)
 {
 	const Primitive &prim = pGrad->mPrim;
 	

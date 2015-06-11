@@ -13,18 +13,19 @@ class DrawContext;
 class PipeStage
 {
 public:
+	PipeStage() = default;
 	PipeStage(const std::string &name, const DrawEngine& de);
-	virtual ~PipeStage() { }
+	virtual ~PipeStage() = default;
 
-	virtual void emit(void *data) = 0;
-	virtual void finalize() = 0;
+	virtual void emit(void *data) { return; }
+	virtual void finalize() { return; }
 
 	// accessors
-	PipeStage *getNextStage() const { return mNextStage; }
+	PipeStage* getNextStage() const { return mNextStage; }
 	const std::string & getName() const { return mName; }
 
 	// mutators
-	void setNextStage(PipeStage *stage) { mNextStage = stage; }
+	PipeStage* setNextStage(PipeStage *stage) { mNextStage = stage; return stage; }
 
 private:
 	const DrawEngine& mDrawEngine;

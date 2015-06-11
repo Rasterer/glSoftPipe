@@ -243,9 +243,14 @@ public:
 	virtual void finalize();
 	virtual void compile();
 
+	bool getDiscardFlag() const { return bHasDiscard; }
+
 private:
 	virtual void execute(fsInput& in, fsOutput& out);
 
+	void SetDiscardFlag() { bHasDiscard = true; }
+
+	bool bHasDiscard;
 };
 
 class Program: public NameItem

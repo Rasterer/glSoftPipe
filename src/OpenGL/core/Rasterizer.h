@@ -20,22 +20,19 @@ public:
 	RasterizerWrapper();
 	~RasterizerWrapper();
 
-	void SetupPipeStages();
+	// PipeStage interfaces
 	virtual void emit(void *data);
 	virtual void finalize();
 
+	void initPipeline();
+	void linkPipeStages(GLContext *gc);
+
 private:
-	PipeStage* getFirstStage() const { return mFirstStage; }
-	void setFirstStage(PipeStage *stage) { mFirstStage = stage; }
-
-	PipeStage *mFirstStage;
-
 	PipeStage *mpRasterizer; // scan conversion
 	PipeStage *mpInterpolate;
 	PipeStage *mpFS;
 	PipeStage *mpOwnershipTest;
 	PipeStage *mpScissorTest;
-	PipeStage *mpAlphaTest;
 	PipeStage *mpStencilTest;
 	PipeStage *mpDepthTest;
 	PipeStage *mpBlender;
@@ -50,9 +47,6 @@ public:
 
 	virtual void emit(void *data);
 	virtual void finalize();
-
-	class Gradience;
-	class fs_in_out;
 
 protected:
 	virtual void onRasterizing(Batch *bat) = 0;

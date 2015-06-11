@@ -117,6 +117,9 @@ typedef ShaderRegisterFile fsOutput;
 // TODO: add operator =
 struct Primitive
 {
+	Primitive() = default;
+	~Primitive() = default;
+
 	enum PrimType
 	{
 		POINT = 0,
@@ -165,5 +168,44 @@ public:
 	// point back to the mDC
 	DrawContext	   *mDC;
 };
+
+
+class Gradience
+{
+public:
+	Gradience(const Primitive &prim):
+		mPrim(prim)
+	{
+	}
+	~Gradience() = default;
+
+	const fsInput	mStarts[Primitive::MAX_PRIM_TYPE];
+
+	// X/Y partial derivatives
+	const fsInput	mGradiencesX;
+	const fsInput	mGradiencesY;
+
+	const Primitive	&mPrim;
+};
+
+class Fsio
+{
+public:
+	Fsio() = default;
+	~Fsio() = default;
+
+	int x, y;
+	fsInput in;
+	fsOutput out;
+
+	const Gradience *mpGrad;
+
+	// used to indicate if in is already interpolated or not
+	bool bValid;
+};
+
+// FIXME: move to a global class
+struct RenderTarget;
+const RenderTarget *gRT = NULL;
 
 NS_CLOSE_GLSP_OGL()

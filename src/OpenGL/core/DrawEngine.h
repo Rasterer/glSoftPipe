@@ -64,22 +64,24 @@ protected:
 	DrawEngine();
 	~DrawEngine();
 
-	void beginFrame(GLContext *dc);
-	void initPipeline();
 
 private:
+	void beginFrame(GLContext *dc);
+	void initPipeline();
+	void linkPipeStages(GLContext *gc);
+
 	// Use pointer member because there may be serveral impls of this components.
 	// And we may need to switch between those dynamically.
-	VertexFetcher*			mVertexFetcher;
-	PrimitiveAssembler*		mPrimAsbl;
-	Clipper*				mClipper;
-	PerspectiveDivider*		mDivider;
-	ScreenMapper*			mMapper;
-	FaceCuller*				mCuller;
-	Rasterizer*				mRast;
+	VertexFetcher 			*mVertexFetcher;
+	PrimitiveAssembler 		*mPrimAsbl;
+	Clipper 				*mClipper;
+	PerspectiveDivider 		*mDivider;
+	ScreenMapper 			*mMapper;
+	FaceCuller 				*mCuller;
+	RasterizerWrapper 		*mRast;
 
 	// TODO(done): Use member pointer may limit the multi-thread use of DrawEngine.
-	// Find a more decent way
+	// Find a better way
 	// DrawContext			   *mCtx;
 	PipeStage			   *mFirstStage;
 
