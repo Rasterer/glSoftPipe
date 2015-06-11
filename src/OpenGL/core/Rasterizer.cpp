@@ -92,21 +92,31 @@ Rasterizer::Gradience::Gradience(Primitive &prim, Interpolater *interp):
 class Rasterizer::fs_in_out
 {
 public:
-	fs_in_out(const Gradience &grad):
-		mGrad(grad)
-	{
-	}
+	fs_in_out() = default;
 	~fs_in_out() = default;
 
+	int x, y;
 	fsInput in;
 	fsOutput out;
 
-	const Gradience &mGrad;
+	const Gradience *mpGrad;
+
+	// used to indicate if in is already interpolated or not
+	bool bValid;
 };
 
 void Interpolater::emit(void *data)
 {
-	onInterpolating();
+	Rasterizer::fs_in_out *pFsio = static_cast<Rasterizer::fs_in_out *>(data);
+	const Rasterizer::Gradience &grad = pFsio->mGrad;
+
+	if(!pFsio->bValid)
+	{
+		onInterpolating(pFsio->in, grad.mGradiencesX);
+		pFsio->bValid = true;
+	}
+
+	getNextStage()->emit(pFsio);
 }
 
 void Interpolater::finalize()
@@ -494,6 +504,10 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 
 		float xleft = fmin(pEdge->x, pAdjcentEdge->x);
 		float xright = fmax(pEdge->x, pAdjcentEdge->x);
+
+		if(xright - xleft < 1.0f)
+			continue;
+
 		vSpans.push_back(span(xleft, xright, pParent));
 
 		pEdge->bActive        = false;
@@ -501,26 +515,45 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 	}
 
 
+	fs_in_out fsio;
+	fsio.y = y;
+
 	for(auto it = vSpans.begin(); it < vSpans.end(); it++)
 	{
 		const triangle &tri = it->mParent;
-		const Primitive  &prim = tri->mPrim;
-
-		fs_in_out fsio(tri.mGrad);
+		const Primitive &prim = tri.mPrim;
 
 		int x = ceil(it->xleft - 0.5f);
 
-		mpInterpolate->onInterpolating(fsio.mGrad.mStarts[0],
-									   fsio.mGrad.mGradiencesX,
-									   fsio.mGrad.mGradiencesY,
+		fsio.mpGrad 	= &tri.mGrad;
+		fsio.x 			= x;
+
+		mpInterpolate->onInterpolating(fsio.mpGrad->mStarts[0],
+									   fsio.mpGrad->mGradiencesX,
+									   fsio.mpGrad->mGradiencesY,
 									   x + 0.5f - pos0.x,
 									   y + 0.5f - pos0.y,
 									   fsio.in);
 
+		fsio.z 		= fsio.in[0].z;
+		fsio.bValid = true;
+
 		// top-left filling convention
-		for(; x < ceil(it->xright - 0.5f); x++)
+		int xmax = ceil(it->xright - 0.5f);
+
+		do
 		{
 			getNextStage()->emit(&fsio);
+
+			// Info for Z test
+			fsio.x  = ++x;
+			fsio.z += tri.mGrad.mGradiencesX[0].z;
+
+			fsio.bValid = false;
+		}
+		while (x < xmax);
+
+#if 0
 			int index = (rt.height - y - 1) * rt.width + x;
 
 			const vec4& pos0 = prim.mVert[0].position();
@@ -556,7 +589,7 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 			else
 			{
 			}
-		}
+#endif
 	}
 
 	return;
@@ -637,6 +670,7 @@ private:
 								 fsInput &out);
 };
 
+// Use the gradience to store partial derivatives of c/z
 void PerspectiveCorrectInterpolater::CalculateRadiences(Rasterizer::Gradience *pGrad)
 {
 	const Primitive &prim = pGrad->mPrim;
@@ -706,8 +740,8 @@ void PerspectiveCorrectInterpolater::CalculateRadiences(Rasterizer::Gradience *p
 
 virtual void PerspectiveCorrectInterpolater::onInterpolating(
 											const fsInput &in,
-							 				const fsInput &gradX;
-							 				const fsInput &gradY;
+							 				const fsInput &gradX,
+							 				const fsInput &gradY,
 							 				float stepX, float stepY,
 							 				fsInput &out)
 {
@@ -723,8 +757,42 @@ virtual void PerspectiveCorrectInterpolater::onInterpolating(
 		out[i] = in[i] + gradX[i] * stepX + gradY[i] * stepY;
 	}
 
+	float z = 1.0f / out[0].w;
 	// WIP, *= operator overload impl
-	out *= out[0].w;
+	// out *= z;
+
+	for(size_t i = 1; i < size; ++i)
+	{
+		out[i] *= z;
+	}
+}
+
+virtual void PerspectiveCorrectInterpolater::onInterpolating(
+											fsInput &in,
+							 				const fsInput &grad)
+{
+	size_t size = in.size();
+
+	assert(grad.size() == size);
+
+	// OPT: performance issue with operator overloading?
+	in += grad;
+
+#if 0
+	for(size_t i = 0; i < size; ++i)
+	{
+		in[i] += gradX[i];
+	}
+#endif
+
+	float z = 1.0f / in[0].w;
+	// WIP, *= operator overload impl
+	// out *= z;
+
+	for(size_t i = 1; i < size; ++i)
+	{
+		in[i] *= z;
+	}
 }
 
 NS_CLOSE_GLSP_OGL()

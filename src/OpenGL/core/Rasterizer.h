@@ -76,10 +76,14 @@ public:
 
 protected:
 	virtual void onInterpolating(const fsInput &in,
-								 const fsInput &gradX;
-								 const fsInput &gradY;
+								 const fsInput &gradX,
+								 const fsInput &gradY,
 								 float stepx, float stepy,
 								 fsInput &out) = 0;
+
+	// step 1 in X or Y axis
+	virtual void onInterpolating(const fsInput &in,
+								 const fsInput &grad) = 0;
 };
 
 

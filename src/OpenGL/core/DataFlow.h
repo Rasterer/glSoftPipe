@@ -81,22 +81,26 @@ public:
 		return getReg(idx);
 	}
 
-	ShaderRegisterFile operator+(const ShaderRegisterFile &rhs)
+	ShaderRegisterFile& operator+=(const ShaderRegisterFile &rhs)
 	{
 		assert(getRegsNum() == rhs.getRegsNum())
 
 		for(size_t i = 0; i < getRegsNum(); i++)
 		{
-			mRegs[i] = rhs[i];
+			mRegs[i] += rhs[i];
 		}
+
+		return *this;
 	}
 
-	ShaderRegisterFile operator*(const float scalar)
+	ShaderRegisterFile& operator*=(const float scalar)
 	{
 		for(size_t i = 0; i < getRegsNum(); i++)
 		{
-			mRegs[i] = rhs[i];
+			mRegs[i] *= scalar;
 		}
+
+		return *this;
 	}
 
 private:
