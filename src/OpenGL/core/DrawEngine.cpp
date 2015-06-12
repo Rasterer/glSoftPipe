@@ -134,10 +134,11 @@ void DrawEngine::initPipeline()
 
 	setFirstStage(mVertexFetcher);
 
-
 	mPrimAsbl->setNextStage(mClipper);
 	mClipper ->setNextStage(mDivider);
 	mDivider ->setNextStage(mMapper);
+
+	mRast->initPipeline();
 }
 
 void DrawEngine::linkPipeStages(GLContext *gc)

@@ -9,7 +9,6 @@
 #include "khronos/GL/glcorearb.h"
 
 
-
 using glm::vec4;
 using glm::vec2;
 using glm::mat4;
@@ -265,7 +264,6 @@ void VertexShader::emit(void *data)
 
 	// Free the memory in Batch.mVertexCache to avoid large memory occupy
 	vsInput_v().swap(in);
-	vsCacheIndex().swap(bat->mCacheIndex);
 
 	getNextStage()->emit(bat);
 }
@@ -275,7 +273,7 @@ void VertexShader::finalize()
 }
 
 FragmentShader::FragmentShader():
-	PipeStage("Fragment Shading", DrawEngine::getDrawEngine()):
+	PipeStage("Fragment Shading", DrawEngine::getDrawEngine()),
 	bHasDiscard(false)
 {
 }

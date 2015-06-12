@@ -76,7 +76,7 @@ public:
 		return (mIsComplete = mpMipmap->mResident);
 	}
 
-	auto getLevelNum() const { return mNumMipmaps; }
+	uint32_t getLevelNum() const { return mNumMipmaps; }
 	TextureMipmap*  getMipmap(uint32_t layer, int32_t level);
 
 	const SamplerObject&  getSamplerObject() const { return mSO; }

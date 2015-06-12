@@ -9,6 +9,8 @@ NS_OPEN_GLSP_OGL()
 
 using namespace std;
 
+class Interpolater;
+
 /* The wrapper for the whole rasterizer stages.
  * Also responsible for resource life management.
  */
@@ -37,6 +39,7 @@ private:
 	PipeStage *mpDepthTest;
 	PipeStage *mpBlender;
 	PipeStage *mpDither;
+	PipeStage *mpFBWriter;
 };
 
 class Rasterizer: public PipeStage
@@ -48,8 +51,16 @@ public:
 	virtual void emit(void *data);
 	virtual void finalize();
 
+	void SetInterpolater(Interpolater *interp)
+	{
+		mpInterpolate = interp;
+	}
+
 protected:
 	virtual void onRasterizing(Batch *bat) = 0;
+
+	// Used to calculate gradiences.
+	Interpolater *mpInterpolate;
 };
 
 
@@ -58,7 +69,7 @@ protected:
 class Interpolater: public PipeStage
 {
 public:
-	Interpolater() = default;
+	Interpolater();
 	virtual ~Interpolater() = default;
 
 	// PipeStage interfaces
@@ -66,9 +77,8 @@ public:
 	virtual void finalize();
 
 	// Should be invoked before onInterpolating
-	virtual void CalculateRadiences(Primitive &prim) = 0;
+	virtual void CalculateRadiences(Gradience *pGrad) = 0;
 
-protected:
 	virtual void onInterpolating(const fsInput &in,
 								 const fsInput &gradX,
 								 const fsInput &gradY,
@@ -76,7 +86,7 @@ protected:
 								 fsInput &out) = 0;
 
 	// step 1 in X or Y axis
-	virtual void onInterpolating(const fsInput &in,
+	virtual void onInterpolating(fsInput &in,
 								 const fsInput &grad) = 0;
 };
 

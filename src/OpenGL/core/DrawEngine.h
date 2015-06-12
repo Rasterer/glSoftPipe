@@ -16,7 +16,7 @@ using boost::serialization::singleton;
 
 class GLContext;
 class VertexFetcher;
-class Rasterizer;
+class RasterizerWrapper;
 
 struct DrawContext
 {

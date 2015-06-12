@@ -38,26 +38,14 @@ public:
 
 	void execute(vsInput &in, vsOutput &out)
 	{
-		//cout << "jzb: before VS" << endl;
 		RESOLVE_IN (vec3, iPos, in);
 		RESOLVE_IN (vec2, iTexCoor, in);
 
 		RESOLVE_OUT(vec4, gl_Position, out);
 		RESOLVE_OUT(vec2, oTexCoor, out);
 
-		cout << "iPos x " << iPos.x << endl;
-		cout << "iPos y " << iPos.y << endl;
-		cout << "iPos z " << iPos.z << endl;
-
 		gl_Position = mProj * mView * vec4(iPos, 1.0f);
-		cout << "gl_color x " << iTexCoor.x << endl;
-		cout << "gl_color y " << iTexCoor.y << endl;
 		oTexCoor = iTexCoor;
-		//cout << "jzb: after VS" << endl;
-		cout << "gl_Position x " << gl_Position.x << endl;
-		cout << "gl_Position y " << gl_Position.y << endl;
-		cout << "gl_Position z " << gl_Position.z << endl;
-		cout << "gl_Position w " << gl_Position.w << endl;
 	}
 
 private:
@@ -168,9 +156,7 @@ int main(int argc, char **argv)
 	EGLint ignore;
 	EGLBoolean ok;
 
-	cout << "jzb: main start" << endl;
 	EGLDisplay display = eglGetDisplay(disp);
-	cout << "jzb: main start 1" << endl;
 	ok = eglInitialize(display, &ignore, &ignore);
 
 	if (!ok)
@@ -292,7 +278,7 @@ int main(int argc, char **argv)
 	while(true)
 	{
 		cout << "draw begin" << endl;
-		std::this_thread::sleep_for (std::chrono::seconds(2));
+		//std::this_thread::sleep_for (std::chrono::seconds(2));
 
 		//xbias += 0.01f;
 
@@ -305,7 +291,7 @@ int main(int argc, char **argv)
 		//view = view * trans;
 		//glUniformMatrix4fv(viewLocation, 1, false, (float *)&view);
 
-		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
 		//glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		ok = eglSwapBuffers(display, surface);
 	}

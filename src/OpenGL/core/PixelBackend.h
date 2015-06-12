@@ -1,15 +1,21 @@
 #pragma once
 
-#include "DataFlow.h"
+#include "PipeStage.h"
+#include "DrawEngine.h"
+#include "GLContext.h"
 
 
 NS_OPEN_GLSP_OGL()
 
+class Fsio;
+
+// FIXME: move to a global class
+extern const RenderTarget *gRT;
 
 class OwnershipTester: public PipeStage
 {
 public:
-	OwnershipTester() = default;
+	OwnershipTester();
 	~OwnershipTester() = default;
 
 private:
@@ -19,7 +25,7 @@ private:
 class ScissorTester: public PipeStage
 {
 public:
-	ScissorTester() = default;
+	ScissorTester();
 	~ScissorTester() = default;
 
 private:
@@ -29,7 +35,7 @@ private:
 class StencilTester: public PipeStage
 {
 public:
-	StencilTester() = default;
+	StencilTester();
 	~StencilTester() = default;
 
 private:
@@ -44,7 +50,6 @@ public:
 
 	// PipeStage interfaces
 	virtual void emit(void *data);
-	virtual void finalize();
 
 private:
 	inline bool onDepthTesting(const Fsio &fsio);
@@ -53,22 +58,37 @@ private:
 class Blender: public PipeStage
 {
 public:
-	Blender() = default;
+	Blender();
 	~Blender() = default;
 
+	// PipeStage interfaces
+	virtual void emit(void *data);
+
 private:
-	inline bool onBlending(const Fsio &fsio);
+	inline void onBlending(Fsio &fsio);
 };
 
 class Dither: public PipeStage
 {
 public:
-	Dither() = default;
+	Dither();
 	~Dither() = default;
 
 private:
 	inline bool onDithering(const Fsio &fsio);
 };
 
+/* The final stage */
+class FBWriter: public PipeStage
+{
+public:
+	FBWriter();
+	~FBWriter() = default;
+
+	virtual void emit(void *data);
+
+private:
+	inline void onFBWriting(const Fsio &fsio);
+};
 
 NS_CLOSE_GLSP_OGL()

@@ -75,7 +75,7 @@ void VertexCachedFetcher::fetchVertex(DrawContext *dc)
 		}
 
 		vsInput_v &cache = bat->mVertexCache;
-		vsCacheIndex::iterator it = cacheIndex.find(idx);
+		auto it = cacheIndex.find(idx);
 
 		if(it != cacheIndex.end())
 		{

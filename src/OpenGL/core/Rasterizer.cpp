@@ -6,9 +6,11 @@
 #include <unordered_map>
 #include <algorithm>
 #include <cmath>
-#include <cfloat>	
+#include <cfloat>
+
 #include "DrawEngine.h"
 #include "GLContext.h"
+#include "PixelBackend.h"
 #include "utils.h"
 
 
@@ -19,136 +21,62 @@ using glm::vec4;
 
 const RenderTarget *gRT = NULL;
 
-RasterizerWrapper::RasterizerWrapper():
-	PipeStage("Rasterizier Wrapper", DrawEngine::getDrawEngine()),
-	mpRasterizer(new ScanlineRasterizer),
-	mpInterpolate(new PerspectiveCorrectInterpolater),
-	// RasterizerWrapper doesn't own FS,
-	// will be linked in when draw validate.
-	mpFS(NULL),
-	mpOwnershipTest(new OwnershipTester),
-	mpScissorTest(new ScissorTester),
-	mpAlphaTest(new AlphaTester),
-	mpStencilTest(new StencilTester),
-	mpDepthTest(new ZTester),
-	mpBlender(new Blender),
-	mpDither(new Dither),
-	mDC(NULL)
-{
-	Interpolater *interp = dynamic_cast<Interpolater *>(mpInterpolate);
-	assert(interp);
-
-	mpRasterizer->SetInterpolater(mpInterpolate);
-}
-
-RasterizerWrapper::~RasterizerWrapper()
-{
-	delete mpDither;
-	delete mpBlender;
-	delete mpDepthTest;
-	delete mpStencilTest;
-	delete mpAlphaTest;
-	delete mpScissorTest;
-	delete mpOwnershipTest;
-	delete mpInterpolate;
-	delete mpRasterizer;
-}
-
-void RasterizerWrapper::initPipeline()
-{
-	setNextStage(mpRasterizer);
-}
-
-void RasterizerWrapper::linkPipeStages(GLContext *gc)
-{
-	int enables = gc->mState.mEnables;
-	FragmentShader *pFS = gc->mPM.getCurrentProgram()->getFS();
-
-	PipeStage *last;
-
-	if(enables & GLSP_DEPTH_TEST)
-	{
-		// enable early Z
-		if(pFS->getDiscardFlag() &&
-			!(enables & GLSP_SCISSOR_TEST) &&
-			!(enables & GL_STENCIL_TEST))
-		{
-			mpRasterizer ->setNextStage(mpDepthTest);
-			mpDepthTest  ->setNextStage(mpInterpolate);
-			mpInterpolate->setNextStage(pFS);
-		}
-		else
-		{
-			mpRasterizer ->setNextStage(mpInterpolate);
-			mpInterpolate->setNextStage(pFS);
-
-			if(enables & GLSP_SCISSOR_TEST)
-				last = pFS->setNextStage(mpScissorTest);
-
-			if((enables & GL_STENCIL_TEST))
-				last = last->setNextStage(mpStencilTest);
-
-			last = last->setNextStage(mpDepthTest);
-		}
-	}
-	else
-	{
-		mpRasterizer ->setNextStage(mpInterpolate);
-		last = mpInterpolate->setNextStage(pFS);
-	}
-
-	last = last->setNextStage(mpBlender);
-
-	if(enables & GLSP_DITHER)
-		last = last->setNextStage(mpDither);
-}
-
-void RasterizerWrapper::emit(void *data)
-{
-	Batch *bat = static_cast<Batch *>(data);
-	gRT = &bat->mDC->gc->mRT;
-
-	Interpolater *interp = dynamic_cast<Interpolater *>(mpInterpolate);
-	assert(interp);
-
-	getFirstStage()->emit(bat);
-}
-
-void RasterizerWrapper::finalize()
-{
-}
-
-void Interpolater::emit(void *data)
-{
-	Fsio *pFsio = static_cast<Fsio *>(data);
-	const Gradience &grad = pFsio->mGrad;
-
-	if(!pFsio->bValid)
-	{
-		onInterpolating(pFsio->in, grad.mGradiencesX);
-		pFsio->bValid = true;
-	}
-
-	getNextStage()->emit(pFsio);
-}
-
-void Interpolater::finalize()
-{
-}
-
 Rasterizer::Rasterizer():
 	PipeStage("Rasterizing", DrawEngine::getDrawEngine())
 {
 }
 
-Rasterizer::emit(void *data)
+void Rasterizer::emit(void *data)
 {
 	Batch *bat = static_cast<Batch *>(data);
-
 	onRasterizing(bat);
 }
 
 void Rasterizer::finalize()
+{
+}
+
+class PerspectiveCorrectInterpolater: public Interpolater
+{
+public:
+	PerspectiveCorrectInterpolater() = default;
+	~PerspectiveCorrectInterpolater() = default;
+
+	// Should be invoked before onInterpolating()
+	virtual void CalculateRadiences(Gradience *pGrad);
+
+	virtual void onInterpolating(const fsInput &in,
+								 const fsInput &gradX,
+								 const fsInput &gradY,
+								 float stepX, float stepY,
+								 fsInput &out);
+
+	// step 1 in X or Y axis
+	virtual void onInterpolating(fsInput &in,
+								 const fsInput &grad);
+
+	static inline void PerspectiveCorrect(const fsInput &in, fsInput &out);
+};
+
+void Interpolater::emit(void *data)
+{
+	Fsio &fsio = *static_cast<Fsio *>(data);
+	const Gradience *pGrad = fsio.mpGrad;
+	fsInput &start = *static_cast<fsInput *>(fsio.m_priv);
+
+	if(!fsio.bValid)
+	{
+		onInterpolating(start, pGrad->mGradiencesX);
+		fsio.bValid = true;
+	}
+
+	// FIXME
+	PerspectiveCorrectInterpolater::PerspectiveCorrect(start, fsio.in);
+
+	getNextStage()->emit(data);
+}
+
+void Interpolater::finalize()
 {
 }
 
@@ -161,15 +89,10 @@ public:
 	{
 	}
 
-	virtual ~ScanlineRasterizer() { }
-
-	void SetInterpolater(Interpolater *interp)
-	{
-		mpInterpolate = interp;
-	}
+	virtual ~ScanlineRasterizer() = default;
 
 protected:
-	virtual int onRasterizing(Batch *bat);
+	virtual void onRasterizing(Batch *bat);
 
 private:
 	class edge;
@@ -191,19 +114,16 @@ private:
 	void advanceEdgesInAET(SRHelper *hlp);
 
 	void finalize(SRHelper *hlp);
-
-	// Used to calculate gradiences.
-	Interpolater *mpInterpolate;
 };
 
 class ScanlineRasterizer::triangle
 {
 public:
 	triangle(const Primitive &prim):
-		mActiveEdge0(NULL),
-		mActiveEdge1(NULL),
 		mGrad(prim),
-		mPrim(prim)
+		mPrim(prim),
+		mActiveEdge0(NULL),
+		mActiveEdge1(NULL)
 	{
 	}
 	~triangle() = default;
@@ -213,13 +133,13 @@ public:
 	void unsetActiveEdge(edge *pEdge);
 	edge* getAdjcentEdge(edge *pEdge);
 
+	Gradience mGrad;
+	const Primitive &mPrim;
+
 private:
 	// There can be at most two edges in AET at the same time
 	edge *mActiveEdge0;
 	edge *mActiveEdge1;
-
-	const Gradience mGrad;
-	const Primitive &mPrim;
 };
 
 // Calculate the barycentric coodinates of point P in this triangle
@@ -232,12 +152,12 @@ private:
 // 2. use area
 vec3 ScanlineRasterizer::triangle::calculateBC(float xp, float yp)
 {
-	const vec4& v0 = mPrim->mVert[0].position();
-	const vec4& v1 = mPrim->mVert[1].position();
-	const vec4& v2 = mPrim->mVert[2].position();
+	const vec4& v0 = mPrim.mVert[0].position();
+	const vec4& v1 = mPrim.mVert[1].position();
+	const vec4& v2 = mPrim.mVert[2].position();
 
-	float a0 = ((v1.x - xp) * (v2.y - yp) - (v1.y - yp) * (v2.x - xp)) * mPrim->mAreaReciprocal;
-	float a1 = ((v2.x - xp) * (v0.y - yp) - (v2.y - yp) * (v0.x - xp)) * mPrim->mAreaReciprocal;
+	float a0 = ((v1.x - xp) * (v2.y - yp) - (v1.y - yp) * (v2.x - xp)) * mPrim.mAreaReciprocal;
+	float a1 = ((v2.x - xp) * (v0.y - yp) - (v2.y - yp) * (v0.x - xp)) * mPrim.mAreaReciprocal;
 
 	return vec3(a0, a1, 1.0f - a0 - a1);
 	//return vec3(mMatrix * vec3(xp, yp, 1.0));
@@ -316,6 +236,8 @@ public:
 	float xleft;
 	float xright;
 	triangle *mParent;
+
+	fsInput mStart;
 };
 
 class ScanlineRasterizer::SRHelper
@@ -335,6 +257,109 @@ public:
 	// active edges table
 	ActiveEdgeTable mAET;
 };
+
+Interpolater::Interpolater():
+	PipeStage("Interpolating", DrawEngine::getDrawEngine())
+{
+}
+
+RasterizerWrapper::RasterizerWrapper():
+	PipeStage("Rasterizer Wrapper", DrawEngine::getDrawEngine()),
+	mpRasterizer(new ScanlineRasterizer),
+	mpInterpolate(new PerspectiveCorrectInterpolater),
+	// RasterizerWrapper doesn't own FS,
+	// will be linked in when draw validate.
+	mpFS(NULL),
+	mpOwnershipTest(new OwnershipTester),
+	mpScissorTest(new ScissorTester),
+	mpStencilTest(new StencilTester),
+	mpDepthTest(new ZTester),
+	mpBlender(new Blender),
+	mpDither(new Dither),
+	mpFBWriter(new FBWriter)
+{
+	Interpolater *interp = dynamic_cast<Interpolater *>(mpInterpolate);
+	assert(interp);
+
+	dynamic_cast<Rasterizer *>(mpRasterizer)->SetInterpolater(interp);
+}
+
+RasterizerWrapper::~RasterizerWrapper()
+{
+	delete mpFBWriter;
+	delete mpDither;
+	delete mpBlender;
+	delete mpDepthTest;
+	delete mpStencilTest;
+	delete mpScissorTest;
+	delete mpOwnershipTest;
+	delete mpInterpolate;
+	delete mpRasterizer;
+}
+
+void RasterizerWrapper::initPipeline()
+{
+	setNextStage(mpRasterizer);
+}
+
+void RasterizerWrapper::linkPipeStages(GLContext *gc)
+{
+	int enables = gc->mState.mEnables;
+	FragmentShader *pFS = gc->mPM.getCurrentProgram()->getFS();
+
+	PipeStage *last;
+
+	if(enables & GLSP_DEPTH_TEST)
+	{
+		// enable early Z
+		if(!pFS->getDiscardFlag() &&
+			!(enables & GLSP_SCISSOR_TEST) &&
+			!(enables & GL_STENCIL_TEST))
+		{
+			mpRasterizer ->setNextStage(mpDepthTest);
+			mpDepthTest  ->setNextStage(mpInterpolate);
+			mpInterpolate->setNextStage(pFS);
+		}
+		else
+		{
+			mpRasterizer ->setNextStage(mpInterpolate);
+			mpInterpolate->setNextStage(pFS);
+
+			if(enables & GLSP_SCISSOR_TEST)
+				last = pFS->setNextStage(mpScissorTest);
+
+			if((enables & GL_STENCIL_TEST))
+				last = last->setNextStage(mpStencilTest);
+
+			last = last->setNextStage(mpDepthTest);
+		}
+	}
+	else
+	{
+		mpRasterizer ->setNextStage(mpInterpolate);
+		last = mpInterpolate->setNextStage(pFS);
+	}
+
+	if(enables & GLSP_BLEND)
+		last = last->setNextStage(mpBlender);
+
+	if(enables & GLSP_DITHER)
+		last = last->setNextStage(mpDither);
+
+	last = last->setNextStage(mpFBWriter);
+}
+
+void RasterizerWrapper::emit(void *data)
+{
+	Batch *bat = static_cast<Batch *>(data);
+	gRT = &bat->mDC->gc->mRT;
+
+	getNextStage()->emit(bat);
+}
+
+void RasterizerWrapper::finalize()
+{
+}
 
 ScanlineRasterizer::SRHelper* ScanlineRasterizer::createGET(Batch *bat)
 {
@@ -525,35 +550,43 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 		pAdjcentEdge->bActive = false;
 	}
 
-
 	Fsio fsio;
 	fsio.y = y;
 
 	for(auto it = vSpans.begin(); it < vSpans.end(); it++)
 	{
-		const triangle &tri = it->mParent;
+		const triangle &tri = *it->mParent;
 		const Primitive &prim = tri.mPrim;
+		const vec4& pos0 = prim.mVert[0].position();
+
+		size_t size = prim.mVert[0].size();
 
 		int x = ceil(it->xleft - 0.5f);
 
 		fsio.mpGrad 	= &tri.mGrad;
 		fsio.x 			= x;
+		fsio.m_priv 	= (void *)&it->mStart;
+		fsio.in.resize(size);
+		it->mStart.resize(size);
 
 		mpInterpolate->onInterpolating(fsio.mpGrad->mStarts[0],
 									   fsio.mpGrad->mGradiencesX,
 									   fsio.mpGrad->mGradiencesY,
 									   x + 0.5f - pos0.x,
 									   y + 0.5f - pos0.y,
-									   fsio.in);
+									   it->mStart);
 
-		fsio.z 		= fsio.in[0].z;
+		fsio.z 		= it->mStart[0].z;
 		fsio.bValid = true;
+		fsio.mIndex = (gRT->height - fsio.y - 1) * gRT->width + fsio.x;
 
 		// top-left filling convention
 		int xmax = ceil(it->xright - 0.5f);
 
 		do
 		{
+			fsio.mIndex = (gRT->height - y - 1) * gRT->width + x;
+
 			getNextStage()->emit(&fsio);
 
 			// Info for Z test
@@ -650,36 +683,17 @@ void ScanlineRasterizer::finalize(SRHelper *hlp)
 
 	delete hlp;
 
-	finalize();
+	Rasterizer::finalize();
 }
 
-int ScanlineRasterizer::onRasterizing(Batch *bat)
+void ScanlineRasterizer::onRasterizing(Batch *bat)
 {
 	SRHelper *hlp = createGET(bat);
 
 	scanConversion(hlp, bat);
 
 	finalize(hlp);
-
-	return 0;
 }
-
-class PerspectiveCorrectInterpolater: public Interpolater
-{
-public:
-	PerspectiveCorrectInterpolater() = default;
-	~PerspectiveCorrectInterpolater() = default;
-
-	// Should be invoked before onInterpolating()
-	virtual void CalculateRadiences(Gradience *grad);
-
-private:
-	virtual void onInterpolating(const fsInput &in,
-								 const fsInput &gradX;
-								 const fsInput &gradY;
-								 float stepX, float stepY,
-								 fsInput &out);
-};
 
 // Use the gradience to store partial derivatives of c/z
 void PerspectiveCorrectInterpolater::CalculateRadiences(Gradience *pGrad)
@@ -690,23 +704,24 @@ void PerspectiveCorrectInterpolater::CalculateRadiences(Gradience *pGrad)
 	
 	for(int i = 0; i < prim.mVertNum; i++)
 	{
-		mStarts[i].resize(size);
-		mGradiencesX[i].resize(size);
-		mGradiencesY[i].resize(size);
+		pGrad->mStarts[i].resize(size);
 
 		const float ZReciprocal = 1.0f / prim.mVert[i].position().w;
-		mStarts[i][0] = prim.mVert[i][0];
-		mStarts[i][0].w = ZReciprocal;
+		pGrad->mStarts[i][0] = prim.mVert[i][0];
+		pGrad->mStarts[i][0].w = ZReciprocal;
 
 		for(size_t j = 1; j < size; j++)
 		{
-			mStarts[i][j] = prim.mVert[i][j] * ZReciprocal;
+			pGrad->mStarts[i][j] = prim.mVert[i][j] * ZReciprocal;
 		}
 	}
 
-	const vec4 &pos0 = it->mVert[0].position();
-	const vec4 &pos1 = it->mVert[1].position();
-	const vec4 &pos2 = it->mVert[2].position();
+	pGrad->mGradiencesX.resize(size);
+	pGrad->mGradiencesY.resize(size);
+	
+	const vec4 &pos0 = prim.mVert[0].position();
+	const vec4 &pos1 = prim.mVert[1].position();
+	const vec4 &pos2 = prim.mVert[2].position();
 
 	const float y1y2 = (pos1.y - pos2.y) * prim.mAreaReciprocal;
 	const float y2y0 = (pos2.y - pos0.y) * prim.mAreaReciprocal;
@@ -717,24 +732,24 @@ void PerspectiveCorrectInterpolater::CalculateRadiences(Gradience *pGrad)
 	const float x1x0 = (pos1.x - pos0.x) * prim.mAreaReciprocal;
 
 #define GRADIENCE_EQUATION(i, c)	\
-	mGradiencesX[i].c = y1y2 * mStarts[0][i].c +	\
-						y2y0 * mStarts[1][i].c +	\
-						y0y1 * mStarts[2][i].c;		\
-	mGradiencesY[i].c = x2x1 * mStarts[0][i].c +	\
-						x0x2 * mStarts[1][i].c +	\
-						x1x0 * mStarts[2][i].c;
+	pGrad->mGradiencesX[i].c = y1y2 * pGrad->mStarts[0][i].c +	\
+							   y2y0 * pGrad->mStarts[1][i].c +	\
+							   y0y1 * pGrad->mStarts[2][i].c;	\
+	pGrad->mGradiencesY[i].c = x2x1 * pGrad->mStarts[0][i].c +	\
+							   x0x2 * pGrad->mStarts[1][i].c +	\
+							   x1x0 * pGrad->mStarts[2][i].c;
 
-	mGradiencesX[0].x = 1.0f;
-	mGradiencesX[0].y = 0.0f;
-	mGradiencesX[0].z = y1y2 * pos0.z +
-						y2y0 * pos1.z +
-						y0y1 * pos2.z;
+	pGrad->mGradiencesX[0].x = 1.0f;
+	pGrad->mGradiencesX[0].y = 0.0f;
+	pGrad->mGradiencesX[0].z = y1y2 * pos0.z +
+							   y2y0 * pos1.z +
+							   y0y1 * pos2.z;
 
-	mGradiencesY[0].x = 0.0f;
-	mGradiencesY[0].y = 1.0f;
-	mGradiencesY[0].z = x2x1 * pos0.z +
-						x0x2 * pos1.z +
-						x1x0 * pos2.z;
+	pGrad->mGradiencesY[0].x = 0.0f;
+	pGrad->mGradiencesY[0].y = 1.0f;
+	pGrad->mGradiencesY[0].z = x2x1 * pos0.z +
+							   x0x2 * pos1.z +
+							   x1x0 * pos2.z;
 
 	GRADIENCE_EQUATION(0, w);
 
@@ -749,7 +764,7 @@ void PerspectiveCorrectInterpolater::CalculateRadiences(Gradience *pGrad)
 #undef GRADIENCE_EQUATION
 }
 
-virtual void PerspectiveCorrectInterpolater::onInterpolating(
+void PerspectiveCorrectInterpolater::onInterpolating(
 											const fsInput &in,
 							 				const fsInput &gradX,
 							 				const fsInput &gradY,
@@ -767,18 +782,9 @@ virtual void PerspectiveCorrectInterpolater::onInterpolating(
 	{
 		out[i] = in[i] + gradX[i] * stepX + gradY[i] * stepY;
 	}
-
-	float z = 1.0f / out[0].w;
-	// WIP, *= operator overload impl
-	// out *= z;
-
-	for(size_t i = 1; i < size; ++i)
-	{
-		out[i] *= z;
-	}
 }
 
-virtual void PerspectiveCorrectInterpolater::onInterpolating(
+void PerspectiveCorrectInterpolater::onInterpolating(
 											fsInput &in,
 							 				const fsInput &grad)
 {
@@ -788,21 +794,24 @@ virtual void PerspectiveCorrectInterpolater::onInterpolating(
 
 	// OPT: performance issue with operator overloading?
 	in += grad;
+}
 
-#if 0
-	for(size_t i = 0; i < size; ++i)
-	{
-		in[i] += gradX[i];
-	}
-#endif
+void PerspectiveCorrectInterpolater::PerspectiveCorrect(const fsInput &in, fsInput &out)
+{
+	assert(in.size() == out.size());
+
+	out[0] = in[0];
 
 	float z = 1.0f / in[0].w;
-	// WIP, *= operator overload impl
+
+	out[0].w = z;
+
+	// *= operator overload impl
 	// out *= z;
 
-	for(size_t i = 1; i < size; ++i)
+	for(size_t i = 1; i < in.size(); ++i)
 	{
-		in[i] *= z;
+		out[i] = in[i] * z;
 	}
 }
 

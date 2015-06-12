@@ -112,8 +112,8 @@ void Clipper::clipping(Batch *bat)
 		{
 			Primitive prim;
 
-			prim.mType = Primitive::TRIANGLE;
-
+			prim.mType    = Primitive::TRIANGLE;
+			prim.mVertNum = 3;
 			prim.mVert[0] = *rr[src][0];
 			prim.mVert[1] = *rr[src][i];
 			prim.mVert[2] = *rr[src][i+1];

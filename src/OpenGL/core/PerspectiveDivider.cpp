@@ -22,7 +22,6 @@ void PerspectiveDivider::emit(void *data)
 // From clip space to NDC
 void PerspectiveDivider::dividing(Batch *bat)
 {
-#if PRIMITIVE_OWNS_VERTICES
 	Primlist &in = bat->mPrims;
 
 	for(auto it = in.begin(); it != in.end(); ++it)
@@ -30,12 +29,13 @@ void PerspectiveDivider::dividing(Batch *bat)
 		for(size_t i = 0; i < 3; ++i)
 		{
 			vec4 &pos = it->mVert[i].position();
-			pos.x /= pos.w;
-			pos.y /= pos.w;
-			pos.z /= pos.w;
+			const float ZReciprocal = 1.0f / pos.w;
+
+			pos.x *= ZReciprocal;
+			pos.y *= ZReciprocal;
+			pos.z *= ZReciprocal;
 		}
 	}
-#endif
 }
 
 void PerspectiveDivider::finalize()

@@ -32,8 +32,9 @@ void PrimitiveAssembler::assemble(Batch *bat)
 
 	assert(index.size() % 3 == 0);
 	pl.resize(index.size() / 3);
+	Primlist::iterator iter = pl.begin();
 
-	for(auto iter = pl.begin(), auto it = index.begin(); it != index.end(); it += 3, iter++)
+	for(auto it = index.begin(); it != index.end(); it += 3)
 	{
 		Primitive &tri = *iter;
 
@@ -42,6 +43,8 @@ void PrimitiveAssembler::assemble(Batch *bat)
 		tri.mVert[0]	= out[*(it + 0)];
 		tri.mVert[1]	= out[*(it + 1)];
 		tri.mVert[2]	= out[*(it + 2)];
+
+		++iter;
 	}
 
 	vsOutput_v().swap(out);

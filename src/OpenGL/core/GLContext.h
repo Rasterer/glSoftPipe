@@ -53,9 +53,8 @@ struct RenderTarget
 #define GLSP_SCISSOR_TEST			(1 << 2)
 #define GLSP_STENCIL_TEST			(1 << 3)
 #define GLSP_DEPTH_TEST				(1 << 4)
-#define GLSP_DEPTH_TEST				(1 << 5)
-#define GLSP_BLEND					(1 << 6)
-#define GLSP_DITHER					(1 << 7)
+#define GLSP_BLEND					(1 << 5)
+#define GLSP_DITHER					(1 << 6)
 
 // TODO: add other states
 struct GLStateMachine

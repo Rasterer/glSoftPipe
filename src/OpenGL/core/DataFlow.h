@@ -83,7 +83,7 @@ public:
 
 	ShaderRegisterFile& operator+=(const ShaderRegisterFile &rhs)
 	{
-		assert(getRegsNum() == rhs.getRegsNum())
+		assert(getRegsNum() == rhs.getRegsNum());
 
 		for(size_t i = 0; i < getRegsNum(); i++)
 		{
@@ -157,7 +157,7 @@ class Batch
 public:
 	void MergePrim(Batch &rhs)
 	{
-		mPrims.splice(mPrims.end(), rhs.mPrims)
+		mPrims.splice(mPrims.end(), rhs.mPrims);
 	}
 
 	vsInput_v		mVertexCache;
@@ -179,11 +179,11 @@ public:
 	}
 	~Gradience() = default;
 
-	const fsInput	mStarts[Primitive::MAX_PRIM_TYPE];
+	fsInput	mStarts[Primitive::MAX_PRIM_TYPE];
 
 	// X/Y partial derivatives
-	const fsInput	mGradiencesX;
-	const fsInput	mGradiencesY;
+	fsInput	mGradiencesX;
+	fsInput	mGradiencesY;
 
 	const Primitive	&mPrim;
 };
@@ -194,18 +194,19 @@ public:
 	Fsio() = default;
 	~Fsio() = default;
 
-	int x, y;
 	fsInput in;
 	fsOutput out;
 
 	const Gradience *mpGrad;
 
+	int 	x, y;
+	float 	z;
+	int 	mIndex; // used to lookup the color/depth/stencil buffers
+
 	// used to indicate if in is already interpolated or not
 	bool bValid;
-};
 
-// FIXME: move to a global class
-struct RenderTarget;
-const RenderTarget *gRT = NULL;
+	void *m_priv;
+};
 
 NS_CLOSE_GLSP_OGL()
