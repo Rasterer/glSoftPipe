@@ -204,6 +204,7 @@ public:
 	int 	mIndex; // used to lookup the color/depth/stencil buffers
 
 	// used to indicate if in is already interpolated or not
+	// FIXME: looks wired, remove this flag
 	bool bValid;
 
 	void *m_priv;

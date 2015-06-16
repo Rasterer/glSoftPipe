@@ -178,14 +178,6 @@ unsigned Shader::getSamplerUnitID(int i) const
 	return unit;
 }
 
-static inline vec4 BiLinearInterpolate(float scaleX, float scaleY, vec4 lb, vec4 lt, vec4 rb, vec4 rt)
-{
-	return (lb *= ((1.0 - scaleX) * (1.0f - scaleY))) +
-		   (lt *= ((1.0 - scaleX) * scaleY)) +
-		   (rb *= (scaleX * (1.0f - scaleY))) +
-		   (rt *= (scaleX * scaleY));
-}
-
 // Calculate the "Level of Detail"
 // TODO: calculate the partial derivatives
 int Shader::calculateLOD(vec2 coord)

@@ -26,6 +26,8 @@ typedef std::map<std::string, int> UniformMap;
 typedef std::vector<VertexInfo> var_v;
 typedef std::map<std::string, int> VarMap;
 
+
+// NOTE:
 // APP should use these two macros to define its own variables(name and type)
 // for vertex shader varying: To make life easy, glPosition should come first!
 #define DECLARE_IN(type, attr)	\
@@ -48,6 +50,15 @@ typedef std::map<std::string, int> VarMap;
 #define DECLARE_SAMPLER(spl)	\
 	this->declareSampler();		\
 	this->declareUniform(#spl, &spl);
+
+// NOTE:
+// One shader should invoke this macro only once,
+// i.e. there is only one texture coordinate in an vertex array.
+#define DECLARE_TEXTURE_COORD(type, attr)	\
+	this->SetTextureCoordLocation();			\
+	this->declareInput(#attr, typeid(type));	\
+
+
 
 typedef unsigned int sampler1D;
 typedef unsigned int sampler2D;
@@ -110,6 +121,10 @@ public:
 		mTexs[unit] = pTex;
 	}
 
+	// NOTE: Can only be called in DECLARE_TEXTURE_COORD
+	void SetTextureCoordLocation() { mTexCoordLoc = mInRegs.size(); }
+	int  GetTextureCoordLocation() const { return mTexCoordLoc; }
+
 protected:
 	template <class T>
 	void declareUniform(const std::string &name, T *constant);
@@ -148,6 +163,8 @@ private:
 	bool		bHasSampler;
 	int			mNumSamplers;
 	unsigned	mSamplerLoc[kMaxSamplers];
+
+	int 		mTexCoordLoc;
 };
 
 template <class T>

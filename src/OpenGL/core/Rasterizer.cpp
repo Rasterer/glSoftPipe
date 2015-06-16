@@ -42,6 +42,9 @@ public:
 	PerspectiveCorrectInterpolater() = default;
 	~PerspectiveCorrectInterpolater() = default;
 
+	// PipeStage interface
+	virtual void emit(void *data);
+
 	// Should be invoked before onInterpolating()
 	virtual void CalculateRadiences(Gradience *pGrad);
 
@@ -55,6 +58,7 @@ public:
 	virtual void onInterpolating(fsInput &in,
 								 const fsInput &grad);
 
+private:
 	static inline void PerspectiveCorrect(const fsInput &in, fsInput &out);
 };
 
@@ -69,9 +73,6 @@ void Interpolater::emit(void *data)
 		onInterpolating(start, pGrad->mGradiencesX);
 		fsio.bValid = true;
 	}
-
-	// FIXME
-	PerspectiveCorrectInterpolater::PerspectiveCorrect(start, fsio.in);
 
 	getNextStage()->emit(data);
 }
@@ -695,6 +696,23 @@ void ScanlineRasterizer::onRasterizing(Batch *bat)
 	finalize(hlp);
 }
 
+void PerspectiveCorrectInterpolater::emit(void *data)
+{
+	Fsio &fsio = *static_cast<Fsio *>(data);
+	const Gradience *pGrad = fsio.mpGrad;
+	fsInput &start = *static_cast<fsInput *>(fsio.m_priv);
+
+	// FIXME: find a better way
+	if(!fsio.bValid)
+	{
+		onInterpolating(start, pGrad->mGradiencesX);
+		fsio.bValid = true;
+	}
+
+	PerspectiveCorrect(start, fsio.in);
+
+	getNextStage()->emit(data);
+}
 // Use the gradience to store partial derivatives of c/z
 void PerspectiveCorrectInterpolater::CalculateRadiences(Gradience *pGrad)
 {

@@ -55,7 +55,7 @@ struct TextureMipmap
 	MemoryBackup mMem;
 	bool mResident;
 
-	uint32_t mLevel;
+	int32_t mLevel;
 	uint32_t mWidth, mHeight;
 	uint32_t mBytesPerTexel;
 	unsigned mFormat;
@@ -69,15 +69,11 @@ public:
 	Texture(TextureTarget target);
 	virtual ~Texture();
 
-	// FIXME: now just check base mipmap level
-	// need check more stuff.
-	bool IsComplete()
-	{
-		return (mIsComplete = mpMipmap->mResident);
-	}
+	bool ValidateState();
 
 	uint32_t getLevelNum() const { return mNumMipmaps; }
-	TextureMipmap*  getMipmap(uint32_t layer, int32_t level);
+	TextureMipmap*  getMipmap(uint32_t layer, int32_t level) const;
+	TextureMipmap*  getBaseMipmap(uint32_t layer) const { return getMipmap(layer, 0); }
 
 	const SamplerObject&  getSamplerObject() const { return mSO; }
 	void TexParameteri(unsigned pname, int param);
@@ -86,19 +82,36 @@ public:
 					int width, int height, int border,
 					unsigned format, unsigned type, const void *pixels);
 
+	float getMagMinThresh() const return { return mMagMinThresh; }
+
 private:
+	// FIXME: now just check base mipmap level
+	// need check more stuff.
+	bool IsComplete()
+	{
+		return (mIsComplete = mpMipmap->mResident);
+	}
+
+private:
+	typedef void (*PFNTexture2D)(const Shader *pShader, const Texture *pTex, const vec2 &coord, vec4 &res);
+	typedef void (*PFNTexture2DMag)(const Texture *pTex, unsigned int level, const vec2 &coord, vec4 &res);
+	typedef void (*PFNTexture2DMin)(const Texture *pTex, float lambda, const vec2 &coord, vec4 &res);
+
+	PFNTexture2D	m_pfnTexture2D;
+	PFNTexture2DMag	m_pfnTexture2DMag;
+	PFNTexture2DMin	m_pfnTexture2DMin;
+
+
 	TextureMipmap  *mpMipmap;
 	uint32_t		mNumMipmaps;
 	TextureState	mState;
 	SamplerObject	mSO;
+	float 			mMagMinThresh;
 
 	TextureTarget	mTextureTarget;
 	uint32_t		mNumLayers;
 
 	bool	mIsComplete;
-
-private:
-	static uint32_t FormatToGroupSize(int32_t target);
 };
 
 struct TextureBindingPoint
