@@ -10,10 +10,10 @@
 NS_OPEN_GLSP_OGL()
 
 #define __GET_CONTEXT()		\
-		glsp::ogl::GLContext *gc = glsp::ogl::getCurrentContext();
+		::glsp::ogl::GLContext *gc = ::glsp::ogl::getCurrentContext();
 
 #define __SET_CONTEXT(gc)	\
-		glsp::ogl::setCurrentContext(gc);
+		::glsp::ogl::setCurrentContext(gc);
 
 #define EMIT_FLAG_VIEWPORT (1 << 0)
 

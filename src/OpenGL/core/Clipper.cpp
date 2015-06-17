@@ -6,18 +6,17 @@
 
 NS_OPEN_GLSP_OGL()
 
-using namespace std;
-using namespace glm;
+using glm::vec4;
 
 Clipper::Clipper():
 	PipeStage("Clipping", DrawEngine::getDrawEngine())
 {
-	mPlanes[0] = vec4(0.0f, 0.0f, 1.0f, 1.0);	// near plane
-	mPlanes[1] = vec4(0.0f, 0.0f, -1.0f, 1.0);	// far  plane
-	mPlanes[2] = vec4(1.0f, 0.0f, 0.0f, 1.0);	// left plane
-	mPlanes[3] = vec4(-1.0f, 0.0f, 0.0f, 1.0);	// right plane
-	mPlanes[4] = vec4(0.0f, 1.0f, 0.0f, 1.0);	// bottom plane
-	mPlanes[5] = vec4(0.0f, -1.0f, 0.0f, 1.0);	// top plane
+	mPlanes[0] = vec4(0.0f, 0.0f, 1.0f, 1.0f);	// near plane
+	mPlanes[1] = vec4(0.0f, 0.0f, -1.0f, 1.0f);	// far  plane
+	mPlanes[2] = vec4(1.0f, 0.0f, 0.0f, 1.0f);	// left plane
+	mPlanes[3] = vec4(-1.0f, 0.0f, 0.0f, 1.0f);	// right plane
+	mPlanes[4] = vec4(0.0f, 1.0f, 0.0f, 1.0f);	// bottom plane
+	mPlanes[5] = vec4(0.0f, -1.0f, 0.0f, 1.0f);	// top plane
 }
 
 void Clipper::emit(void *data)
@@ -35,7 +34,7 @@ void Clipper::clipping(Batch *bat)
 {
 	Primlist out;
 	Primlist &pl = bat->mPrims;
-	vsOutput tmp[ARRAY_SIZE(mPlanes) * 3];
+	vsOutput tmp[ARRAY_SIZE(mPlanes) * 4];
 
 	for(auto it = pl.begin(); it != pl.end(); it++)
 	{
@@ -90,7 +89,7 @@ void Clipper::clipping(Batch *bat)
 				{
 					vsOutput *new_vert = &tmp[tmpnr++];
 
-					vertexLerp(*new_vert, *rr[src][k], *rr[src][j], dist[1] / (dist[0] - dist[1]));
+					vertexLerp(*new_vert, *rr[src][k], *rr[src][j], dist[1] / (dist[1] - dist[0]));
 					rr[dst][vertNum[dst]] = new_vert;
 					++vertNum[dst];
 				}
@@ -105,8 +104,8 @@ void Clipper::clipping(Batch *bat)
 		if(vertNum[src] == 0)
 			continue;
 
-		assert(vertNum[src] >= 3 && vertNum[src] <= 6);
-		
+		assert(vertNum[src] >= 3 && vertNum[src] <= 7);
+
 		// Triangulation
 		for(int i = 1; i < vertNum[src] - 1; i++)
 		{
@@ -137,7 +136,7 @@ void Clipper::vertexLerp(vsOutput &new_vert,
 
 	for(size_t i = 0; i < vert1.getRegsNum(); ++i)
 	{
-		new_vert.getReg(i) = vert1.getReg(i) * (1 - t)  + vert2.getReg(i) * t;
+		new_vert[i] = vert1[i] * (1 - t)  + vert2[i] * t;
 	}
 }
 

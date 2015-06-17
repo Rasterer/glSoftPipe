@@ -176,7 +176,7 @@ void ScanlineRasterizer::triangle::setActiveEdge(edge *pEdge)
 	}
 	else
 	{
-		cout << "How could this happen!" << endl;
+		std::cout << "How could this happen!" << std::endl;
 		assert(0);
 	}
 }
@@ -189,7 +189,7 @@ void ScanlineRasterizer::triangle::unsetActiveEdge(edge *pEdge)
 		mActiveEdge1 = NULL;
 	else
 	{
-		cout << "This edge is not active" << endl;
+		std::cout << "This edge is not active" << std::endl;
 	}
 }
 
@@ -201,7 +201,7 @@ ScanlineRasterizer::edge* ScanlineRasterizer::triangle::getAdjcentEdge(edge *pEd
 	if(pEdge == mActiveEdge1)
 		return mActiveEdge0;
 
-	cout << "How could this happen!" << endl;
+	std::cout << "How could this happen!" << std::endl;
 	assert(0);
 }
 
@@ -423,7 +423,7 @@ ScanlineRasterizer::SRHelper* ScanlineRasterizer::createGET(Batch *bat)
 			auto iter = get.find(ystart);
 			if(iter == get.end())
 				//get.insert(pair<int, vector<edge *> >(ystart, vector<edge *>()));
-				get[ystart] = vector<edge *>();
+				get[ystart] = std::vector<edge *>();
 
 			get[ystart].push_back(pEdge);
 		}

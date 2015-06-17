@@ -9,6 +9,8 @@
 #include "khronos/GL/glcorearb.h"
 
 
+using std::string;
+using std::type_info;
 using glm::vec4;
 using glm::vec2;
 using glm::mat4;
@@ -94,6 +96,9 @@ GLAPI GLint APIENTRY glGetAttribLocation (GLuint program, const GLchar *name)
 
 NS_OPEN_GLSP_OGL()
 
+
+thread_local void *Shader::m_priv = NULL;
+
 // vertex shader cache
 Shader::Shader():
 	mSource(NULL),
@@ -178,48 +183,6 @@ unsigned Shader::getSamplerUnitID(int i) const
 	return unit;
 }
 
-// Calculate the "Level of Detail"
-// TODO: calculate the partial derivatives
-int Shader::calculateLOD(vec2 coord)
-{
-	return 0;
-}
-
-vec4 Shader::texture2D(sampler2D sampler, vec2 coord)
-{
-	int lvl = calculateLOD(coord);
-	TextureMipmap *pMipmap = mTexs[sampler]->getMipmap(0, lvl);
-	const SamplerObject &so = mTexs[sampler]->getSamplerObject();
-
-	int x, y;
-	float TexSpaceX = coord.x * pMipmap->mWidth;
-	float TexSpaceY = coord.y * pMipmap->mHeight;
-	vec4 *pAddr = static_cast<vec4 *>(pMipmap->mMem.addr);
-
-	if(so.eMagFilter == GL_NEAREST)
-	{
-		x = (int)floor(TexSpaceX);
-		y = (int)floor(TexSpaceY);
-
-		return pAddr[(pMipmap->mHeight - y - 1) * pMipmap->mWidth + x];
-	}
-	else //GL_LINEAR
-	{
-		x = (int)floor(TexSpaceX - 0.5f);
-		y = (int)floor(TexSpaceY - 0.5f);
-
-		vec4 lb = pAddr[(pMipmap->mHeight - y - 1) * pMipmap->mWidth + x];
-		vec4 lt = pAddr[(pMipmap->mHeight - y) * pMipmap->mWidth + x];
-		vec4 rb = pAddr[(pMipmap->mHeight - y - 1) * pMipmap->mWidth + x + 1];
-		vec4 rt = pAddr[(pMipmap->mHeight - y) * pMipmap->mWidth + x];
-
-		float scaleX = TexSpaceX - 0.5f - x;
-		float scaleY = TexSpaceY - 0.5f - y;
-
-		return BiLinearInterpolate(scaleX, scaleY, lb, lt, rb, rt);
-	}
-}
-
 VertexInfo::VertexInfo(const string &name, const type_info &type):
 	mName(name),
 	mType(type)
@@ -274,7 +237,10 @@ void FragmentShader::emit(void *data)
 {
 	Fsio *pFsio = static_cast<Fsio *>(data);
 
+	m_priv = pFsio;
+
 	pFsio->out.resize(getOutRegsNum());
+
 	execute(pFsio->in, pFsio->out);
 
 	getNextStage()->emit(pFsio);

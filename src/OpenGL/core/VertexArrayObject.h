@@ -1,7 +1,9 @@
 #pragma once
 
+#include <common/glsp_defs.h>
 #include "NameSpace.h"
 #include "BufferObject.h"
+
 
 NS_OPEN_GLSP_OGL()
 

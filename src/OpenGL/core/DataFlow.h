@@ -1,6 +1,8 @@
 #pragma once
 
 #include <glm/glm.hpp>
+
+#include <common/glsp_defs.h>
 #include <vector>
 #include <list>
 

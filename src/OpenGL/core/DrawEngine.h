@@ -2,21 +2,28 @@
 
 #include <boost/serialization/singleton.hpp>
 
-#include "common/IEGLBridge.h"
-#include "PrimitiveAssembler.h"
-#include "Clipper.h"
-#include "FaceCuller.h"
-#include "PerspectiveDivider.h"
-#include "ScreenMapper.h"
+#include <common/glsp_defs.h>
 
+
+namespace glsp {
+	struct IEGLBridge;
+}
 
 NS_OPEN_GLSP_OGL()
 
-using boost::serialization::singleton;
-
 class GLContext;
 class VertexFetcher;
+class PrimitiveAssembler;
+class Clipper;
+class PerspectiveDivider;
+class ScreenMapper;
+class FaceCuller;
 class RasterizerWrapper;
+class PipeStage;
+
+namespace glsp {
+	struct IEGLBridge;
+}
 
 struct DrawContext
 {
@@ -39,7 +46,7 @@ struct DrawContext
 // It's a singleton, but can be triggered in any thread without lock protection.
 // That requires the respect stage classes shall not use writable members,
 // or any other global writable variables(local variables or heap alloc are qualified).
-class DrawEngine: public singleton<DrawEngine>
+class DrawEngine: public boost::serialization::singleton<DrawEngine>
 {
 public:
 	void init(void *dpy, IEGLBridge *bridge);
@@ -55,7 +62,7 @@ public:
 		return get_mutable_instance();
 	}
 
-	PipeStage   *getFirstStage() const { return mFirstStage; }
+	PipeStage* getFirstStage() const { return mFirstStage; }
 
 	// mutators
 	void setFirstStage(PipeStage *stage) { mFirstStage = stage; }
@@ -87,7 +94,7 @@ private:
 
 	// EGL related data member
 	void             *mpEGLDisplay;
-	glsp::IEGLBridge *mpBridge;
+	IEGLBridge *mpBridge;
 };
 
 NS_CLOSE_GLSP_OGL()

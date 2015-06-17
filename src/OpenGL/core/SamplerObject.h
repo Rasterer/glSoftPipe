@@ -1,6 +1,7 @@
 #pragma once
 
 #include "khronos/GL/glcorearb.h"
+#include <common/glsp_defs.h>
 #include "NameSpace.h"
 
 

@@ -9,6 +9,8 @@
 
 using glsp::ogl::GLContext;
 using glsp::ogl::TextureMachine;
+using glm::vec2;
+using glm::vec4;
 
 GLAPI void APIENTRY glGenTextures (GLsizei n, GLuint *textures)
 {
@@ -299,12 +301,12 @@ TextureTarget TargetToIndex(unsigned target)
 }
 
 
-float ComputeLambda(const Shader *pShader, vec2 &coord, int texW, int texH)
+float ComputeLambda(const Shader *pShader, const vec2 &coord, int texW, int texH)
 {
-	const Fsio &fsio = *pFsio;
+	const Fsio &fsio = *static_cast<Fsio *>(pShader->getPrivateData());
 	const fsInput &start = *static_cast<fsInput *>(fsio.m_priv);
-	const fsInput &derivativeX = fsio.mpGrad.mGradiencesX;
-	const fsInput &derivativeY = fsio.mpGrad.mGradiencesY;
+	const fsInput &derivativeX = fsio.mpGrad->mGradiencesX;
+	const fsInput &derivativeY = fsio.mpGrad->mGradiencesY;
 
 	int texCoordLoc = pShader->GetTextureCoordLocation();
 
@@ -322,10 +324,10 @@ float ComputeLambda(const Shader *pShader, vec2 &coord, int texW, int texH)
 	return std::log2(std::max(x, y));
 }
 
-inline void BiLinearInterpolate(float scaleX, float scaleY, vec4 &lb, vec4 &lt, vec4 &rb, vec4 &rt, vec &res)
+inline void BiLinearInterpolate(float scaleX, float scaleY, const vec4 &lb, const vec4 &lt, const vec4 &rb, const vec4 &rt, vec4 &res)
 {
-	res = lb * ((1.0 - scaleX) * (1.0f - scaleY)) +
-		  lt * ((1.0 - scaleX) * scaleY) +
+	res = lb * ((1.0f - scaleX) * (1.0f - scaleY)) +
+		  lt * ((1.0f - scaleX) * scaleY) +
 		  rb * (scaleX * (1.0f - scaleY)) +
 		  rt * (scaleX * scaleY);
 #if 0
@@ -338,11 +340,23 @@ inline void BiLinearInterpolate(float scaleX, float scaleY, vec4 &lb, vec4 &lt, 
 
 void Sample2DNearestLevel(const Texture *pTex, unsigned int level, const vec2 &coord, vec4 &res)
 {
-	const TextureMipmap *pMipmap = pTex->getMipmap(0, 0);
-	const SamplerObject &so = pTex->getSamplerObject();
+	const TextureMipmap *pMipmap = pTex->getMipmap(0, level);
 
 	int x = static_cast<int>(floor(coord.x * pMipmap->mWidth));
 	int y = static_cast<int>(floor(coord.y * pMipmap->mHeight));
+
+#if 0
+	if(x >= pMipmap->mWidth)
+		x = pMipmap->mWidth - 1;
+	else if(x < 0)
+		x = 0;
+
+	if(y > pMipmap->mHeight)
+		y = pMipmap->mHeight - 1;
+	else if(y < 0)
+		y = 0;
+#endif
+
 	vec4 *pAddr = static_cast<vec4 *>(pMipmap->mMem.addr);
 
 	res = pAddr[(pMipmap->mHeight - y - 1) * pMipmap->mWidth + x];
@@ -350,11 +364,26 @@ void Sample2DNearestLevel(const Texture *pTex, unsigned int level, const vec2 &c
 
 void Sample2DLinearLevel(const Texture *pTex, unsigned int level, const vec2 &coord, vec4 &res)
 {
-	const TextureMipmap *pMipmap = pTex->getMipmap(0, 0);
-	const SamplerObject &so = pTex->getSamplerObject();
+	const TextureMipmap *pMipmap = pTex->getMipmap(0, level);
 
-	int x = static_cast<int>(floor(coord.x * pMipmap->mWidth  - 0.5f));
-	int y = static_cast<int>(floor(coord.y * pMipmap->mHeight - 0.5f));
+	float TexSpaceX = coord.x * pMipmap->mWidth;
+	float TexSpaceY = coord.y * pMipmap->mHeight;
+
+	int x = static_cast<int>(floor(TexSpaceX  - 0.5f));
+	int y = static_cast<int>(floor(TexSpaceY - 0.5f));
+
+#if 0
+	if(x >= pMipmap->mWidth - 1)
+		x = pMipmap->mWidth - 2;
+	else if(x < 0)
+		x = 0;
+
+	if(y > pMipmap->mHeight - 1)
+		y = pMipmap->mHeight - 2;
+	else if(y < 0)
+		y = 0;
+#endif
+
 	vec4 *pAddr = static_cast<vec4 *>(pMipmap->mMem.addr);
 
 	vec4 lb = pAddr[(pMipmap->mHeight - y - 1) * pMipmap->mWidth + x];
@@ -368,25 +397,127 @@ void Sample2DLinearLevel(const Texture *pTex, unsigned int level, const vec2 &co
 	BiLinearInterpolate(scaleX, scaleY, lb, lt, rb, rt, res);
 }
 
-inline void Sample2DNearest(const Shader *, const Texture *pTex, const vec2 &coord, vec4 &res)
+void Sample2DNearestNonmipmap(const Texture *pTex, float, const vec2 &coord, vec4 &res)
 {
 	Sample2DNearestLevel(pTex, 0, coord, res);
 }
 
-inline void Sample2DLinear(const Shader *, const Texture *pTex, const vec2 &coord, vec4 &res)
+void Sample2DLinearNonmipmap(const Texture *pTex, float, const vec2 &coord, vec4 &res)
+{
+	Sample2DLinearLevel(pTex, 0, coord, res);
+}
+
+void Sample2DNearestMipmapNearest(const Texture *pTex, float lambda, const vec2 &coord, vec4 &res)
+{
+	unsigned int lvl;
+
+	if(lambda <= 0.5f)
+		lvl = 0;
+	else
+		lvl = std::ceil(lambda + 0.5f) - 1;
+
+	if(lvl > pTex->getAvailableMipmaps())
+		lvl = pTex->getAvailableMipmaps();
+
+	Sample2DNearestLevel(pTex, lvl, coord, res);
+}
+
+void Sample2DLinearMipmapNearest(const Texture *pTex, float lambda, const vec2 &coord, vec4 &res)
+{
+	unsigned int lvl;
+
+	if(lambda <= 0.5f)
+		lvl = 0;
+	else
+		lvl = std::ceil(lambda + 0.5f) - 1;
+
+	if(lvl > pTex->getAvailableMipmaps())
+		lvl = pTex->getAvailableMipmaps();
+
+	Sample2DLinearLevel(pTex, lvl, coord, res);
+}
+
+void Sample2DNearestMipmapLinear(const Texture *pTex, float lambda, const vec2 &coord, vec4 &res)
+{
+	uint32_t lvl1, lvl2;
+
+	lvl1 = std::floor(lambda);
+
+	if(lvl1 >= pTex->getAvailableMipmaps())
+	{
+		lvl1 = pTex->getAvailableMipmaps();
+		lvl2 = lvl1;
+
+		Sample2DNearestLevel(pTex, lvl1, coord, res);
+	}
+	else
+	{
+		lvl2 = lvl1 + 1;
+
+		vec4 texel1, texel2;
+
+		Sample2DNearestLevel(pTex, lvl1, coord, texel1);
+		Sample2DNearestLevel(pTex, lvl2, coord, texel2);
+
+		float intpart;
+		float frac = std::modf(lambda, &intpart);
+
+		res = texel1 * (1.0f - frac) + texel2 * frac;
+	}
+}
+
+void Sample2DLinearMipmapLinear(const Texture *pTex, float lambda, const vec2 &coord, vec4 &res)
+{
+	uint32_t lvl1, lvl2;
+
+	lvl1 = std::floor(lambda);
+
+	if(lvl1 >= pTex->getAvailableMipmaps())
+	{
+		lvl1 = pTex->getAvailableMipmaps();
+		lvl2 = lvl1;
+
+		Sample2DLinearLevel(pTex, lvl1, coord, res);
+	}
+	else
+	{
+		lvl2 = lvl1 + 1;
+
+		vec4 texel1, texel2;
+
+		Sample2DLinearLevel(pTex, lvl1, coord, texel1);
+		Sample2DLinearLevel(pTex, lvl2, coord, texel2);
+
+		float intpart;
+		float frac = std::modf(lambda, &intpart);
+
+		res = texel1 * (1.0f - frac) + texel2 * frac;
+	}
+}
+
+void Sample2DNearest(const Shader *, const Texture *pTex, const vec2 &coord, vec4 &res)
+{
+	Sample2DNearestLevel(pTex, 0, coord, res);
+}
+
+void Sample2DLinear(const Shader *, const Texture *pTex, const vec2 &coord, vec4 &res)
 {
 	Sample2DLinearLevel(pTex, 0, coord, res);
 }
 
 void Sample2DLambda(const Shader *pShader, const Texture *pTex, const vec2 &coord, vec4 &res)
 {
-	TextureMipmap *pMipmap = getBaseMipmap(0);
+	TextureMipmap *pMipmap = pTex->getBaseMipmap(0);
 	float lambda = ComputeLambda(pShader, coord, pMipmap->mWidth, pMipmap->mHeight);
 
 	if(lambda <= pTex->getMagMinThresh())
+	{
 		pTex->m_pfnTexture2DMag(pTex, 0, coord, res);
+	}
 	else
+	{
 		pTex->m_pfnTexture2DMin(pTex, lambda, coord, res);
+	}
 }
 
 } /* namespace */
@@ -409,14 +540,15 @@ TextureMipmap::~TextureMipmap()
 }
 
 Texture::Texture(TextureTarget target):
+	mAvailableMipmaps(0),
 	mTextureTarget(target),
 	mNumLayers(1), // FIXME: set layer num correctly
 	mIsComplete(false)
 {
 	mSO.setName(0);
-	// FIXME: the initial value should be GL_LINEAR
-	// However, it hasn't been implemented yet.
-	mSO.eMagFilter = GL_NEAREST;
+
+	mSO.eMagFilter = GL_LINEAR;
+	mSO.eMinFilter = GL_NEAREST_MIPMAP_LINEAR;
 
 	mNumMipmaps = TargetToMipmapLevels(target);
 
@@ -436,7 +568,7 @@ Texture::~Texture()
 }
 
 // TODO: add support for other targets
-TextureMipmap* Texture::getMipmap(uint32_t layer, int32_t level)
+TextureMipmap* Texture::getMipmap(uint32_t layer, int32_t level) const
 {
 	switch(mTextureTarget)
 	{
@@ -454,20 +586,30 @@ void Texture::TexImage2D(int level, int internalformat,
 				unsigned format, unsigned type, const void *pixels)
 {
 	uint32_t layer = 0;
-	uint32_t req_w, req_h;
 
-	assert(border == 0);
-
-	TextureMipmap *pBaseLevel = getBaseMipmap(layer);
-
-	if((req_w = pBaseLevel->mWidth >> level) == 0)
-		req_w = 1;
-
-	if((req_h = pBaseLevel->mHeight >> level) == 0)
-		req_h = 1;
-
-	if(req_w != width || req_h != height)
+	if(border != 0)
 		return;
+
+	if(level >= MAX_TEXTURE_MIPMAP_LEVELS)
+		return;
+
+	if(level > (int)mAvailableMipmaps)
+		mAvailableMipmaps = level;
+
+	if(level != 0)
+	{
+		int req_w, req_h;
+		TextureMipmap *pBaseLevel = getBaseMipmap(layer);
+
+		if((req_w = pBaseLevel->mWidth >> level) == 0)
+			req_w = 1;
+
+		if((req_h = pBaseLevel->mHeight >> level) == 0)
+			req_h = 1;
+
+		if(req_w != width || req_h != height)
+			return;
+	}
 
 	uint32_t bytesPerTexel = 0;
 	PFNCopyTexels pfnCopyTexels = NULL;
@@ -553,6 +695,22 @@ void Texture::TexParameteri(unsigned pname, int param)
 	}
 }
 
+bool Texture::IsComplete()
+{
+	bool ret = true;
+
+	for(uint32_t i = 0; i <= mAvailableMipmaps; ++i)
+	{
+		if(!mpMipmap[i].mResident)
+		{
+			ret = false;
+			break;
+		}
+	}
+
+	return ret;
+}
+
 bool Texture::ValidateState()
 {
 	if(!IsComplete())
@@ -560,13 +718,16 @@ bool Texture::ValidateState()
 
 	if(mSO.eMagFilter == mSO.eMinFilter)
 	{
-		if(mSO.eMagFilter == GL_NEAREST)
+		switch(mSO.eMagFilter)
 		{
-			m_pfnTexture2D = &Sample2DNearest;
-		}
-		else // GL_LINEAR
-		{
-			m_pfnTexture2D = &Sample2DLinear;
+			case GL_NEAREST:
+				m_pfnTexture2D = &Sample2DNearest;
+				break;
+			case GL_LINEAR:
+				m_pfnTexture2D = &Sample2DLinear;
+				break;
+			default:
+				return false;
 		}
 
 		return true;
@@ -576,19 +737,54 @@ bool Texture::ValidateState()
 		if(mSO.eMagFilter == GL_LINEAR &&
 		  (mSO.eMinFilter == GL_NEAREST_MIPMAP_NEAREST ||
 		   mSO.eMinFilter == GL_NEAREST_MIPMAP_LINEAR))
+			// Pixel: Texel = 1: sqrt(2)
 			mMagMinThresh = 0.5f;
 		else
+			// Pixel: Texel = 1: 1
 			mMagMinThresh = 0.0f;
 
-		if(mSO.eMagFilter == GL_NEAREST)
-			m_pfnTexture2DMag = &Sample2DNearestLevel;
-		else // GL_LINEAR
-			m_pfnTexture2DMag = &Sample2DLinearLevel;
+		switch(mSO.eMagFilter)
+		{
+			case GL_NEAREST:
+				m_pfnTexture2DMag = &Sample2DNearestLevel;
+				break;
+			case GL_LINEAR:
+				m_pfnTexture2DMag = &Sample2DLinearLevel;
+				break;
+			default:
+				return false;
+		}
 
-		if(mSO.eMagFilter == GL_NEAREST)
-			m_pfnTexture2DMin = &Sample2DNearestLevel;
+		switch(mSO.eMinFilter)
+		{
+			case GL_NEAREST:
+				m_pfnTexture2DMin = &Sample2DNearestNonmipmap;
+				break;
+			case GL_LINEAR:
+				m_pfnTexture2DMin = &Sample2DLinearNonmipmap;
+				break;
+			case GL_NEAREST_MIPMAP_NEAREST:
+				m_pfnTexture2DMin = &Sample2DNearestMipmapNearest;
+				break;
+			case GL_NEAREST_MIPMAP_LINEAR:
+				m_pfnTexture2DMin = &Sample2DNearestMipmapLinear;
+				break;
+			case GL_LINEAR_MIPMAP_NEAREST:
+				m_pfnTexture2DMin = &Sample2DLinearMipmapNearest;
+				break;
+			case GL_LINEAR_MIPMAP_LINEAR:
+				m_pfnTexture2DMin = &Sample2DLinearMipmapLinear;
+				break;
+			default:
+				return false;
+		}
+
+		m_pfnTexture2D = &Sample2DLambda;
+
+		return true;
 	}
 }
+
 TextureBindingPoint::TextureBindingPoint():
 	mTex(NULL)
 {
@@ -727,7 +923,9 @@ bool TextureMachine::validateTextureState(Shader *pVS, Shader *pFS)
 	// TODO: add support for other targets
 	if(pVS->HasSampler())
 	{
-		for(int i = 0; i < pVS->getSamplerNum(); i++)
+		int num = pVS->getSamplerNum();
+
+		for(int i = 0; i < num; ++i)
 		{
 			unsigned unit = pVS->getSamplerUnitID(i);
 
@@ -737,13 +935,14 @@ bool TextureMachine::validateTextureState(Shader *pVS, Shader *pFS)
 				return false;
 
 			pVS->SetupTextureInfo(unit, pTex);
-			;
 		}
 	}
 
 	if(pFS->HasSampler())
 	{
-		for(int i = 0; i < pFS->getSamplerNum(); i++)
+		int num = pFS->getSamplerNum();
+
+		for(int i = 0; i < num; ++i)
 		{
 			unsigned unit = pFS->getSamplerUnitID(i);
 
@@ -755,8 +954,6 @@ bool TextureMachine::validateTextureState(Shader *pVS, Shader *pFS)
 			pFS->SetupTextureInfo(unit, pTex);
 		}
 	}
-
-	if(mSO.eMagFilter == mSO.eMinFilter)
 
 	return true;
 }

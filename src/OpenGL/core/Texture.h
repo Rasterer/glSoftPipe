@@ -2,6 +2,9 @@
 
 #include <cstdint>
 
+#include <glm/glm.hpp>
+
+#include <common/glsp_defs.h>
 #include "SamplerObject.h"
 #include "NameSpace.h"
 
@@ -82,28 +85,27 @@ public:
 					int width, int height, int border,
 					unsigned format, unsigned type, const void *pixels);
 
-	float getMagMinThresh() const return { return mMagMinThresh; }
+	float getMagMinThresh() const { return mMagMinThresh; }
+	uint32_t getAvailableMipmaps() const { return mAvailableMipmaps; }
 
-private:
-	// FIXME: now just check base mipmap level
-	// need check more stuff.
-	bool IsComplete()
-	{
-		return (mIsComplete = mpMipmap->mResident);
-	}
-
-private:
-	typedef void (*PFNTexture2D)(const Shader *pShader, const Texture *pTex, const vec2 &coord, vec4 &res);
-	typedef void (*PFNTexture2DMag)(const Texture *pTex, unsigned int level, const vec2 &coord, vec4 &res);
-	typedef void (*PFNTexture2DMin)(const Texture *pTex, float lambda, const vec2 &coord, vec4 &res);
+public:
+	typedef void (*PFNTexture2D)(const Shader *pShader, const Texture *pTex, const glm::vec2 &coord, glm::vec4 &res);
+	typedef void (*PFNTexture2DMag)(const Texture *pTex, unsigned int level, const glm::vec2 &coord, glm::vec4 &res);
+	typedef void (*PFNTexture2DMin)(const Texture *pTex, float lambda, const glm::vec2 &coord, glm::vec4 &res);
 
 	PFNTexture2D	m_pfnTexture2D;
 	PFNTexture2DMag	m_pfnTexture2DMag;
 	PFNTexture2DMin	m_pfnTexture2DMin;
 
+private:
+	// FIXME: now just check base mipmap level
+	// need check more stuff.
+	bool IsComplete();
 
+private:
 	TextureMipmap  *mpMipmap;
 	uint32_t		mNumMipmaps;
+	uint32_t		mAvailableMipmaps;
 	TextureState	mState;
 	SamplerObject	mSO;
 	float 			mMagMinThresh;

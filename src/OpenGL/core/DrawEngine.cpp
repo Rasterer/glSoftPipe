@@ -1,13 +1,22 @@
 #include "DrawEngine.h"
 
 #include "khronos/GL/glcorearb.h"
+#include "common/IEGLBridge.h"
 #include "GLContext.h"
 #include "VertexFetcher.h"
 #include "Rasterizer.h"
+#include "PrimitiveAssembler.h"
+#include "Clipper.h"
+#include "FaceCuller.h"
+#include "PerspectiveDivider.h"
+#include "ScreenMapper.h"
 
+#include <iostream> //jzb
+using namespace std; //jzb
 
 using glsp::ogl::DrawEngine;
 using glsp::ogl::DrawContext;
+using glsp::IEGLBridge;
 
 GLAPI void APIENTRY glDrawArrays (GLenum mode, GLint first, GLsizei count)
 {

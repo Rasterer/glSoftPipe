@@ -1,6 +1,9 @@
 #pragma once
 
+#include <common/glsp_defs.h>
+
 #include "PipeStage.h"
+
 
 NS_OPEN_GLSP_OGL()
 

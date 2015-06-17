@@ -1,13 +1,14 @@
 #pragma once
 
+#include <common/glsp_defs.h>
 #include "PipeStage.h"
 #include "DrawEngine.h"
-#include "GLContext.h"
 
 
 NS_OPEN_GLSP_OGL()
 
 class Fsio;
+struct RenderTarget;
 
 // FIXME: move to a global class
 extern const RenderTarget *gRT;

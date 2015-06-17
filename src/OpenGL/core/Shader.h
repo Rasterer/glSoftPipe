@@ -125,6 +125,8 @@ public:
 	void SetTextureCoordLocation() { mTexCoordLoc = mInRegs.size(); }
 	int  GetTextureCoordLocation() const { return mTexCoordLoc; }
 
+	static void* getPrivateData() { return m_priv; }
+
 protected:
 	template <class T>
 	void declareUniform(const std::string &name, T *constant);
@@ -139,10 +141,19 @@ protected:
 
 	unsigned getOutRegsNum() const { return mOutRegs.size(); }
 
-	glm::vec4 texture2D(sampler2D sampler, glm::vec2 coord);
+	inline glm::vec4 texture2D(sampler2D sampler, const glm::vec2 &coord)
+	{
+		glm::vec4 res;
 
-private:
-	static int calculateLOD(glm::vec2 coord);
+		mTexs[sampler]->m_pfnTexture2D(this, mTexs[sampler], coord, res);
+
+		return res;
+	}
+
+protected:
+	// TLS variable, prepare for multi-threads
+	// FIXME: find a better way
+	static thread_local void *m_priv;
 
 private:
 	ShaderType mType;

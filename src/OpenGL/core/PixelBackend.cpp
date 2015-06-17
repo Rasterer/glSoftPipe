@@ -2,6 +2,7 @@
 
 #include <glm/glm.hpp>
 #include "DataFlow.h"
+#include "GLContext.h"
 
 
 NS_OPEN_GLSP_OGL()
