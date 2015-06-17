@@ -89,18 +89,21 @@ public:
 	uint32_t getAvailableMipmaps() const { return mAvailableMipmaps; }
 
 public:
-	typedef void (*PFNTexture2D)(const Shader *pShader, const Texture *pTex, const glm::vec2 &coord, glm::vec4 &res);
-	typedef void (*PFNTexture2DMag)(const Texture *pTex, unsigned int level, const glm::vec2 &coord, glm::vec4 &res);
-	typedef void (*PFNTexture2DMin)(const Texture *pTex, float lambda, const glm::vec2 &coord, glm::vec4 &res);
+	void (*m_pfnTexture2D)(const Shader *pShader, const Texture *pTex, const glm::vec2 &coord, glm::vec4 &res);
+	void (*m_pfnTexture2DMag)(const Texture *pTex, unsigned int level, const glm::vec2 &coord, glm::vec4 &res);
+	void (*m_pfnTexture2DMin)(const Texture *pTex, float lambda, const glm::vec2 &coord, glm::vec4 &res);
 
-	PFNTexture2D	m_pfnTexture2D;
-	PFNTexture2DMag	m_pfnTexture2DMag;
-	PFNTexture2DMin	m_pfnTexture2DMin;
+	typedef int (*PWrapFunc)(int coord, int size);
+
+	PWrapFunc		m_pfnWrapS;
+	PWrapFunc		m_pfnWrapT;
+	PWrapFunc		m_pfnWrapR;
 
 private:
 	// FIXME: now just check base mipmap level
 	// need check more stuff.
 	bool IsComplete();
+	bool PickupWrapFunc(GLenum mode, PWrapFunc &pFunc);
 
 private:
 	TextureMipmap  *mpMipmap;

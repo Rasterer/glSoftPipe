@@ -30,7 +30,7 @@ public:
 		DECLARE_UNIFORM(mWVP);
 
 		DECLARE_IN (vec3, iPos);
-		DECLARE_IN(vec2, iTexCoor);
+		DECLARE_TEXTURE_COORD(vec2, iTexCoor);
 
 		DECLARE_OUT(vec4, gl_Position);
 		DECLARE_OUT(vec2, oTexCoor);
@@ -60,7 +60,7 @@ public:
 		DECLARE_SAMPLER(mSampler);
 
 		DECLARE_IN(vec4, gl_Position);
-		DECLARE_IN(vec2, oTexCoor);
+		DECLARE_TEXTURE_COORD(vec2, oTexCoor);
 
 		DECLARE_OUT(vec4, FragColor);
 	}
@@ -260,11 +260,26 @@ int main(int argc, char **argv)
 
 
 	Magick::InitializeMagick(*argv);
-	Magick::Blob blob;
+	Magick::Blob blob0;
+	Magick::Blob blob1;
+	Magick::Blob blob2;
+	Magick::Blob blob3;
+	Magick::Blob blob4;
+	Magick::Blob blob5;
 	//Magick::Image* pImage = new Magick::Image("test.png");
-	Magick::Image* pImage = new Magick::Image("test.png");
-	pImage->write(&blob, "RGBA");
-	Magick::Image OffscreenImage(pImage->columns(), pImage->rows(), "RGBA", Magick::CharPixel, blob.data());
+	Magick::Image* pImage0 = new Magick::Image("../examples/materials/test0.tga");
+	Magick::Image* pImage1 = new Magick::Image("../examples/materials/test1.tga");
+	Magick::Image* pImage2 = new Magick::Image("../examples/materials/test2.tga");
+	Magick::Image* pImage3 = new Magick::Image("../examples/materials/test3.tga");
+	Magick::Image* pImage4 = new Magick::Image("../examples/materials/test4.tga");
+	Magick::Image* pImage5 = new Magick::Image("../examples/materials/test5.tga");
+	pImage0->write(&blob0, "RGBA");
+	pImage1->write(&blob1, "RGBA");
+	pImage2->write(&blob2, "RGBA");
+	pImage3->write(&blob3, "RGBA");
+	pImage4->write(&blob4, "RGBA");
+	pImage5->write(&blob5, "RGBA");
+	//Magick::Image OffscreenImage(pImage->columns(), pImage->rows(), "RGBA", Magick::CharPixel, blob.data());
 	//OffscreenImage.write("output.png");
 
 	//Magick::Image my_image("640x480", "white");
@@ -273,7 +288,14 @@ int main(int argc, char **argv)
 	GLuint texobj;
 	glGenTextures(1, &texobj);
 	glBindTexture(GL_TEXTURE_2D, texobj);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pImage->columns(), pImage->rows(), 0, GL_RGBA, GL_UNSIGNED_BYTE, blob.data());
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pImage0->columns(), pImage0->rows(), 0, GL_RGBA, GL_UNSIGNED_BYTE, blob0.data());
+	glTexImage2D(GL_TEXTURE_2D, 1, GL_RGBA, pImage1->columns(), pImage1->rows(), 0, GL_RGBA, GL_UNSIGNED_BYTE, blob1.data());
+	glTexImage2D(GL_TEXTURE_2D, 2, GL_RGBA, pImage2->columns(), pImage2->rows(), 0, GL_RGBA, GL_UNSIGNED_BYTE, blob2.data());
+	glTexImage2D(GL_TEXTURE_2D, 3, GL_RGBA, pImage3->columns(), pImage3->rows(), 0, GL_RGBA, GL_UNSIGNED_BYTE, blob3.data());
+	glTexImage2D(GL_TEXTURE_2D, 4, GL_RGBA, pImage4->columns(), pImage4->rows(), 0, GL_RGBA, GL_UNSIGNED_BYTE, blob4.data());
+	glTexImage2D(GL_TEXTURE_2D, 5, GL_RGBA, pImage5->columns(), pImage5->rows(), 0, GL_RGBA, GL_UNSIGNED_BYTE, blob5.data());
+
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 

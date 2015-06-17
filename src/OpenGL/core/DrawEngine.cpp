@@ -11,8 +11,6 @@
 #include "PerspectiveDivider.h"
 #include "ScreenMapper.h"
 
-#include <iostream> //jzb
-using namespace std; //jzb
 
 using glsp::ogl::DrawEngine;
 using glsp::ogl::DrawContext;

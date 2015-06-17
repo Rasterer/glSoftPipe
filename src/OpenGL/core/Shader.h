@@ -59,7 +59,6 @@ typedef std::map<std::string, int> VarMap;
 	this->declareInput(#attr, typeid(type));	\
 
 
-
 typedef unsigned int sampler1D;
 typedef unsigned int sampler2D;
 
