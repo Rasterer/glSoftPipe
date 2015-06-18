@@ -3,8 +3,9 @@
 #include <glm/glm.hpp>
 
 #include <common/glsp_defs.h>
-#include <vector>
 #include <list>
+#include <vector>
+#include <utility>
 
 
 NS_OPEN_GLSP_OGL()
@@ -17,6 +18,15 @@ public:
 	ShaderRegisterFile& operator=(const ShaderRegisterFile&) = default;
 	~ShaderRegisterFile() = default;
 
+	// Move semantics
+	ShaderRegisterFile(ShaderRegisterFile &&rhs)
+	{
+		mRegs.swap(rhs);
+	}
+	ShaderRegisterFile& operator=(ShaderRegisterFile &&rhs)
+	{
+		mRegs.swap(rhs);
+	}
 	// getReg() and resize() is one pair
 	void resize(size_t n)
 	{
@@ -105,10 +115,56 @@ public:
 		return *this;
 	}
 
+	friend ShaderRegisterFile operator+(const ShaderRegisterFile &lhs, const ShaderRegisterFile &rhs);
+	friend ShaderRegisterFile operator*(const ShaderRegisterFile &v, float scalar);
+	friend ShaderRegisterFile operator*(float scalar, const ShaderRegisterFile &v);
+
 private:
 	typedef std::vector<glm::vec4> RegArray;
 	RegArray mRegs;
 };
+
+ShaderRegisterFile operator+(const ShaderRegisterFile &lhs, const ShaderRegisterFile &rhs)
+{
+	assert(lhs.size() == rhs.size());
+
+	ShaderRegisterFile tmp;
+	tmp.resize(lhs.size());
+
+	for(size_t i = 0; i < lhs.size(); i++)
+	{
+		tmp[i] = lhs[i] + rhs[i];
+	}
+
+	return std::move(tmp);
+}
+
+ShaderRegisterFile operator*(const ShaderRegisterFile &v, float scalar)
+{
+	ShaderRegisterFile tmp;
+	tmp.resize(v.size());
+
+	for(size_t i = 0; i < v.size(); i++)
+	{
+		tmp[i] = v[i] * scalar;
+	}
+
+	return std::move(tmp);
+}
+
+ShaderRegisterFile operator*(float scalar, const ShaderRegisterFile &v)
+{
+	ShaderRegisterFile tmp;
+	tmp.resize(v.size());
+
+	for(size_t i = 0; i < v.size(); i++)
+	{
+		tmp[i] = v[i] * scalar;
+	}
+
+	return std::move(tmp);
+}
+
 
 typedef ShaderRegisterFile vsInput;
 typedef ShaderRegisterFile vsOutput;
@@ -157,9 +213,17 @@ typedef std::vector<vsOutput> vsOutput_v;
 class Batch
 {
 public:
-	void MergePrim(Batch &rhs)
+	Batch& splice(Batch &rhs)
 	{
 		mPrims.splice(mPrims.end(), rhs.mPrims);
+		return *this;
+	}
+
+	// Move semantics
+	Batch& operator+=(Batch &&rhs)
+	{
+		mPrims.splice(mPrims.end(), rhs.mPrims);
+		return *this;
 	}
 
 	vsInput_v		mVertexCache;

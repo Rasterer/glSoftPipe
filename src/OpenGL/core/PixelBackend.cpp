@@ -86,11 +86,11 @@ void FBWriter::onFBWriting(const Fsio &fsio)
 	const int &index = fsio.mIndex;
 	uint8_t *colorBuffer = (uint8_t *)gRT->pColorBuffer;
 
+	// FIXME: How could we know this is a BGRA format buffer?
 	colorBuffer[4 * index+2] = (uint8_t)(fsio.out.fragcolor().x * 256);
 	colorBuffer[4 * index+1] = (uint8_t)(fsio.out.fragcolor().y * 256);
 	colorBuffer[4 * index+0] = (uint8_t)(fsio.out.fragcolor().z * 256);
-	//colorBuffer[4 * index+3] = (unsigned char)(fsio.out.fragcolor().w * 256);
-	colorBuffer[4 * index+3] = 255;
+	colorBuffer[4 * index+3] = (uint8_t)(fsio.out.fragcolor().w * 256);
 }
 
 NS_CLOSE_GLSP_OGL()
