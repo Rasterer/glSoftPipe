@@ -4,7 +4,6 @@
 #include <cstring>
 
 #include "GLContext.h"
-#include "khronos/GL/glcorearb.h"
 
 
 using glsp::ogl::GLContext;
@@ -54,6 +53,12 @@ GLAPI void APIENTRY glTexParameteri (GLenum target, GLenum pname, GLint param)
 	gc->mTM.TexParameteri(gc, target, pname, param);
 }
 
+GLAPI void APIENTRY glTexParameterfv (GLenum target, GLenum pname, const GLfloat *params)
+{
+	__GET_CONTEXT();
+
+	gc->mTM.TexParameterfv(gc, target, pname, params);
+}
 
 NS_OPEN_GLSP_OGL()
 
@@ -345,6 +350,13 @@ void Sample2DNearestLevel(const Texture *pTex, unsigned int level, const vec2 &c
 	int i = pTex->m_pfnWrapS(static_cast<int>(std::floor(coord.x * pMipmap->mWidth)), pMipmap->mWidth);
 	int j = pTex->m_pfnWrapT(static_cast<int>(std::floor(coord.y * pMipmap->mHeight)), pMipmap->mHeight);
 
+	if(i < 0 || i >= (int)pMipmap->mWidth ||
+	   j < 0 || j >= (int)pMipmap->mHeight)
+	{
+		res = pTex->getSamplerObject().mBorderColor;
+		return;
+	}
+
 	vec4 *pAddr = static_cast<vec4 *>(pMipmap->mMem.addr);
 
 	res = pAddr[(pMipmap->mHeight - j - 1) * pMipmap->mWidth + i];
@@ -363,7 +375,15 @@ void Sample2DLinearLevel(const Texture *pTex, unsigned int level, const vec2 &co
 	int i1 = pTex->m_pfnWrapS(static_cast<int>(floor(TexSpaceX)) + 1, pMipmap->mWidth);
 	int j1 = pTex->m_pfnWrapT(static_cast<int>(floor(TexSpaceY)) + 1, pMipmap->mHeight);
 
-	// TODO: add border texel
+	if(i0 < 0 || i0 >= (int)pMipmap->mWidth  ||
+	   j0 < 0 || j0 >= (int)pMipmap->mHeight ||
+	   i1 < 0 || i1 >= (int)pMipmap->mWidth  ||
+	   j1 < 0 || j1 >= (int)pMipmap->mHeight)
+	{
+		res = pTex->getSamplerObject().mBorderColor;
+		return;
+	}
+
 	vec4 *pAddr = static_cast<vec4 *>(pMipmap->mMem.addr);
 
 	vec4 lb = pAddr[(pMipmap->mHeight - j0 - 1) * pMipmap->mWidth + i0];
@@ -506,7 +526,8 @@ inline int mirror(int val)
 	return (val >= 0) ? val: (-1 - val);
 }
 
-inline int clamp(int val, int l, int h)
+template <class T>
+inline T clamp(T val, T l, T h)
 {
 	return (val < l) ? l: (val > h) ? h: val;
 }
@@ -538,6 +559,16 @@ int WrapMirrorClampToEdge(int coord, int size)
 
 } /* namespace */
 
+
+SamplerObject::SamplerObject():
+	mBorderColor(0.0f, 0.0f, 0.0f, 0.0f),
+	eWrapS(GL_REPEAT),
+	eWrapT(GL_REPEAT),
+	eWrapR(GL_REPEAT),
+	eMagFilter(GL_LINEAR),
+	eMinFilter(GL_NEAREST_MIPMAP_LINEAR)
+{
+}
 
 TextureMipmap::TextureMipmap():
 	mResident(false),
@@ -699,6 +730,28 @@ void Texture::TexParameteri(unsigned pname, int param)
 		case GL_TEXTURE_MIN_FILTER:
 		{
 			pSO->eMinFilter = param;
+			break;
+		}
+		default:
+		{
+			break;
+		}
+	}
+}
+
+void Texture::TexParameterfv(unsigned pname, const GLfloat *params)
+{
+	SamplerObject *pSO = &mSO;
+
+	switch(pname)
+	{
+		case GL_TEXTURE_BORDER_COLOR:
+		{
+			pSO->mBorderColor.x = clamp(params[0], 0.0f, 1.0f);
+			pSO->mBorderColor.y = clamp(params[1], 0.0f, 1.0f);
+			pSO->mBorderColor.z = clamp(params[2], 0.0f, 1.0f);
+			pSO->mBorderColor.w = clamp(params[3], 0.0f, 1.0f);
+
 			break;
 		}
 		default:
@@ -961,6 +1014,23 @@ void TextureMachine::TexParameteri(GLContext *gc, unsigned target, unsigned pnam
 		return;
 
 	pTex->TexParameteri(pname, param);
+}
+
+void TextureMachine::TexParameterfv(GLContext *gc, unsigned target, unsigned pname, const GLfloat *params)
+{
+	GLSP_UNREFERENCED_PARAM(gc);
+
+	TextureBindingPoint *pBP = getBindingPoint(mActiveTextureUnit, target);
+
+	if(!pBP)
+		return;
+
+	Texture *pTex = pBP->mTex;
+
+	if(pTex->getName() == 0)
+		return;
+
+	pTex->TexParameterfv(pname, params);
 }
 
 bool TextureMachine::validateTextureState(Shader *pVS, Shader *pFS)

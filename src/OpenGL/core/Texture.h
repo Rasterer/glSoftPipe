@@ -5,7 +5,7 @@
 #include <glm/glm.hpp>
 
 #include <common/glsp_defs.h>
-#include "SamplerObject.h"
+#include "khronos/GL/glcorearb.h"
 #include "NameSpace.h"
 
 
@@ -21,6 +21,21 @@ struct TextureMipmap;
 class  Texture;
 class  TextureMachine;
 class  Shader;
+
+
+struct SamplerObject: public NameItem
+{
+	SamplerObject();
+	~SamplerObject() = default;
+
+	glm::vec4 	mBorderColor;
+	GLenum 		eWrapS;
+	GLenum 		eWrapT;
+	GLenum 		eWrapR;
+
+	GLenum 		eMagFilter;
+	GLenum 		eMinFilter;
+};
 
 enum TextureTarget
 {
@@ -79,7 +94,9 @@ public:
 	TextureMipmap*  getBaseMipmap(uint32_t layer) const { return getMipmap(layer, 0); }
 
 	const SamplerObject&  getSamplerObject() const { return mSO; }
+
 	void TexParameteri(unsigned pname, int param);
+	void TexParameterfv(unsigned pname, const GLfloat *params);
 
 	void TexImage2D(int level, int internalformat,
 					int width, int height, int border,
@@ -138,6 +155,7 @@ public:
 	void BindTexture(GLContext *gc, unsigned target, unsigned texture);
 	void DeleteTextures(GLContext *gc, int n, const unsigned *textures);
 	void TexParameteri(GLContext *gc, unsigned target, unsigned pname, int param);
+	void TexParameterfv(GLContext *gc, unsigned target, unsigned pname, const GLfloat *params);
 	void TexImage2D(GLContext *gc, unsigned target, int level,
 					int internalformat, int width, int height,
 					int border, unsigned format, unsigned type,

@@ -5,7 +5,6 @@
 #include "DrawEngine.h"
 #include "Rasterizer.h"
 #include "Texture.h"
-#include "SamplerObject.h"
 #include "khronos/GL/glcorearb.h"
 
 

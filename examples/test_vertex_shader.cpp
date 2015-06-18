@@ -208,7 +208,7 @@ int main(int argc, char **argv)
 	in[0].iTexCoor = vec2(0.0f, 0.0f);
 	in[1].iTexCoor = vec2(1.0f, 0.0f);
 	in[2].iTexCoor = vec2(0.0f, 1.0f);
-	in[3].iTexCoor = vec2(1.0f, 1.0f);
+	in[3].iTexCoor = vec2(1.1f, 1.0f);
 	//in[3].fTexCoor = vec2(255.0f, 255.0f, 0.0f);
 	//in[4].fTexCoor = vec2(0.0f, 255.0f, 255.0f);
 	//in[5].fTexCoor = vec2(255.0f, 0.0f, 255.0f);
@@ -296,6 +296,8 @@ int main(int argc, char **argv)
 	glTexImage2D(GL_TEXTURE_2D, 4, GL_RGBA, pImage4->columns(), pImage4->rows(), 0, GL_RGBA, GL_UNSIGNED_BYTE, blob4.data());
 	glTexImage2D(GL_TEXTURE_2D, 5, GL_RGBA, pImage5->columns(), pImage5->rows(), 0, GL_RGBA, GL_UNSIGNED_BYTE, blob5.data());
 
+//	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+//	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
