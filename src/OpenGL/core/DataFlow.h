@@ -252,6 +252,12 @@ public:
 	fsInput	mGradiencesY;
 
 	const Primitive	&mPrim;
+
+#if 1
+	// used to compute lambda. Refer to:
+	// http://www.gamasutra.com/view/feature/3301/runtime_mipmap_filtering.php?print=1
+	float a, b, c, d, e, f;
+#endif
 };
 
 class Fsio

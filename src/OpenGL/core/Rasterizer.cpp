@@ -527,7 +527,7 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 //	const RenderTarget& rt = bat->mDC->gc->mRT;
 //	unsigned char *colorBuffer = (unsigned char *)rt.pColorBuffer;
 //	auto &fsio = hlp->mFsio;
-	
+
 	for(auto it = aet.begin(); it != aet.end(); it++)
 	{
 		if((*it)->bActive != true)
@@ -713,13 +713,14 @@ void PerspectiveCorrectInterpolater::emit(void *data)
 
 	getNextStage()->emit(data);
 }
+
 // Use the gradience to store partial derivatives of c/z
 void PerspectiveCorrectInterpolater::CalculateRadiences(Gradience *pGrad)
 {
 	const Primitive &prim = pGrad->mPrim;
-	
+
 	size_t size = prim.mVert[0].getRegsNum();
-	
+
 	for(int i = 0; i < prim.mVertNum; i++)
 	{
 		pGrad->mStarts[i].resize(size);
@@ -778,8 +779,30 @@ void PerspectiveCorrectInterpolater::CalculateRadiences(Gradience *pGrad)
 		GRADIENCE_EQUATION(i, z);
 		GRADIENCE_EQUATION(i, w);
 	}
-
 #undef GRADIENCE_EQUATION
+
+#if 1
+	__GET_CONTEXT();
+
+	int texCoordLoc = gc->mPM.getCurrentProgram()->getFS()->GetTextureCoordLocation();
+
+	const float &dudx = pGrad->mGradiencesX[texCoordLoc].x;
+	const float &dvdx = pGrad->mGradiencesX[texCoordLoc].y;
+	const float &dudy = pGrad->mGradiencesY[texCoordLoc].x;
+	const float &dvdy = pGrad->mGradiencesY[texCoordLoc].y;
+	const float &dzdx = pGrad->mGradiencesX[0].w;
+	const float &dzdy = pGrad->mGradiencesY[0].w;
+	const float z0    = Grad->mStarts[0].w;
+	const float u0    = Grad->mStarts[texCoordLoc].x;
+	const float v0    = Grad->mStarts[texCoordLoc].y;
+
+	pGrad->a = dudx * dzdy - dzdx * dudy;
+	pGrad->b = dvdx * dzdy - dzdx * dvdy;
+	pGrad->c = dudx * z0   - dzdx * u0;
+	pGrad->d = dvdx * z0   - dzdx * v0;
+	pGrad->e = dudy * z0   - dzdy * u0;
+	pGrad->f = dvdy * z0   - dzdy * v0;
+#endif
 }
 
 void PerspectiveCorrectInterpolater::onInterpolating(

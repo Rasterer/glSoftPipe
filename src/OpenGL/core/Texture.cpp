@@ -312,7 +312,7 @@ float ComputeLambda(const Shader *pShader, const vec2 &coord, int texW, int texH
 	const fsInput &start = *static_cast<fsInput *>(fsio.m_priv);
 	const fsInput &derivativeX = fsio.mpGrad->mGradiencesX;
 	const fsInput &derivativeY = fsio.mpGrad->mGradiencesY;
-
+#if 0
 	int texCoordLoc = pShader->GetTextureCoordLocation();
 
 	float z_stepx = 1.0f / (start[0].w + derivativeX[0].w);
@@ -323,10 +323,35 @@ float ComputeLambda(const Shader *pShader, const vec2 &coord, int texW, int texH
 	float dudy = texW * ((start[texCoordLoc].x + derivativeY[texCoordLoc].x) * z_stepy - coord.x);
 	float dvdy = texH * ((start[texCoordLoc].y + derivativeY[texCoordLoc].y) * z_stepy - coord.y);
 
-	float x = std::sqrt(dudx * dudx + dvdx * dvdx);
-	float y = std::sqrt(dudy * dudy + dvdy * dvdy);
+	float x = dudx * dudx + dvdx * dvdx;
+	float y = dudy * dudy + dvdy * dvdy;
 
-	return std::log2(std::max(x, y));
+	return 0.5f * std::log2(std::max(x, y));
+#else
+	// Refer to:
+	// http://www.gamasutra.com/view/feature/3301/runtime_mipmap_filtering.php?print=1
+	const Gradience *pGrad = fsio.mpGrad;
+
+	const float stepx = fsio.x + 0.5f - start[0].x;
+	const float stepy = fsio.y + 0.5f - start[0].y;
+
+	float Z = derivativeX[0].w * stepx + derivativeY[0].w * stepy + start[0].w;
+	Z = Z * Z; Z = Z * Z; // Z = pow(Z, 4)
+
+	float ux = pGrad->c + pGrad->a * stepy;
+	ux = ux * ux;
+
+	float vx = pGrad->d + pGrad->b * stepy;
+	vx = vx * vx;
+
+	float uy = pGrad->e - pGrad->a * stepx;
+	uy = uy * uy;
+
+	float vy = pGrad->f - pGrad->b * stepx;
+	vy = vy * vy;
+
+	return 0.5f * (std::log2(std::max(ux + vx, uy + vy)) / Z);
+#endif
 }
 
 inline void BiLinearInterpolate(float scaleX, float scaleY, const vec4 &lb, const vec4 &lt, const vec4 &rb, const vec4 &rt, vec4 &res)

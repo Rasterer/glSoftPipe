@@ -345,7 +345,7 @@ public:
 	template <class T>
 	void UniformUif(GLContext *gc, int location, int count, const T *value);
 
-	Program *getCurrentProgram() const { return mCurrentProgram; }
+	Program* getCurrentProgram() const { return mCurrentProgram; }
 
 private:
 	void setCurrentProgram(Program *prog) { mCurrentProgram = prog; }
