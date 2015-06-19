@@ -10,6 +10,7 @@
 #include "common/glsp_defs.h"
 #include "khronos/GL/glcorearb.h"
 
+
 NS_OPEN_GLSP_OGL()
 
 using glm::vec4;

@@ -315,11 +315,11 @@ void RasterizerWrapper::linkPipeStages(GLContext *gc)
 		// enable early Z
 		if(!pFS->getDiscardFlag() &&
 			!(enables & GLSP_SCISSOR_TEST) &&
-			!(enables & GL_STENCIL_TEST))
+			!(enables & GLSP_STENCIL_TEST))
 		{
 			mpRasterizer ->setNextStage(mpDepthTest);
 			mpDepthTest  ->setNextStage(mpInterpolate);
-			mpInterpolate->setNextStage(pFS);
+			last = mpInterpolate->setNextStage(pFS);
 		}
 		else
 		{

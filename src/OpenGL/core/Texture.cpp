@@ -851,8 +851,6 @@ bool Texture::ValidateState()
 			default:
 				return false;
 		}
-
-		return true;
 	}
 	else
 	{

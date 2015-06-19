@@ -21,6 +21,13 @@ GLAPI void APIENTRY glViewport (GLint x, GLint y, GLsizei width, GLsizei height)
 	return;
 }
 
+GLAPI void APIENTRY glEnable (GLenum cap)
+{
+	__GET_CONTEXT();
+
+	if(cap == GL_DEPTH_TEST)
+		gc->mState.mEnables |= GLSP_DEPTH_TEST;
+}
 
 NS_OPEN_GLSP_OGL()
 

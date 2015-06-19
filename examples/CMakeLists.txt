@@ -1,7 +1,7 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
 #SET(TESTPIPE_SRC test_vs_example.cpp)
-SET(TESTSHADER_SRC test_vertex_shader.cpp)
+SET(TESTSHADER_SRC test_vertex_shader.cpp mesh.cpp)
 SET(TEST_NAMESPACE_SRC test_name_space.cpp)
 SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -lX11")
@@ -32,7 +32,8 @@ TARGET_LINK_LIBRARIES(test_shader
 					  glsp_egl
 					  ${XCB_LIBRARY}
 					  ${XLIB_XCB_LIBRARY}
-					  ${XCB_DRI2_LIBRARY})
+					  ${XCB_DRI2_LIBRARY}
+					  assimp)
 
 ADD_DEPENDENCIES(test_shader glsp_egl glsp_ogl)
 

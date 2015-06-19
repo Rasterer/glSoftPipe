@@ -14,6 +14,7 @@
 
 #include "khronos/GL/glcorearb.h"
 #include "khronos/EGL/egl.h"
+#include "mesh.h"
 
 using namespace std;
 using namespace glm;
@@ -234,30 +235,33 @@ int main(int argc, char **argv)
 	glAttachShader(prog, fs);
 	glLinkProgram(prog);
 	glUseProgram(prog);
+	glEnable(GL_DEPTH_TEST);
 
 	GLint WVPLocation    = glGetUniformLocation(prog, "mWVP");
 	GLint samplerLocation = glGetUniformLocation(prog, "mSampler");
 
-	float xbias = 0.1f;
-	//mat4 trans = translate(mat4(1.0f), vec3(xbias, 0.0f, 0.0f));
-	mat4 rotate = glm::rotate(mat4(1.0f), (float)M_PI * 78 / 180, vec3(1.0f, 0.0f, 0.0f));
+	float xbias = 20.0f;
+	mat4 rotate = translate(mat4(1.0f), vec3(0.0f, 0.0f, xbias));
+	rotate = glm::scale(rotate, vec3(0.1f, 0.1f, 0.1f));
+	rotate = glm::rotate(rotate, (float)M_PI * 78 / 180, vec3(0.0f, 1.0f, 0.0f));
 	mat4 view = lookAt(vec3(0.0f, 0.0f, -4.0f),
 					   vec3(0.0f, 0.0f, 1.0f),
 					   vec3(0.0f, 1.0f, 0.0f));
-	mat4 project = perspective((float)M_PI * 30.0f / 180.0f, 16.0f / 9.0f, 3.0f, 10.0f); 
+	mat4 project = perspective((float)M_PI * 30.0f / 180.0f, 16.0f / 9.0f, 15.0f, 30.0f); 
 
 	mat4 wvp = project * view * rotate;
 
 	glUniformMatrix4fv(WVPLocation, 1, false, (float *)&wvp);
 	glUniform1i(samplerLocation, 0);
-
+	Magick::InitializeMagick(*argv);
+#if 0
 	int posLocation   = glGetAttribLocation(prog, "iPos");
 	int texCoorLocation = glGetAttribLocation(prog, "iTexCoor");
 	glEnableVertexAttribArray(posLocation);
 	glEnableVertexAttribArray(texCoorLocation);
+	cout << "jzb posLocation " << posLocation << " texCoorLocation " << texCoorLocation << endl;
 	glVertexAttribPointer(posLocation, 3, GL_FLOAT, GL_FALSE, sizeof(in[0]), 0);
 	glVertexAttribPointer(texCoorLocation, 2, GL_FLOAT, GL_FALSE, sizeof(in[0]), (const void *)sizeof(vec3));
-
 
 	Magick::InitializeMagick(*argv);
 	Magick::Blob blob0;
@@ -284,7 +288,24 @@ int main(int argc, char **argv)
 
 	//Magick::Image my_image("640x480", "white");
 	//my_image.write("output.png");
+#endif
+	Mesh *pMesh = new Mesh();
+	pMesh->LoadMesh("../examples/materials/phoenix_ugv.md2");
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+#if 0
 	GLuint texobj;
 	glGenTextures(1, &texobj);
 	glBindTexture(GL_TEXTURE_2D, texobj);
@@ -302,10 +323,10 @@ int main(int argc, char **argv)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
 	//glViewport(640, 360, 640, 360);
+#endif
 	while(true)
 	{
 		cout << "draw begin" << endl;
-		//std::this_thread::sleep_for (std::chrono::seconds(2));
 
 		//xbias += 0.01f;
 
@@ -319,8 +340,10 @@ int main(int argc, char **argv)
 		//glUniformMatrix4fv(viewLocation, 1, false, (float *)&view);
 
 		//glDrawArrays(GL_TRIANGLES, 0, 3);
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		pMesh->Render();
+		//glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		ok = eglSwapBuffers(display, surface);
+		std::this_thread::sleep_for (std::chrono::seconds(2));
 	}
 
 	cout << __func__ << ": after execute" << endl;
