@@ -127,7 +127,9 @@ bool EGLSurfaceX11::swapBuffers()
 		mCurrentBO = NULL;
 	}
 
-	return swap_count != -1;
+	bool ret = pDisp->getEGLBridge()->swapBuffers();
+
+	return ret && swap_count != -1;
 }
 
 EGLSurfaceX11::~EGLSurfaceX11()

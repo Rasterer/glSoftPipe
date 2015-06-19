@@ -243,6 +243,8 @@ void DrawEngine::beginFrame(GLContext *gc)
 	{
 		*(rt.pDepthBuffer + i) = 1.0f;
 	}
+
+	gc->mbInFrame = true;
 }
 
 void DrawEngine::prepareToDraw(DrawContext *dc)
