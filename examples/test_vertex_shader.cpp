@@ -208,7 +208,7 @@ int main(int argc, char **argv)
 	in[0].iTexCoor = vec2(0.0f, 0.0f);
 	in[1].iTexCoor = vec2(1.0f, 0.0f);
 	in[2].iTexCoor = vec2(0.0f, 1.0f);
-	in[3].iTexCoor = vec2(1.1f, 1.0f);
+	in[3].iTexCoor = vec2(1.0f, 1.0f);
 	//in[3].fTexCoor = vec2(255.0f, 255.0f, 0.0f);
 	//in[4].fTexCoor = vec2(0.0f, 255.0f, 255.0f);
 	//in[5].fTexCoor = vec2(255.0f, 0.0f, 255.0f);

@@ -350,7 +350,10 @@ float ComputeLambda(const Shader *pShader, const vec2 &coord, int texW, int texH
 	float vy = pGrad->f - pGrad->b * stepx;
 	vy = vy * vy;
 
-	return 0.5f * (std::log2(std::max(ux + vx, uy + vy)) / Z);
+	texW = texW * texW;
+	texH = texH * texH;
+
+	return 0.5f * std::log2(std::max(ux * texW + vx * texH, uy * texW + vy * texH) / Z);
 #endif
 }
 

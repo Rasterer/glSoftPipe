@@ -792,9 +792,9 @@ void PerspectiveCorrectInterpolater::CalculateRadiences(Gradience *pGrad)
 	const float &dvdy = pGrad->mGradiencesY[texCoordLoc].y;
 	const float &dzdx = pGrad->mGradiencesX[0].w;
 	const float &dzdy = pGrad->mGradiencesY[0].w;
-	const float z0    = Grad->mStarts[0].w;
-	const float u0    = Grad->mStarts[texCoordLoc].x;
-	const float v0    = Grad->mStarts[texCoordLoc].y;
+	const float &z0   = pGrad->mStarts[0][0].w;
+	const float &u0   = pGrad->mStarts[0][texCoordLoc].x;
+	const float &v0   = pGrad->mStarts[0][texCoordLoc].y;
 
 	pGrad->a = dudx * dzdy - dzdx * dudy;
 	pGrad->b = dvdx * dzdy - dzdx * dvdy;

@@ -10,9 +10,13 @@
 
 NS_OPEN_GLSP_OGL()
 
+struct DrawContext;
+
 class ShaderRegisterFile
 {
 public:
+	typedef std::vector<glm::vec4> RegArray;
+
 	ShaderRegisterFile() = default;
 	ShaderRegisterFile(const ShaderRegisterFile&) = default;
 	ShaderRegisterFile& operator=(const ShaderRegisterFile&) = default;
@@ -21,11 +25,12 @@ public:
 	// Move semantics
 	ShaderRegisterFile(ShaderRegisterFile &&rhs)
 	{
-		mRegs.swap(rhs);
+		mRegs.swap(rhs.getRegArray());
 	}
 	ShaderRegisterFile& operator=(ShaderRegisterFile &&rhs)
 	{
-		mRegs.swap(rhs);
+		mRegs.swap(rhs.getRegArray());
+		return *this;
 	}
 	// getReg() and resize() is one pair
 	void resize(size_t n)
@@ -43,6 +48,14 @@ public:
 		return mRegs[location];
 	}
 
+	RegArray& getRegArray()
+	{
+		return mRegs;
+	}
+	const RegArray& getRegArray() const
+	{
+		return mRegs;
+	}
 	// glPosition and FragColor are both in the first location,
 	// which can be treat as a union.
 	glm::vec4& position()
@@ -93,77 +106,16 @@ public:
 		return getReg(idx);
 	}
 
-	ShaderRegisterFile& operator+=(const ShaderRegisterFile &rhs)
-	{
-		assert(getRegsNum() == rhs.getRegsNum());
-
-		for(size_t i = 0; i < getRegsNum(); i++)
-		{
-			mRegs[i] += rhs[i];
-		}
-
-		return *this;
-	}
-
-	ShaderRegisterFile& operator*=(const float scalar)
-	{
-		for(size_t i = 0; i < getRegsNum(); i++)
-		{
-			mRegs[i] *= scalar;
-		}
-
-		return *this;
-	}
-
-	friend ShaderRegisterFile operator+(const ShaderRegisterFile &lhs, const ShaderRegisterFile &rhs);
-	friend ShaderRegisterFile operator*(const ShaderRegisterFile &v, float scalar);
-	friend ShaderRegisterFile operator*(float scalar, const ShaderRegisterFile &v);
+	ShaderRegisterFile& operator+=(const ShaderRegisterFile &rhs);
+	ShaderRegisterFile& operator*=(const float scalar);
 
 private:
-	typedef std::vector<glm::vec4> RegArray;
 	RegArray mRegs;
 };
 
-ShaderRegisterFile operator+(const ShaderRegisterFile &lhs, const ShaderRegisterFile &rhs)
-{
-	assert(lhs.size() == rhs.size());
-
-	ShaderRegisterFile tmp;
-	tmp.resize(lhs.size());
-
-	for(size_t i = 0; i < lhs.size(); i++)
-	{
-		tmp[i] = lhs[i] + rhs[i];
-	}
-
-	return std::move(tmp);
-}
-
-ShaderRegisterFile operator*(const ShaderRegisterFile &v, float scalar)
-{
-	ShaderRegisterFile tmp;
-	tmp.resize(v.size());
-
-	for(size_t i = 0; i < v.size(); i++)
-	{
-		tmp[i] = v[i] * scalar;
-	}
-
-	return std::move(tmp);
-}
-
-ShaderRegisterFile operator*(float scalar, const ShaderRegisterFile &v)
-{
-	ShaderRegisterFile tmp;
-	tmp.resize(v.size());
-
-	for(size_t i = 0; i < v.size(); i++)
-	{
-		tmp[i] = v[i] * scalar;
-	}
-
-	return std::move(tmp);
-}
+ShaderRegisterFile operator+(const ShaderRegisterFile &lhs, const ShaderRegisterFile &rhs);
+ShaderRegisterFile operator*(const ShaderRegisterFile &v, float scalar);
+ShaderRegisterFile operator*(float scalar, const ShaderRegisterFile &v);
 
 
 typedef ShaderRegisterFile vsInput;
@@ -234,7 +186,6 @@ public:
 	// point back to the mDC
 	DrawContext	   *mDC;
 };
-
 
 class Gradience
 {
