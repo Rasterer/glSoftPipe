@@ -30,7 +30,7 @@ public:
 	{
 		DECLARE_UNIFORM(mWVP);
 
-		DECLARE_IN (vec3, iPos);
+		DECLARE_IN(vec3, iPos);
 		DECLARE_TEXTURE_COORD(vec2, iTexCoor);
 
 		DECLARE_OUT(vec4, gl_Position);
@@ -39,14 +39,14 @@ public:
 
 	void execute(vsInput &in, vsOutput &out)
 	{
-		RESOLVE_IN (vec3, iPos, in);
-		RESOLVE_IN (vec2, iTexCoor, in);
+		RESOLVE_IN(vec3, iPos, in);
+		RESOLVE_IN(vec2, iTexCoor, in);
 
 		RESOLVE_OUT(vec4, gl_Position, out);
 		RESOLVE_OUT(vec2, oTexCoor, out);
 
 		gl_Position = mWVP * vec4(iPos, 1.0f);
-		oTexCoor = iTexCoor;
+		oTexCoor    = iTexCoor;
 	}
 
 private:
@@ -184,6 +184,7 @@ int main(int argc, char **argv)
 
 	ShaderFactory *pFact = new simpleShaderFactory();
 
+#if 0
 	int iIndex[6] = {0, 1, 2, 1, 2, 3};
 	//int iIndex[3] = {0, 1, 2};
 
@@ -197,11 +198,10 @@ int main(int argc, char **argv)
 	//in[0].iPos = vec3(-2.0f, -1.0f, 0.6f);
 	//in[1].iPos = vec3(1.0f, -1.0f, 0.6f);
 	//in[2].iPos = vec3(0.0f, 1.0f, 0.0f);
-
 	in[0].iPos = vec3(-2.0f, -2.0f, 0.0f);
 	in[1].iPos = vec3(2.0f, -2.0f, 0.0f);
-	in[2].iPos = vec3(-2.0f, 6.0f, 0.0f);
-	in[3].iPos = vec3(2.0f, 6.0f, 0.0f);
+	in[2].iPos = vec3(-2.0f, 2.0f, 0.0f);
+	in[3].iPos = vec3(2.0f, 2.0f, 0.0f);
 	//in[3].iPos = vec3(-1.0f, 1.0f, 0.0f);
 	//in[4].iPos = vec3(1.0f, 1.0f, 0.0f);
 	//in[5].iPos = vec3(0.0f, -1.0f, -1.0f);
@@ -220,7 +220,7 @@ int main(int argc, char **argv)
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bo[1]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(in), in, GL_STATIC_DRAW);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(iIndex), iIndex, GL_STATIC_DRAW);
-
+#endif
 	GLuint prog = glCreateProgram();
 	GLuint vs = glCreateShader(GL_VERTEX_SHADER);
 	GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
@@ -237,19 +237,21 @@ int main(int argc, char **argv)
 	glUseProgram(prog);
 	glEnable(GL_DEPTH_TEST);
 
-	GLint WVPLocation    = glGetUniformLocation(prog, "mWVP");
+	GLint WVPLocation     = glGetUniformLocation(prog, "mWVP");
 	GLint samplerLocation = glGetUniformLocation(prog, "mSampler");
 
-	float xbias = 20.0f;
-	mat4 rotate = translate(mat4(1.0f), vec3(0.0f, 0.0f, xbias));
-	rotate = glm::scale(rotate, vec3(0.1f, 0.1f, 0.1f));
-	rotate = glm::rotate(rotate, (float)M_PI * 78 / 180, vec3(0.0f, 1.0f, 0.0f));
-	mat4 view = lookAt(vec3(0.0f, 0.0f, -4.0f),
-					   vec3(0.0f, 0.0f, 1.0f),
+	float xbias = 10.0f;
+	mat4 scal  = glm::scale(mat4(1.0f), vec3(0.1f, 0.1f, 0.1f));
+	mat4 trans = glm::translate(mat4(1.0f), vec3(0.0f, 0.0f, xbias));
+	//rotate = glm::rotate(world, (float)M_PI * 70 / 180, vec3(0.0f, 1.0f, 0.0f));
+	//rotate = glm::rotate(world, (float)M_PI * 30 / 180, vec3(1.0f, 0.0f, 0.0f));
+	mat4 world = trans * scal;
+	mat4 view = glm::lookAt(vec3(15.0f, 10.0f, -10.0f),
+					   vec3(0.0f, 0.0f, 10.0f),
 					   vec3(0.0f, 1.0f, 0.0f));
-	mat4 project = perspective((float)M_PI * 30.0f / 180.0f, 16.0f / 9.0f, 15.0f, 30.0f); 
+	mat4 project = glm::perspective((float)M_PI * 60.0f / 180.0f, 16.0f / 9.0f, 1.0f, 50.0f); 
 
-	mat4 wvp = project * view * rotate;
+	mat4 wvp   = project * view * world;
 
 	glUniformMatrix4fv(WVPLocation, 1, false, (float *)&wvp);
 	glUniform1i(samplerLocation, 0);
@@ -271,12 +273,18 @@ int main(int argc, char **argv)
 	Magick::Blob blob4;
 	Magick::Blob blob5;
 	//Magick::Image* pImage = new Magick::Image("test.png");
-	Magick::Image* pImage0 = new Magick::Image("../examples/materials/test0.tga");
-	Magick::Image* pImage1 = new Magick::Image("../examples/materials/test1.tga");
-	Magick::Image* pImage2 = new Magick::Image("../examples/materials/test2.tga");
-	Magick::Image* pImage3 = new Magick::Image("../examples/materials/test3.tga");
-	Magick::Image* pImage4 = new Magick::Image("../examples/materials/test4.tga");
-	Magick::Image* pImage5 = new Magick::Image("../examples/materials/test5.tga");
+	//Magick::Image* pImage0 = new Magick::Image("../examples/materials/test0.tga");
+	//Magick::Image* pImage1 = new Magick::Image("../examples/materials/test1.tga");
+	//Magick::Image* pImage2 = new Magick::Image("../examples/materials/test2.tga");
+	//Magick::Image* pImage3 = new Magick::Image("../examples/materials/test3.tga");
+	//Magick::Image* pImage4 = new Magick::Image("../examples/materials/test4.tga");
+	//Magick::Image* pImage5 = new Magick::Image("../examples/materials/test5.tga");
+	Magick::Image* pImage0 = new Magick::Image("../examples/materials/0.tga");
+	Magick::Image* pImage1 = new Magick::Image("../examples/materials/1.tga");
+	Magick::Image* pImage2 = new Magick::Image("../examples/materials/2.tga");
+	Magick::Image* pImage3 = new Magick::Image("../examples/materials/3.tga");
+	Magick::Image* pImage4 = new Magick::Image("../examples/materials/4.tga");
+	Magick::Image* pImage5 = new Magick::Image("../examples/materials/5.tga");
 	pImage0->write(&blob0, "RGBA");
 	pImage1->write(&blob1, "RGBA");
 	pImage2->write(&blob2, "RGBA");
@@ -290,7 +298,7 @@ int main(int argc, char **argv)
 	//my_image.write("output.png");
 #endif
 	Mesh *pMesh = new Mesh();
-	pMesh->LoadMesh("../examples/materials/phoenix_ugv.md2");
+	pMesh->LoadMesh("../examples/LocalModel/materials/phoenix_ugv.md2");
 
 
 
@@ -341,7 +349,7 @@ int main(int argc, char **argv)
 
 		//glDrawArrays(GL_TRIANGLES, 0, 3);
 		pMesh->Render();
-		//glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		ok = eglSwapBuffers(display, surface);
 		std::this_thread::sleep_for (std::chrono::seconds(2));
 	}

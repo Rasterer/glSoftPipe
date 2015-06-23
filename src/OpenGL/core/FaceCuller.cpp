@@ -10,8 +10,7 @@ NS_OPEN_GLSP_OGL()
 FaceCuller::FaceCuller():
 	PipeStage("Face Culling", DrawEngine::getDrawEngine()),
 	mOrient(CCW),
-	mCullFace(BACK),
-	mCullEnabled(false)
+	mCullFace(BACK)
 {
 }
 
@@ -31,8 +30,6 @@ void FaceCuller::culling(Batch *bat)
 {
 	Primlist &pl = bat->mPrims;
 	Primlist::iterator it = pl.begin();
-
-	assert(mCullEnabled);
 
 	while(it != pl.end())
 	{

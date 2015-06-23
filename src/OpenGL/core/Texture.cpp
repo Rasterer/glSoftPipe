@@ -387,7 +387,7 @@ void Sample2DNearestLevel(const Texture *pTex, unsigned int level, const vec2 &c
 
 	vec4 *pAddr = static_cast<vec4 *>(pMipmap->mMem.addr);
 
-	res = pAddr[(pMipmap->mHeight - j - 1) * pMipmap->mWidth + i];
+	res = pAddr[j * pMipmap->mWidth + i];
 }
 
 void Sample2DLinearLevel(const Texture *pTex, unsigned int level, const vec2 &coord, vec4 &res)
@@ -414,10 +414,10 @@ void Sample2DLinearLevel(const Texture *pTex, unsigned int level, const vec2 &co
 
 	vec4 *pAddr = static_cast<vec4 *>(pMipmap->mMem.addr);
 
-	vec4 lb = pAddr[(pMipmap->mHeight - j0 - 1) * pMipmap->mWidth + i0];
-	vec4 lt = pAddr[(pMipmap->mHeight - j1 - 1) * pMipmap->mWidth + i0];
-	vec4 rb = pAddr[(pMipmap->mHeight - j0 - 1) * pMipmap->mWidth + i1];
-	vec4 rt = pAddr[(pMipmap->mHeight - j1 - 1) * pMipmap->mWidth + i1];
+	vec4 lb = pAddr[j0 * pMipmap->mWidth + i0];
+	vec4 lt = pAddr[j1 * pMipmap->mWidth + i0];
+	vec4 rb = pAddr[j0 * pMipmap->mWidth + i1];
+	vec4 rt = pAddr[j1 * pMipmap->mWidth + i1];
 
 	float intpart;
 	float scaleX = std::modf(TexSpaceX, &intpart);

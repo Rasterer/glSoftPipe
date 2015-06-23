@@ -33,7 +33,10 @@ void ZTester::emit(void *data)
 
 	bool success = onDepthTesting(*pFsio);
 
-	if(!success)
+	if(success)
+		// TODO: depth mask
+		gRT->pDepthBuffer[pFsio->mIndex] = pFsio->z;
+	else
 		return;
 
 	getNextStage()->emit(pFsio);

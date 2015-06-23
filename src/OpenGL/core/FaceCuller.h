@@ -31,16 +31,12 @@ public:
 	virtual void emit(void *data);
 	virtual void finalize();
 
-	bool CullEnabled() const { return mCullEnabled; }
-	void setCullEnabled(bool enable) { mCullEnabled = enable; }
-
 private:
 	void culling(Batch *bat);
 
 private:
 	orient_t mOrient;
 	face_t mCullFace;
-	bool mCullEnabled;
 };
 
 NS_CLOSE_GLSP_OGL()
