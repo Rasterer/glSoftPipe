@@ -10,7 +10,7 @@
 #include "FaceCuller.h"
 #include "PerspectiveDivider.h"
 #include "ScreenMapper.h"
-
+#include "ThreadPool.h"
 
 using glsp::ogl::DrawEngine;
 using glsp::ogl::DrawContext;
@@ -118,6 +118,10 @@ void DrawEngine::init(void *dpy, IEGLBridge *bridge)
 	mpBridge = bridge;
 
 	initPipeline();
+
+	ThreadPool &threadPool = ThreadPool::get();
+
+	threadPool.Initialize();
 }
 
 void DrawEngine::initPipeline()
