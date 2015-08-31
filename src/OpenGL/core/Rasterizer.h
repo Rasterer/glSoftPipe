@@ -55,6 +55,8 @@ public:
 		mpInterpolate = interp;
 	}
 
+	Interpolater* GetInterpolater() const { return mpInterpolate; }
+
 protected:
 	virtual void onRasterizing(Batch *bat) = 0;
 

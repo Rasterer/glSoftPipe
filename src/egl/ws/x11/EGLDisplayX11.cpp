@@ -76,7 +76,7 @@ bool EGLDisplayX11::initDisplay()
 
 	mDri2Major = dri2_query->major_version;
 	mDri2Minor = dri2_query->minor_version;
-	free(dri2_query);
+	::free(dri2_query);
 
 	connect = ::xcb_dri2_connect_reply (mXCBConn, connect_cookie, NULL);
 
@@ -89,11 +89,11 @@ bool EGLDisplayX11::initDisplay()
 	device_name = ::xcb_dri2_connect_device_name(connect);
 	mDriverName = driver_name;
 	mDeviceName = device_name;
-	free(connect);
 
 	// use mDriverName & mDeviceName
 	//mDrmFd = ::drmOpen("i915", NULL);
 	mDrmFd = ::open(device_name, O_RDWR | O_CLOEXEC);
+	::free(connect);
 
 
 	if(mDrmFd < 0)
@@ -113,7 +113,7 @@ bool EGLDisplayX11::initDisplay()
 	if(authenticate == NULL || !authenticate->authenticated)
 		goto err_fd;
 
-	free(authenticate);
+	::free(authenticate);
 
 	mBufMgr = ::drm_intel_bufmgr_gem_init(mDrmFd, batch_size_);
 

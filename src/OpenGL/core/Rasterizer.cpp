@@ -12,6 +12,8 @@
 #include "GLContext.h"
 #include "PixelBackend.h"
 #include "utils.h"
+#include "ThreadPool.h"
+
 
 
 NS_OPEN_GLSP_OGL()
@@ -143,14 +145,16 @@ private:
 	edge *mActiveEdge1;
 };
 
-// Calculate the barycentric coodinates of point P in this triangle
-//
-// 1. use homogeneous coordinates
-// [x0  x1  x2 ] -1    [xp ]
-// [y0  y1  y2 ]    *  [yp ]
-// [1.0 1.0 1.0]       [1.0]
-//
-// 2. use area
+/*
+ * Calculate the barycentric coodinates of point P in this triangle
+ *
+ * 1. use homogeneous coordinates
+ * [x0  x1  x2 ] -1    [xp ]
+ * [y0  y1  y2 ]    *  [yp ]
+ * [1.0 1.0 1.0]       [1.0]
+ *
+ * 2. use area
+ */
 vec3 ScanlineRasterizer::triangle::calculateBC(float xp, float yp)
 {
 	const vec4& v0 = mPrim.mVert[0].position();
@@ -213,7 +217,7 @@ public:
 		bActive(false) 
 	{
 	}
-	~edge() {}
+	~edge() = default;
 
 	float x;
 	float dx;
@@ -232,7 +236,7 @@ public:
 		mParent(pParent)
 	{
 	}
-	~span() {}
+	~span() = default;
 
 	float xleft;
 	float xright;
@@ -356,6 +360,8 @@ void RasterizerWrapper::emit(void *data)
 	gRT = &bat->mDC->gc->mRT;
 
 	getNextStage()->emit(bat);
+
+	delete bat;
 }
 
 void RasterizerWrapper::finalize()
@@ -422,8 +428,8 @@ ScanlineRasterizer::SRHelper* ScanlineRasterizer::createGET(Batch *bat)
 
 			auto iter = get.find(ystart);
 			if(iter == get.end())
-				//get.insert(pair<int, vector<edge *> >(ystart, vector<edge *>()));
-				get[ystart] = std::vector<edge *>();
+				get.insert(std::pair<int, std::vector<edge *> >(ystart, std::vector<edge *>()));
+				//get[ystart] = std::vector<edge *>();
 
 			get[ystart].push_back(pEdge);
 		}
@@ -522,11 +528,8 @@ void ScanlineRasterizer::interpolate(vec3& coeff, Primitive& prim, fsInput& resu
 
 void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 {
-	auto &aet = hlp->mAET;
-	std::vector<span> vSpans;
-//	const RenderTarget& rt = bat->mDC->gc->mRT;
-//	unsigned char *colorBuffer = (unsigned char *)rt.pColorBuffer;
-//	auto &fsio = hlp->mFsio;
+	SRHelper::ActiveEdgeTable &aet = hlp->mAET;
+	std::vector<span> *pSpans = new std::vector<span>;
 
 	for(auto it = aet.begin(); it != aet.end(); it++)
 	{
@@ -539,103 +542,75 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
 
 		assert(pAdjcentEdge->bActive);
 
+		pEdge->bActive        = false;
+		pAdjcentEdge->bActive = false;
+
 		float xleft = fmin(pEdge->x, pAdjcentEdge->x);
 		float xright = fmax(pEdge->x, pAdjcentEdge->x);
 
 		if(xright - xleft < 1.0f)
 			continue;
 
-		vSpans.push_back(span(xleft, xright, pParent));
-
-		pEdge->bActive        = false;
-		pAdjcentEdge->bActive = false;
+		pSpans->push_back(span(xleft, xright, pParent));
 	}
 
-	Fsio fsio;
-	fsio.y = y;
-
-	for(auto it = vSpans.begin(); it < vSpans.end(); it++)
+	auto handler = [this, y](void *data)
 	{
-		const triangle &tri = *it->mParent;
-		const Primitive &prim = tri.mPrim;
-		const vec4& pos0 = prim.mVert[0].position();
+		std::vector<span> *spans = static_cast<std::vector<span> *>(data);
+		Fsio fsio;
+		fsio.y = y;
 
-		size_t size = prim.mVert[0].size();
-
-		int x = ceil(it->xleft - 0.5f);
-
-		fsio.mpGrad 	= &tri.mGrad;
-		fsio.x 			= x;
-		fsio.m_priv 	= (void *)&it->mStart;
-		fsio.in.resize(size);
-		it->mStart.resize(size);
-
-		mpInterpolate->onInterpolating(fsio.mpGrad->mStarts[0],
-									   fsio.mpGrad->mGradiencesX,
-									   fsio.mpGrad->mGradiencesY,
-									   x + 0.5f - pos0.x,
-									   y + 0.5f - pos0.y,
-									   it->mStart);
-
-		fsio.z 		= it->mStart[0].z;
-		fsio.bValid = true;
-		fsio.mIndex = (gRT->height - fsio.y - 1) * gRT->width + fsio.x;
-
-		// top-left filling convention
-		int xmax = ceil(it->xright - 0.5f);
-
-		do
+		for(auto &sp: *spans)
 		{
-			fsio.mIndex = (gRT->height - y - 1) * gRT->width + x;
-
-			getNextStage()->emit(&fsio);
-
-			// Info for Z test
-			fsio.x  = ++x;
-			fsio.z += tri.mGrad.mGradiencesX[0].z;
-
-			fsio.bValid = false;
-		}
-		while (x < xmax);
-
-#if 0
-			int index = (rt.height - y - 1) * rt.width + x;
-
+			const triangle &tri = *(sp.mParent);
+			const Primitive &prim = tri.mPrim;
 			const vec4& pos0 = prim.mVert[0].position();
-			const vec4& pos1 = prim.mVert[1].position();
-			const vec4& pos2 = prim.mVert[2].position();
 
+			size_t size = prim.mVert[0].size();
 
+			int x = ceil(sp.xleft - 0.5f);
 
-			// There is no need to do perspective-correct for z.
-			vec3 bc = pParent->calculateBC(x + 0.5f, y + 0.5f);
-			float depth = dot(bc, vec3(pos0.z, pos1.z, pos2.z));
+			fsio.mpGrad 	= &tri.mGrad;
+			fsio.x 			= x;
+			fsio.m_priv 	= (void *)&sp.mStart;
+			fsio.in.resize(size);
+			sp.mStart.resize(size);
 
-			// Early-z implementation, so draw near objs first will gain more performance.
-			// TODO: "defer" implementation
-			if(depth < rt.pDepthBuffer[index])
+			mpInterpolate->onInterpolating(fsio.mpGrad->mStarts[0],
+										   fsio.mpGrad->mGradiencesX,
+										   fsio.mpGrad->mGradiencesY,
+										   x + 0.5f - pos0.x,
+										   y + 0.5f - pos0.y,
+										   sp.mStart);
+
+			fsio.z 		= sp.mStart[0].z;
+			fsio.bValid = true;
+			fsio.mIndex = (gRT->height - fsio.y - 1) * gRT->width + fsio.x;
+
+			// top-left filling convention
+			int xmax = ceil(sp.xright - 0.5f);
+
+			do
 			{
-				rt.pDepthBuffer[index] = depth;
-				vec3 coeff = bc * vec3(1.0f / pos0.w, 1.0f / pos1.w, 1.0f / pos2.w);
-
-				fsio.in.resize(prim->mVert[0].getRegsNum());
-				fsio.in.position() = vec4(x + 0.5f, y + 0.5f, depth, 1.0f);
-
-				interpolate(coeff, *prim, fsio.in);
+				fsio.mIndex = (gRT->height - fsio.y - 1) * gRT->width + x;
 
 				getNextStage()->emit(&fsio);
 
-				colorBuffer[4 * index+2] = (unsigned char)(fsio.out.fragcolor().x * 256);
-				colorBuffer[4 * index+1] = (unsigned char)(fsio.out.fragcolor().y * 256);
-				colorBuffer[4 * index+0] = (unsigned char)(fsio.out.fragcolor().z * 256);
-				//colorBuffer[4 * index+3] = (unsigned char)(fsio.out.fragcolor().w * 256);
-				colorBuffer[4 * index+3] = 255;
+				// Info for Z test
+				fsio.x  = ++x;
+				fsio.z += tri.mGrad.mGradiencesX[0].z;
+
+				fsio.bValid = false;
 			}
-			else
-			{
-			}
-#endif
-	}
+			while (x < xmax);
+		}
+
+		delete spans;
+	};
+
+	ThreadPool &threadPool = ThreadPool::get();
+	WorkItem *pWork = threadPool.CreateWork(handler, pSpans);
+	threadPool.AddWork(pWork);
 
 	return;
 }
@@ -648,7 +623,6 @@ void ScanlineRasterizer::advanceEdgesInAET(SRHelper *hlp)
 	}
 
 	return;
-
 }
 
 void ScanlineRasterizer::scanConversion(SRHelper *hlp, Batch *bat)
@@ -661,6 +635,8 @@ void ScanlineRasterizer::scanConversion(SRHelper *hlp, Batch *bat)
 		traversalAET(hlp, bat, i);
 		advanceEdgesInAET(hlp);
 	}
+
+	ThreadPool::get().waitForAllTaskDone();
 }
 
 void ScanlineRasterizer::finalize(SRHelper *hlp)
@@ -673,14 +649,10 @@ void ScanlineRasterizer::finalize(SRHelper *hlp)
 		{
 			delete *iter;
 		}
-		it->second.clear();
 	}
-	hlp->mGET.clear();
 
 	for(auto it = hlp->mTri.begin(); it < hlp->mTri.end(); it++)
 		delete *it;
-
-	hlp->mTri.clear();
 
 	delete hlp;
 
@@ -721,7 +693,9 @@ void PerspectiveCorrectInterpolater::CalculateRadiences(Gradience *pGrad)
 
 	size_t size = prim.mVert[0].getRegsNum();
 
-	for(int i = 0; i < prim.mVertNum; i++)
+	assert(prim.mVertNum <= 3);
+
+	for(int i = 0; i < prim.mVertNum; ++i)
 	{
 		pGrad->mStarts[i].resize(size);
 
@@ -729,7 +703,7 @@ void PerspectiveCorrectInterpolater::CalculateRadiences(Gradience *pGrad)
 		pGrad->mStarts[i][0] = prim.mVert[i][0];
 		pGrad->mStarts[i][0].w = ZReciprocal;
 
-		for(size_t j = 1; j < size; j++)
+		for(size_t j = 1; j < size; ++j)
 		{
 			pGrad->mStarts[i][j] = prim.mVert[i][j] * ZReciprocal;
 		}
@@ -737,7 +711,7 @@ void PerspectiveCorrectInterpolater::CalculateRadiences(Gradience *pGrad)
 
 	pGrad->mGradiencesX.resize(size);
 	pGrad->mGradiencesY.resize(size);
-	
+
 	const vec4 &pos0 = prim.mVert[0].position();
 	const vec4 &pos1 = prim.mVert[1].position();
 	const vec4 &pos2 = prim.mVert[2].position();
@@ -760,16 +734,11 @@ void PerspectiveCorrectInterpolater::CalculateRadiences(Gradience *pGrad)
 
 	pGrad->mGradiencesX[0].x = 1.0f;
 	pGrad->mGradiencesX[0].y = 0.0f;
-	pGrad->mGradiencesX[0].z = y1y2 * pos0.z +
-							   y2y0 * pos1.z +
-							   y0y1 * pos2.z;
 
 	pGrad->mGradiencesY[0].x = 0.0f;
 	pGrad->mGradiencesY[0].y = 1.0f;
-	pGrad->mGradiencesY[0].z = x2x1 * pos0.z +
-							   x0x2 * pos1.z +
-							   x1x0 * pos2.z;
 
+	GRADIENCE_EQUATION(0, z);
 	GRADIENCE_EQUATION(0, w);
 
 	for(size_t i = 1; i < size; i++)
@@ -806,11 +775,11 @@ void PerspectiveCorrectInterpolater::CalculateRadiences(Gradience *pGrad)
 }
 
 void PerspectiveCorrectInterpolater::onInterpolating(
-											const fsInput &in,
-							 				const fsInput &gradX,
-							 				const fsInput &gradY,
-							 				float stepX, float stepY,
-							 				fsInput &out)
+									const fsInput &in,
+							 		const fsInput &gradX,
+							 		const fsInput &gradY,
+							 		float stepX, float stepY,
+							 		fsInput &out)
 {
 	// OPT: performance issue with operator overloading?
 	//out = in + gradX * stepX + gradY * stepY;
@@ -818,6 +787,7 @@ void PerspectiveCorrectInterpolater::onInterpolating(
 
 	assert(gradX.size() == size);
 	assert(gradY.size() == size);
+	assert(out.size() == size);
 
 	for(size_t i = 0; i < size; ++i)
 	{
@@ -826,8 +796,8 @@ void PerspectiveCorrectInterpolater::onInterpolating(
 }
 
 void PerspectiveCorrectInterpolater::onInterpolating(
-											fsInput &in,
-							 				const fsInput &grad)
+									fsInput &in,
+							 		const fsInput &grad)
 {
 	size_t size = in.size();
 

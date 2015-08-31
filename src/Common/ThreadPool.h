@@ -3,8 +3,8 @@
 #include <condition_variable>
 #include <deque>
 #include <functional>
-#include <future>
 #include <mutex>
+#include <stack>
 #include <thread>
 #include <boost/serialization/singleton.hpp>
 
@@ -21,16 +21,15 @@ public:
 
 	typedef std::function<void (void *)> callback_t;
 
-	void WaitForComplete();
-
 private:
-	WorkItem(callback_t &&fn, void *data);
+	WorkItem() = default;
 	~WorkItem() = default;
 
 private:
 	callback_t mCallback;
 	void *mData;
 };
+
 
 class ThreadPool: public boost::serialization::singleton<ThreadPool>
 {
@@ -44,11 +43,21 @@ public:
 
 	bool IsInitialized() const { return bInitialzed; }
 
-	WorkItem* CreateWork(WorkItem::callback_t &&fn, void *data);
+	WorkItem* CreateWork(const WorkItem::callback_t &fn, void *data);
 
 	bool AddWork(WorkItem *work);
 
 	uint32_t getDoneWorks() const { return mDoneWorks; }
+
+	/* NOTE:
+	 * This method should be called only after all producer threads
+	 * have dispatched all pending tasks.
+	 */
+	void waitForAllTaskDone() const
+	{
+		while(!mWorkQueue.empty() || mRunningWorks)
+			std::this_thread::yield();
+	}
 
 protected:
 	ThreadPool();
@@ -58,11 +67,11 @@ protected:
 	ThreadPool& operator=(const ThreadPool &rhs) = delete;
 
 private:
-	int						mWorkPoolSize;
-	WorkItem 			   *mWorkPool;
+	std::stack<WorkItem *>	mWorkPool;
 	std::deque<WorkItem *>	mWorkQueue;
-	WorkItem			   *mLastQueuedWork;
+
 	uint32_t				mDoneWorks;
+	uint32_t				mRunningWorks;
 
 	// TODO: replace mutex with spinlock
 	std::mutex				mQueueLock;
@@ -73,7 +82,6 @@ private:
 
 	bool bInitialzed;
 	bool bIsFinalizing;
-	bool bAllWorkDone;
 };
 
 } // namespace glsp

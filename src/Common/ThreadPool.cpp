@@ -10,22 +10,13 @@
 
 namespace glsp {
 
-WorkItem::WorkItem(callback_t &&fn, void *data):
-	mCallback(std::move(fn)),
-	mData(data)
-{
-}
-
 ThreadPool::ThreadPool():
-	mWorkPoolSize(0),
-	mWorkPool(NULL),
-	mLastQueuedWork(NULL),
 	mDoneWorks(0),
+	mRunningWorks(0),
 	mThreadsNum(0),
 	mThreads(NULL),
 	bInitialzed(false),
-	bIsFinalizing(false),
-	bAllWorkDone(false)
+	bIsFinalizing(false)
 {
 }
 
@@ -37,10 +28,7 @@ ThreadPool::~ThreadPool()
 
 	lk.unlock();
 
-	while(!bAllWorkDone)
-	{
-		std::this_thread::yield();
-	}
+	waitForAllTaskDone();
 
 	mWorkQueuedCond.notify_all();
 
@@ -50,7 +38,13 @@ ThreadPool::~ThreadPool()
 	}
 
 	delete []mThreads;
-	delete []mWorkPool;
+
+	while(!mWorkPool.empty())
+	{
+		WorkItem *pWork = mWorkPool.top();
+		mWorkPool.pop();
+		delete pWork;
+	}
 }
 
 bool ThreadPool::Initialize()
@@ -75,9 +69,6 @@ bool ThreadPool::Initialize()
 
 	mThreads = new std::thread[n];
 
-	// Alloc double size of the threads number
-	mWorkPool = (WorkItem *)malloc(sizeof(WorkItem) * n * 2);
-
 	auto workerThread = [this]
 	{
 		while(true)
@@ -93,22 +84,22 @@ bool ThreadPool::Initialize()
 			if(bIsFinalizing)
 				break;
 
+			if(mWorkQueue.empty())
+				continue;
+
+			mRunningWorks++;
 			WorkItem *pWork = mWorkQueue.front();
 			mWorkQueue.pop_front();
-			lk.unlock();
 
-			assert(pWork);
+			lk.unlock();
 
 			pWork->mCallback(pWork->mData);
 
 			lk.lock();
+			mRunningWorks--;
 			mDoneWorks++;
-
-			if(mLastQueuedWork == pWork)
-				bAllWorkDone = true;
-
-			lk.unlock();
-			delete pWork;
+			assert(mRunningWorks >= 0 && mRunningWorks <= mThreadsNum);
+			mWorkPool.push(pWork);
 		}
 	};
 
@@ -118,21 +109,28 @@ bool ThreadPool::Initialize()
 	return bInitialzed = ret;
 }
 
-WorkItem* ThreadPool::CreateWork(WorkItem::callback_t &&work, void *data)
+WorkItem* ThreadPool::CreateWork(const WorkItem::callback_t &work, void *data)
 {
-	// FIXME:
-	// Placement new is also thread safe
-	// But it's this very peculiarity, the performance may be bad.
-	while(true)
+	std::unique_lock<std::mutex> lk(mQueueLock);
+
+	if(bIsFinalizing)
+		return NULL;
+
+	WorkItem *pWork;
+
+	if(mWorkPool.empty())
 	{
-		WorkItem *pWork = new(mWorkPool) WorkItem(std::move(work), data);
-
-		if(pWork)
-			return pWork;
-
-		// FIXME: find a better way
-		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		pWork = new WorkItem;
 	}
+	else
+	{
+		pWork = mWorkPool.top();
+		mWorkPool.pop();
+	}
+
+	pWork->mCallback = work;
+	pWork->mData	 = data;
+	return pWork;
 }
 
 bool ThreadPool::AddWork(WorkItem *work)
@@ -142,8 +140,6 @@ bool ThreadPool::AddWork(WorkItem *work)
 	if(bIsFinalizing || !work)
 		return false;
 
-	bAllWorkDone = false;
-	mLastQueuedWork = work;
 	mWorkQueue.push_back(work);
 
 	mWorkQueuedCond.notify_one();

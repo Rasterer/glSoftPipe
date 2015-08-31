@@ -75,6 +75,7 @@ private:
 		RESOLVE_OUT(vec4, FragColor, out);
 
 		(void)gl_Position;
+
 		FragColor = texture2D(mSampler, oTexCoor);
 	}
 
@@ -241,7 +242,7 @@ int main(int argc, char **argv)
 	GLint samplerLocation = glGetUniformLocation(prog, "mSampler");
 
 	float xbias = 10.0f;
-	mat4 scal  = glm::scale(mat4(1.0f), vec3(0.1f, 0.1f, 0.1f));
+	mat4 scal  = glm::scale(mat4(1.0f), vec3(0.2f, 0.2f, 0.2f));
 	mat4 trans = glm::translate(mat4(1.0f), vec3(0.0f, 0.0f, xbias));
 	//rotate = glm::rotate(world, (float)M_PI * 70 / 180, vec3(0.0f, 1.0f, 0.0f));
 	//rotate = glm::rotate(world, (float)M_PI * 30 / 180, vec3(1.0f, 0.0f, 0.0f));
@@ -349,9 +350,9 @@ int main(int argc, char **argv)
 
 		//glDrawArrays(GL_TRIANGLES, 0, 3);
 		pMesh->Render();
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		//glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		ok = eglSwapBuffers(display, surface);
-		std::this_thread::sleep_for (std::chrono::seconds(2));
+		//std::this_thread::sleep_for (std::chrono::seconds(2));
 	}
 
 	cout << __func__ << ": after execute" << endl;

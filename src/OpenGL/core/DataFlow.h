@@ -29,7 +29,7 @@ public:
 	}
 	ShaderRegisterFile& operator=(ShaderRegisterFile &&rhs)
 	{
-		mRegs.swap(rhs.getRegArray());
+		mRegs.swap(rhs.mRegs);
 		return *this;
 	}
 	// getReg() and resize() is one pair
@@ -165,6 +165,9 @@ typedef std::vector<vsOutput> vsOutput_v;
 class Batch
 {
 public:
+	Batch() = default;
+	~Batch() = default;
+
 	Batch& splice(Batch &rhs)
 	{
 		mPrims.splice(mPrims.end(), rhs.mPrims);
