@@ -1,8 +1,8 @@
 #include <cmath>
-#include <iostream>
 #include <string.h>
 #include <thread>
 #include <chrono>
+#include <cstdio>
 
 #include <xcb/xcb.h>
 #include <X11/Xlib-xcb.h>
@@ -335,7 +335,7 @@ int main(int argc, char **argv)
 #endif
 	while(true)
 	{
-		cout << "draw begin" << endl;
+		printf("main: draw begin\n");
 
 		//xbias += 0.01f;
 
@@ -354,8 +354,6 @@ int main(int argc, char **argv)
 		ok = eglSwapBuffers(display, surface);
 		//std::this_thread::sleep_for (std::chrono::seconds(2));
 	}
-
-	cout << __func__ << ": after execute" << endl;
 
 	return 0;
 }

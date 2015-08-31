@@ -1,7 +1,7 @@
 #include "VertexFetcher.h"
 
+#include <cassert>
 #include <cstring>
-#include <iostream>
 #include <unordered_map>
 #include "DataFlow.h"
 #include "GLContext.h"
@@ -60,7 +60,7 @@ void VertexCachedFetcher::fetchVertex(DrawContext *dc)
 	// OPT: Too many copies 
 	for(int i = 0; i < dc->mCount; i++)
 	{
-		unsigned int idx;
+		unsigned int idx = 0;
 
 		if(dc->mDrawType == DrawContext::kElementDraw)
 			idx = iBuf[dc->mFirst + i];

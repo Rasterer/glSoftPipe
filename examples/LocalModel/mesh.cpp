@@ -1,5 +1,5 @@
 #include <assert.h>
-#include <iostream>
+#include <cstdio>
 
 #include "mesh.h"
 
@@ -18,7 +18,7 @@ bool Texture::Load()
         m_pImage->write(&m_blob, "RGBA");
     }
     catch (Magick::Error& Error) {
-        std::cout << "Error loading texture '" << m_fileName << "': " << Error.what() << std::endl;
+        printf("Error loading texture '%s'\n", m_fileName.c_str());
         return false;
     }
 

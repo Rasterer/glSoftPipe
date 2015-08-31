@@ -27,7 +27,7 @@ NameSpace::~NameSpace()
 bool NameSpace::genNames(unsigned n, unsigned *pNames)
 {
 	auto iter = mNameBlockLists.begin();
-	unsigned end;
+	unsigned end = 0xFFFFFFFF;
 
 	while(iter != mNameBlockLists.end())
 	{

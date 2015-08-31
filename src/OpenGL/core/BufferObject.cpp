@@ -1,12 +1,12 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
-#include <iostream>
 
 #include "khronos/GL/glcorearb.h"
 #include "common/glsp_defs.h"
 #include "BufferObject.h"
 #include "GLContext.h"
+#include "common/glsp_debug.h"
 
 
 using namespace std;
@@ -107,7 +107,7 @@ bool BufferObjectMachine::BindBuffer(GLContext *gc, unsigned target, unsigned bu
 
 		if(!mNameSpace.validate(buffer))
 		{
-			cout << "BindBuffer: no such buffer " << buffer << "!" << endl;
+			GLSP_DPF(GLSP_DPF_LEVEL_ERROR, "BindBuffer: no such buffer %d!\n", buffer);
 			return false;
 		}
 
@@ -136,7 +136,7 @@ bool BufferObjectMachine::BufferData(GLContext *gc, unsigned target, unsigned si
 	BufferObject *pBO = pBP->mBO;
 	if(!pBO)
 	{
-		cout << "BufferData: no buffer bound " << target << "!" << endl;
+		GLSP_DPF(GLSP_DPF_LEVEL_ERROR, "BufferData: no buffer bound for target %d\n", target);
 		return false;
 	}
 
@@ -177,7 +177,7 @@ BindingPoint *BufferObjectMachine::getBindingPoint(GLContext *gc, unsigned targe
 
 	if(targetIndex == -1)
 	{
-		cout << "BindBuffer: error target " << target << "!" << endl;
+		GLSP_DPF(GLSP_DPF_LEVEL_ERROR, "BindBuffer: error target %d\n", target);
 		return NULL;
 	}
 

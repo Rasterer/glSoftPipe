@@ -1,18 +1,19 @@
 #include "Rasterizer.h"
 
-#include <iostream>
-#include <vector>
+#include <algorithm>
+#include <cassert>
+#include <cfloat>
+#include <cmath>
 #include <list>
 #include <unordered_map>
-#include <algorithm>
-#include <cmath>
-#include <cfloat>
+#include <vector>
 
 #include "DrawEngine.h"
 #include "GLContext.h"
 #include "PixelBackend.h"
 #include "utils.h"
 #include "ThreadPool.h"
+#include "common/glsp_debug.h"
 
 
 
@@ -180,7 +181,7 @@ void ScanlineRasterizer::triangle::setActiveEdge(edge *pEdge)
 	}
 	else
 	{
-		std::cout << "How could this happen!" << std::endl;
+		GLSP_DPF(GLSP_DPF_LEVEL_FATAL, "How could this happen!\n");
 		assert(0);
 	}
 }
@@ -193,7 +194,7 @@ void ScanlineRasterizer::triangle::unsetActiveEdge(edge *pEdge)
 		mActiveEdge1 = NULL;
 	else
 	{
-		std::cout << "This edge is not active" << std::endl;
+		GLSP_DPF(GLSP_DPF_LEVEL_ERROR, "This edge is not active\n");
 	}
 }
 
@@ -205,8 +206,9 @@ ScanlineRasterizer::edge* ScanlineRasterizer::triangle::getAdjcentEdge(edge *pEd
 	if(pEdge == mActiveEdge1)
 		return mActiveEdge0;
 
-	std::cout << "How could this happen!" << std::endl;
-	assert(0);
+	GLSP_DPF(GLSP_DPF_LEVEL_ERROR, "getAdjcentEdge: No adjcent edge exist!\n");
+
+	return NULL;
 }
 
 class ScanlineRasterizer::edge
@@ -312,7 +314,7 @@ void RasterizerWrapper::linkPipeStages(GLContext *gc)
 	int enables = gc->mState.mEnables;
 	FragmentShader *pFS = gc->mPM.getCurrentProgram()->getFS();
 
-	PipeStage *last;
+	PipeStage *last = NULL;
 
 	if(enables & GLSP_DEPTH_TEST)
 	{
@@ -799,9 +801,7 @@ void PerspectiveCorrectInterpolater::onInterpolating(
 									fsInput &in,
 							 		const fsInput &grad)
 {
-	size_t size = in.size();
-
-	assert(grad.size() == size);
+	assert(grad.size() == in.size());
 
 	// OPT: performance issue with operator overloading?
 	in += grad;

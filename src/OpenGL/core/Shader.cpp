@@ -177,7 +177,7 @@ int Shader::GetInRegLocation(const string &name)
 
 unsigned Shader::getSamplerUnitID(int i) const
 {
-	unsigned unit;
+	unsigned unit = 0;
 	mUniformBlock[mSamplerLoc[i]].getVal(&unit);
 	return unit;
 }
@@ -391,7 +391,7 @@ void ProgramMachine::ShaderSource(
 	GLSP_UNREFERENCED_PARAM(count);
 	GLSP_UNREFERENCED_PARAM(length);
 
-	Shader *pShader;
+	Shader *pShader = NULL;
 	const char ** pString = const_cast<const char **>(string);
 	ShaderFactory *pFact = reinterpret_cast<ShaderFactory *>(pString);
 	ShaderPlaceHolder *pSPH = static_cast<ShaderPlaceHolder *>(mShaderNameSpace.retrieveObject(shader));
