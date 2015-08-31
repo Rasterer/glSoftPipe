@@ -6,7 +6,7 @@
 #include <mutex>
 #include <stack>
 #include <thread>
-#include <boost/serialization/singleton.hpp>
+
 
 
 namespace glsp {
@@ -31,12 +31,13 @@ private:
 };
 
 
-class ThreadPool: public boost::serialization::singleton<ThreadPool>
+class ThreadPool
 {
 public:
 	static ThreadPool& get()
 	{
-		return get_mutable_instance();
+		static ThreadPool instance;
+		return instance;
 	}
 
 	bool Initialize();

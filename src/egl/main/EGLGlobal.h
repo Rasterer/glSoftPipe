@@ -1,18 +1,17 @@
 #pragma once
 
 #include <vector>
-#include <boost/serialization/singleton.hpp>
 
 #include <khronos/EGL/egl.h>
 #include <khronos/EGL/eglext.h>
 #include <common/glsp_defs.h>
+
 
 NS_OPEN_GLSP_EGL()
 
 class EGLGlobal;
 class EGLDisplayBase;
 
-typedef boost::serialization::singleton<EGLGlobal> EGLGlobalSingleton;
 
 class EGLGlobal
 {
@@ -20,7 +19,8 @@ public:
 	// singleton accessor
 	static EGLGlobal& getEGLGloabl()
 	{
-		return EGLGlobalSingleton::get_mutable_instance();
+		static EGLGlobal instance;
+		return instance;
 	}
 
 	bool validateDisplay(EGLDisplayBase *dpy);

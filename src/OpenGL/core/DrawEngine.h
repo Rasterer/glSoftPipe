@@ -1,7 +1,5 @@
 #pragma once
 
-#include <boost/serialization/singleton.hpp>
-
 #include <common/glsp_defs.h>
 
 
@@ -41,12 +39,14 @@ struct DrawContext
 	GLContext *gc;
 };
 
-// DrawEngine is the abstraction of GPU pipeline, containing fixed function stages.
-// Shaders are injected from DrawContext during validateState().
-// It's a singleton, but can be triggered in any thread without lock protection.
-// That requires the respect stage classes shall not use writable members,
-// or any other global writable variables(local variables or heap alloc are qualified).
-class DrawEngine: public boost::serialization::singleton<DrawEngine>
+/*
+ * DrawEngine is the abstraction of GPU pipeline, containing fixed function stages.
+ * Shaders are injected from DrawContext during validateState().
+ * It's a singleton, but can be triggered in any thread without lock protection.
+ * That requires the respect stage classes shall not use writable members,
+ * or any other global writable variables(local variables or heap alloc are qualified).
+ */
+class DrawEngine
 {
 public:
 	void init(void *dpy, IEGLBridge *bridge);
@@ -59,7 +59,8 @@ public:
 	// accessors
 	static DrawEngine& getDrawEngine()
 	{
-		return get_mutable_instance();
+		static DrawEngine instance;
+		return instance;
 	}
 
 	PipeStage* getFirstStage() const { return mFirstStage; }
