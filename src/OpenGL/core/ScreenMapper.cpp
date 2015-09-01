@@ -24,7 +24,7 @@ void ScreenMapper::emit(void *data)
 
 void ScreenMapper::viewportTransform(Batch *bat)
 {
-	__GET_CONTEXT();
+	GLContext   *gc = bat->mDC->gc;
 
 	int xCenter = gc->mState.mViewport.xCenter;
 	int yCenter = gc->mState.mViewport.yCenter;

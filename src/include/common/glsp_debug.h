@@ -15,6 +15,9 @@
  * the branch here.
  */
 #ifndef NDEBUG
+
+#define GLSP_DPF_LEVEL_DEFAULT GLSP_DPF_LEVEL_DEBUG
+
 #define GLSP_DPF(level, fmt, ...)				\
 	do 											\
 	{											\
@@ -24,16 +27,19 @@
 
 
 #define GLSP_ASSERT(cond, fmt, ...)				\
-	do
-	{
-		if(!(cond))
-		{
-			std::printf(fmt, ##__VA_ARGS__);
-			assert(false);
-		}
+	do											\
+	{											\
+		if(!(cond))								\
+		{										\
+			std::printf(fmt, ##__VA_ARGS__);	\
+			assert(false);						\
+		}										\
 	} while (0);
 
 #else
+
+#define GLSP_DPF_LEVEL_DEFAULT GLSP_DPF_LEVEL_ERROR
+
 #define GLSP_DPF(level, fmt, ...)
 #define GLSP_ASSERT(cond, fmt, ...)
 #endif

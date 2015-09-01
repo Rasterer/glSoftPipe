@@ -4,6 +4,7 @@
 
 NS_OPEN_GLSP_OGL()
 
+
 using glm::vec4;
 PerspectiveDivider::PerspectiveDivider():
 	PipeStage("Perspective Dividing", DrawEngine::getDrawEngine())

@@ -16,6 +16,7 @@ using glsp::ogl::DrawEngine;
 using glsp::ogl::DrawContext;
 using glsp::IEGLBridge;
 
+
 GLAPI void APIENTRY glDrawArrays (GLenum mode, GLint first, GLsizei count)
 {
 	__GET_CONTEXT();
@@ -80,6 +81,64 @@ bool swapBuffers()
 
 } //namespace
 
+class GeometryFinalStageForMultithreading: public PipeStage
+{
+public:
+	GeometryFinalStageForMultithreading():
+		PipeStage("GeometryFinalStageForMultithreading", DrawEngine::getDrawEngine())
+	{
+	}
+	~GeometryFinalStageForMultithreading() = default;
+
+	virtual void emit(void *data);
+	virtual void finalize() { }
+};
+
+void GeometryFinalStageForMultithreading::emit(void *data)
+{
+	Batch *bat = static_cast<Batch *>(data);
+	DrawContext *dc = bat->mDC;
+
+	{
+		std::lock_guard<std::mutex> lk(dc->mFifoLock);
+		dc->mOrderUnpreservedPrimtivesFifo.splice(
+			dc->mOrderUnpreservedPrimtivesFifo.end(), bat->mPrims);
+	}
+
+	delete bat;
+}
+
+class GeometryStageWrapper: public PipeStage
+{
+public:
+	GeometryStageWrapper():
+		PipeStage("GeometryStageWrapper", DrawEngine::getDrawEngine())
+	{
+	}
+
+	~GeometryStageWrapper() = default;
+
+	virtual void emit(void *data)
+	{
+		DrawContext *dc = static_cast<DrawContext *>(data);
+		m_pSubStages->emit(dc);
+
+		// Wait for all the geometry tasks done.
+		ThreadPool::get().waitForAllTaskDone();
+
+		getNextStage()->emit(dc);
+	}
+
+	virtual void finalize() { }
+
+	PipeStage* getFinalSubStage() { return &mFinalSubStage; }
+	void setFirstSubStage(PipeStage *child) { m_pSubStages = child; }
+
+private:
+	PipeStage *m_pSubStages;
+	GeometryFinalStageForMultithreading  mFinalSubStage;
+};
+
 DrawEngine::DrawEngine():
 	mFirstStage(NULL),
 	mpEGLDisplay(NULL),
@@ -98,6 +157,7 @@ DrawEngine::~DrawEngine()
 	delete mMapper;
 	delete mCuller;
 	delete mRast;
+	delete mGeometry;
 }
 
 // TODO(done): connect all the pipeline stages
@@ -133,6 +193,7 @@ void DrawEngine::initPipeline()
 	mMapper        = new ScreenMapper();
 	mCuller        = new FaceCuller();
 	mRast          = new RasterizerWrapper();
+	mGeometry      = new GeometryStageWrapper();
 
 	assert(mVertexFetcher &&
 		   mPrimAsbl      &&
@@ -140,15 +201,16 @@ void DrawEngine::initPipeline()
 		   mDivider       &&
 		   mMapper        &&
 		   mCuller        &&
-		   mRast
-		   );
+		   mRast);
 
-	setFirstStage(mVertexFetcher);
+	setFirstStage(mGeometry);
 
+	mGeometry->setNextStage(mRast);
 	mPrimAsbl->setNextStage(mClipper);
 	mClipper ->setNextStage(mDivider);
 	mDivider ->setNextStage(mMapper);
 
+	mGeometry->setFirstSubStage(mVertexFetcher);
 	mRast->initPipeline();
 }
 
@@ -163,11 +225,11 @@ void DrawEngine::linkPipeStages(GLContext *gc)
 	if(enables & GLSP_CULL_FACE)
 	{
 		mMapper->setNextStage(mCuller);
-		mCuller->setNextStage(mRast);
+		mCuller->setNextStage(mGeometry->getFinalSubStage());
 	}
 	else
 	{
-		mMapper->setNextStage(mRast);
+		mMapper->setNextStage(mGeometry->getFinalSubStage());
 	}
 
 	mRast->linkPipeStages(gc);

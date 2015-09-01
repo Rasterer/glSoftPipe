@@ -1,6 +1,8 @@
 #pragma once
 
-#include <common/glsp_defs.h>
+#include <mutex>
+#include "DataFlow.h"
+#include "common/glsp_defs.h"
 
 
 namespace glsp {
@@ -18,6 +20,7 @@ class ScreenMapper;
 class FaceCuller;
 class RasterizerWrapper;
 class PipeStage;
+class GeometryStageWrapper;
 
 namespace glsp {
 	struct IEGLBridge;
@@ -35,8 +38,11 @@ struct DrawContext
 	int mCount;
 	unsigned mIndexSize;
 	DrawType mDrawType;
-	const void *mIndices;
-	GLContext *gc;
+	const void 		*mIndices;
+	GLContext 		*gc;
+
+	std::mutex		 mFifoLock;
+	Primlist 	     mOrderUnpreservedPrimtivesFifo;
 };
 
 /*
@@ -87,6 +93,7 @@ private:
 	ScreenMapper 			*mMapper;
 	FaceCuller 				*mCuller;
 	RasterizerWrapper 		*mRast;
+	GeometryStageWrapper    *mGeometry;
 
 	// TODO(done): Use member pointer may limit the multi-thread use of DrawEngine.
 	// Find a better way

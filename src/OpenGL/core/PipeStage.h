@@ -3,6 +3,7 @@
 #include <string>
 
 #include "common/glsp_defs.h"
+#include "common/glsp_debug.h"
 
 
 NS_OPEN_GLSP_OGL()
@@ -21,7 +22,12 @@ public:
 	virtual void finalize() { return; }
 
 	// accessors
-	PipeStage* getNextStage() const { return mNextStage; }
+	PipeStage* getNextStage() const
+	{
+		GLSP_DPF(GLSP_DPF_LEVEL_DEBUG, "Stage %s starting...\n", mNextStage->mName.c_str());
+		return mNextStage;
+	}
+
 	const std::string & getName() const { return mName; }
 
 	// mutators

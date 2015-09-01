@@ -7,6 +7,7 @@
 #include "GLContext.h"
 #include "DrawEngine.h"
 #include "VertexArrayObject.h"
+#include "ThreadPool.h"
 #include "common/glsp_defs.h"
 #include "khronos/GL/glcorearb.h"
 
@@ -126,7 +127,7 @@ void VertexCachedFetcher::fetchVertex(DrawContext *dc)
 		// Check if it's time to dispatch this batch
 		if((i % 3 == 2) && (cache.size() >= VERTEX_CACHE_EMIT_THRESHHOLD))
 		{
-			getNextStage()->emit(bat);
+			dispatchOneBatch(bat);
 			cacheIndex.clear();
 			bat = NULL;
 		}
@@ -134,8 +135,22 @@ void VertexCachedFetcher::fetchVertex(DrawContext *dc)
 
 	if(bat)
 	{
-		getNextStage()->emit(bat);
+		dispatchOneBatch(bat);
 	}
+}
+
+void VertexCachedFetcher::dispatchOneBatch(Batch *bat)
+{
+	ThreadPool &threadPool = ThreadPool::get();
+
+	WorkItem *task = threadPool.CreateWork(
+		[this](void *data)
+		{
+			this->getNextStage()->emit(data);
+		}
+		, bat);
+
+	threadPool.AddWork(task);
 }
 
 void VertexCachedFetcher::finalize()

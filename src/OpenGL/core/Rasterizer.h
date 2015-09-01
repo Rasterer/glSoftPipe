@@ -8,6 +8,7 @@
 NS_OPEN_GLSP_OGL()
 
 class Interpolater;
+class DrawContext;
 
 /* The wrapper for the whole rasterizer stages.
  * Also responsible for resource life management.
@@ -57,7 +58,7 @@ public:
 	Interpolater* GetInterpolater() const { return mpInterpolate; }
 
 protected:
-	virtual void onRasterizing(Batch *bat) = 0;
+	virtual void onRasterizing(DrawContext *dc) = 0;
 
 	// Used to calculate gradiences.
 	Interpolater *mpInterpolate;

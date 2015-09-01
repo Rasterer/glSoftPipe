@@ -98,7 +98,7 @@ bool ThreadPool::Initialize()
 			lk.lock();
 			mRunningWorks--;
 			mDoneWorks++;
-			assert(mRunningWorks >= 0 && mRunningWorks <= mThreadsNum);
+			assert(mRunningWorks >= 0 && mRunningWorks <= (uint32_t)mThreadsNum);
 			mWorkPool.push(pWork);
 		}
 	};

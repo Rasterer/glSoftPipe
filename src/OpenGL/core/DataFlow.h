@@ -124,6 +124,7 @@ typedef ShaderRegisterFile vsOutput;
 typedef ShaderRegisterFile fsInput;
 typedef ShaderRegisterFile fsOutput;
 
+
 // TODO: add operator =
 struct Primitive
 {
@@ -154,14 +155,15 @@ typedef std::list<Primitive> Primlist;
 typedef std::vector<vsOutput> vsOutput_v;
 
 
-// TODO: comment
-// Batch represents a batch of data flow to be passed through the whole pipeline
-// It's hard to give a decent name to each member based on their repective usages.
-// Here is rough explanation:
-// Vertex Fetch: read data from VBO, produce mVertexCache & mIndexBuf.
-// Vertex Shading: consumer mVertexCache, produce mVsOut
-// Primitive Assembly: consumer mIndexBuf & mVsOut, produce mPrims
-// Clipping ~ Viewport transform: consumer mPrims, produce mPrims
+/* TODO: comment
+ * Batch represents a batch of data flow to be passed through the whole pipeline
+ * It's hard to give a decent name to each member based on their repective usages.
+ * Here is rough explanation:
+ * Vertex Fetch: read data from VBO, produce mVertexCache & mIndexBuf.
+ * Vertex Shading: consumer mVertexCache, produce mVsOut
+ * Primitive Assembly: consumer mIndexBuf & mVsOut, produce mPrims
+ * Clipping ~ Viewport transform: consumer mPrims, produce mPrims
+ */
 class Batch
 {
 public:

@@ -31,8 +31,8 @@ Rasterizer::Rasterizer():
 
 void Rasterizer::emit(void *data)
 {
-	Batch *bat = static_cast<Batch *>(data);
-	onRasterizing(bat);
+	DrawContext *dc = static_cast<DrawContext *>(data);
+	onRasterizing(dc);
 }
 
 void Rasterizer::finalize()
@@ -96,7 +96,7 @@ public:
 	virtual ~ScanlineRasterizer() = default;
 
 protected:
-	virtual void onRasterizing(Batch *bat);
+	virtual void onRasterizing(DrawContext *dc);
 
 private:
 	class edge;
@@ -106,15 +106,15 @@ private:
 
 	static bool compareFunc(edge *pEdge1, edge *pEdge2);
 
-	SRHelper* createGET(Batch *bat);
-	void scanConversion(SRHelper *hlp, Batch *bat);
+	SRHelper* createGET(DrawContext *dc);
+	void scanConversion(SRHelper *hlp);
 	void activateEdgesFromGET(SRHelper *hlp, int y);
 	void removeEdgeFromAET(SRHelper *hlp, int y);
 	//void sortAETbyX();
 
 	// perspective-correct interpolation
 	void interpolate(glm::vec3 &coeff, Primitive& prim, fsInput& result);
-	void traversalAET(SRHelper *hlp, Batch *bat, int y);
+	void traversalAET(SRHelper *hlp, int y);
 	void advanceEdgesInAET(SRHelper *hlp);
 
 	void finalize(SRHelper *hlp);
@@ -358,22 +358,20 @@ void RasterizerWrapper::linkPipeStages(GLContext *gc)
 
 void RasterizerWrapper::emit(void *data)
 {
-	Batch *bat = static_cast<Batch *>(data);
-	gRT = &bat->mDC->gc->mRT;
+	DrawContext *dc = static_cast<DrawContext *>(data);
+	gRT = &dc->gc->mRT;
 
-	getNextStage()->emit(bat);
-
-	delete bat;
+	getNextStage()->emit(dc);
 }
 
 void RasterizerWrapper::finalize()
 {
 }
 
-ScanlineRasterizer::SRHelper* ScanlineRasterizer::createGET(Batch *bat)
+ScanlineRasterizer::SRHelper* ScanlineRasterizer::createGET(DrawContext *dc)
 {
-	GLContext *gc = bat->mDC->gc;
-	Primlist  &pl = bat->mPrims;
+	GLContext *gc = dc->gc;
+	Primlist  &pl = dc->mOrderUnpreservedPrimtivesFifo;
 
 	SRHelper *hlp = new SRHelper();
 
@@ -528,7 +526,7 @@ void ScanlineRasterizer::interpolate(vec3& coeff, Primitive& prim, fsInput& resu
 	}
 }
 
-void ScanlineRasterizer::traversalAET(SRHelper *hlp, Batch *bat, int y)
+void ScanlineRasterizer::traversalAET(SRHelper *hlp, int y)
 {
 	SRHelper::ActiveEdgeTable &aet = hlp->mAET;
 	std::vector<span> *pSpans = new std::vector<span>;
@@ -627,14 +625,14 @@ void ScanlineRasterizer::advanceEdgesInAET(SRHelper *hlp)
 	return;
 }
 
-void ScanlineRasterizer::scanConversion(SRHelper *hlp, Batch *bat)
+void ScanlineRasterizer::scanConversion(SRHelper *hlp)
 {
 	for(int i = hlp->ymin; i <= hlp->ymax; i++)
 	{
 		removeEdgeFromAET(hlp, i);
 		activateEdgesFromGET(hlp, i);
 		//sortAETbyX();
-		traversalAET(hlp, bat, i);
+		traversalAET(hlp, i);
 		advanceEdgesInAET(hlp);
 	}
 
@@ -661,11 +659,11 @@ void ScanlineRasterizer::finalize(SRHelper *hlp)
 	Rasterizer::finalize();
 }
 
-void ScanlineRasterizer::onRasterizing(Batch *bat)
+void ScanlineRasterizer::onRasterizing(DrawContext *dc)
 {
-	SRHelper *hlp = createGET(bat);
+	SRHelper *hlp = createGET(dc);
 
-	scanConversion(hlp, bat);
+	scanConversion(hlp);
 
 	finalize(hlp);
 }
