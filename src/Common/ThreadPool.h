@@ -3,9 +3,10 @@
 #include <condition_variable>
 #include <deque>
 #include <functional>
-#include <mutex>
 #include <stack>
 #include <thread>
+
+#include "common/glsp_spinlock.h"
 
 
 
@@ -74,9 +75,9 @@ private:
 	uint32_t				mDoneWorks;
 	uint32_t				mRunningWorks;
 
-	// TODO: replace mutex with spinlock
-	std::mutex				mQueueLock;
-	std::condition_variable	mWorkQueuedCond;
+	// TODO (Done): replace mutex with spinlock
+	SpinLock					mQueueLock;
+	std::condition_variable_any	mWorkQueuedCond;
 
 	int				mThreadsNum;
 	std::thread    *mThreads;

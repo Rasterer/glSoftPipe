@@ -100,9 +100,10 @@ void GeometryFinalStageForMultithreading::emit(void *data)
 	DrawContext *dc = bat->mDC;
 
 	{
-		std::lock_guard<std::mutex> lk(dc->mFifoLock);
+		dc->mFifoLock.lock();
 		dc->mOrderUnpreservedPrimtivesFifo.splice(
 			dc->mOrderUnpreservedPrimtivesFifo.end(), bat->mPrims);
+		dc->mFifoLock.unlock();
 	}
 
 	delete bat;
@@ -124,7 +125,7 @@ public:
 		m_pSubStages->emit(dc);
 
 		// Wait for all the geometry tasks done.
-		ThreadPool::get().waitForAllTaskDone();
+		::glsp::ThreadPool::get().waitForAllTaskDone();
 
 		getNextStage()->emit(dc);
 	}
@@ -179,7 +180,7 @@ void DrawEngine::init(void *dpy, IEGLBridge *bridge)
 
 	initPipeline();
 
-	ThreadPool &threadPool = ThreadPool::get();
+	::glsp::ThreadPool &threadPool = ::glsp::ThreadPool::get();
 
 	threadPool.Initialize();
 }

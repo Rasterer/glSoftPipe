@@ -141,7 +141,7 @@ void VertexCachedFetcher::fetchVertex(DrawContext *dc)
 
 void VertexCachedFetcher::dispatchOneBatch(Batch *bat)
 {
-	ThreadPool &threadPool = ThreadPool::get();
+	::glsp::ThreadPool &threadPool = ::glsp::ThreadPool::get();
 
 	WorkItem *task = threadPool.CreateWork(
 		[this](void *data)

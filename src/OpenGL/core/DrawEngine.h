@@ -1,8 +1,8 @@
 #pragma once
 
-#include <mutex>
 #include "DataFlow.h"
 #include "common/glsp_defs.h"
+#include "common/glsp_spinlock.h"
 
 
 namespace glsp {
@@ -41,8 +41,8 @@ struct DrawContext
 	const void 		*mIndices;
 	GLContext 		*gc;
 
-	std::mutex		 mFifoLock;
-	Primlist 	     mOrderUnpreservedPrimtivesFifo;
+	::glsp::SpinLock	 mFifoLock;
+	Primlist 	     	 mOrderUnpreservedPrimtivesFifo;
 };
 
 /*

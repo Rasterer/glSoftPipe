@@ -608,7 +608,7 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, int y)
 		delete spans;
 	};
 
-	ThreadPool &threadPool = ThreadPool::get();
+	::glsp::ThreadPool &threadPool = ::glsp::ThreadPool::get();
 	WorkItem *pWork = threadPool.CreateWork(handler, pSpans);
 	threadPool.AddWork(pWork);
 
@@ -636,7 +636,7 @@ void ScanlineRasterizer::scanConversion(SRHelper *hlp)
 		advanceEdgesInAET(hlp);
 	}
 
-	ThreadPool::get().waitForAllTaskDone();
+	::glsp::ThreadPool::get().waitForAllTaskDone();
 }
 
 void ScanlineRasterizer::finalize(SRHelper *hlp)

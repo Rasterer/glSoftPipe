@@ -22,7 +22,7 @@ ThreadPool::ThreadPool():
 
 ThreadPool::~ThreadPool()
 {
-	std::unique_lock<std::mutex> lk(mQueueLock);
+	std::unique_lock<SpinLock> lk(mQueueLock);
 
 	bIsFinalizing = true;
 
@@ -73,7 +73,7 @@ bool ThreadPool::Initialize()
 	{
 		while(true)
 		{
-			std::unique_lock<std::mutex> lk(mQueueLock);
+			std::unique_lock<SpinLock> lk(mQueueLock);
 	
 			if(mWorkQueue.empty())
 			{
@@ -111,7 +111,7 @@ bool ThreadPool::Initialize()
 
 WorkItem* ThreadPool::CreateWork(const WorkItem::callback_t &work, void *data)
 {
-	std::unique_lock<std::mutex> lk(mQueueLock);
+	std::lock_guard<SpinLock> lk(mQueueLock);
 
 	if(bIsFinalizing)
 		return NULL;
@@ -135,7 +135,7 @@ WorkItem* ThreadPool::CreateWork(const WorkItem::callback_t &work, void *data)
 
 bool ThreadPool::AddWork(WorkItem *work)
 {
-	std::unique_lock<std::mutex> lk(mQueueLock);
+	std::lock_guard<SpinLock> lk(mQueueLock);
 
 	if(bIsFinalizing || !work)
 		return false;
