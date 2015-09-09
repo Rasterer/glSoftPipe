@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cmath>
 #include <string.h>
 #include <thread>
@@ -15,6 +16,10 @@
 #include "khronos/GL/glcorearb.h"
 #include "khronos/EGL/egl.h"
 #include "mesh.h"
+
+
+#define GLM_FORCE_RADIANS
+
 
 using namespace std;
 using namespace glm;
@@ -299,7 +304,7 @@ int main(int argc, char **argv)
 	//my_image.write("output.png");
 #endif
 	Mesh *pMesh = new Mesh();
-	pMesh->LoadMesh("../examples/LocalModel/materials/phoenix_ugv.md2");
+	pMesh->LoadMesh("../examples/LoadModel/materials/phoenix_ugv.md2");
 
 
 
@@ -333,10 +338,12 @@ int main(int argc, char **argv)
 
 	//glViewport(640, 360, 640, 360);
 #endif
+
+	uint64_t nFrames = 0;
+	std::chrono::high_resolution_clock::time_point  beginTime = std::chrono::high_resolution_clock::now();
+	std::chrono::high_resolution_clock::time_point  endTime;
 	while(true)
 	{
-		printf("main: draw begin\n");
-
 		//xbias += 0.01f;
 
 		//mat4 trans = translate(mat4(1.0f), vec3(xbias, 0.0f, 0.0f));
@@ -349,10 +356,21 @@ int main(int argc, char **argv)
 		//glUniformMatrix4fv(viewLocation, 1, false, (float *)&view);
 
 		//glDrawArrays(GL_TRIANGLES, 0, 3);
-		pMesh->Render();
 		//glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		pMesh->Render();
 		ok = eglSwapBuffers(display, surface);
-		//std::this_thread::sleep_for (std::chrono::seconds(2));
+
+		nFrames++;
+
+		if(nFrames == 150)
+		{
+			endTime = std::chrono::high_resolution_clock::now();
+
+			printf("FPS: %f\n", 150.0 / (std::chrono::duration_cast<std::chrono::duration<double>>(endTime - beginTime)).count());
+
+			nFrames = 0;
+			beginTime = endTime;
+		}
 	}
 
 	return 0;
