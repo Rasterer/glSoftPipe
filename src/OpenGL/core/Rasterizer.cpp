@@ -881,16 +881,16 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, int y)
 			{
 				if (rmFront && this->pfnHSR == &HiddenSurfaceRemoval)
 				{
-					ActiveEdgeTableX::const_iterator nearest_iter = aetx.begin();
+					ActiveEdgeTableX::iterator nearest_iter = aetx.begin();
 
-					for (ActiveEdgeTableX::const_iterator iter = aetx.begin(); iter != aetx.end(); ++iter)
+					for (ActiveEdgeTableX::iterator iter = aetx.begin(); iter != aetx.end(); ++iter)
 					{
 						if((*iter)->mCurrentZ < (*nearest_iter)->mCurrentZ)
 						nearest_iter = iter;
 					}
 
 					if (nearest_iter != aetx.begin())
-						aetx.splice(aetx.cbegin(), aetx, nearest_iter);
+						aetx.splice(aetx.begin(), aetx, nearest_iter);
 				}
 				else if (added && this->pfnHSR == &HiddenSurfaceRemovalTranslucent)
 				{
