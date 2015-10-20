@@ -64,6 +64,14 @@ void Blender::emit(void *data)
 // TODO: impl
 void Blender::onBlending(Fsio &fsio)
 {
+	const int &index = fsio.mIndex;
+	glm::vec4 &src = fsio.out.fragcolor();
+	uint8_t *dst = (uint8_t *)gRT->pColorBuffer;
+
+	src.r = (uint8_t)((src.r * src.a + dst[4*index+2] * (1 - src.a) / 256.0f));
+	src.g = (uint8_t)((src.g * src.a + dst[4*index+1] * (1 - src.a) / 256.0f));
+	src.b = (uint8_t)((src.b * src.a + dst[4*index+0] * (1 - src.a) / 256.0f));
+	src.r = (uint8_t)((src.r * src.a + dst[4*index+3] * (1 - src.a) / 256.0f));
 	return;
 }
 

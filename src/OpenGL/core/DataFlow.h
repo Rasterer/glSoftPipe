@@ -1,11 +1,11 @@
 #pragma once
 
-#include <glm/glm.hpp>
-
-#include <common/glsp_defs.h>
 #include <list>
 #include <vector>
 #include <utility>
+#include <glm/glm.hpp>
+#include <common/glsp_defs.h>
+#include "MemoryPool.h"
 
 
 NS_OPEN_GLSP_OGL()
@@ -15,7 +15,7 @@ struct DrawContext;
 class ShaderRegisterFile
 {
 public:
-	typedef std::vector<glm::vec4> RegArray;
+	typedef std::vector<glm::vec4, ::glsp::ShaderRegisterAllocator<glm::vec4> > RegArray;
 
 	ShaderRegisterFile() = default;
 	ShaderRegisterFile(const ShaderRegisterFile&) = default;
@@ -147,6 +147,8 @@ struct Primitive
 	// The reciprocal of the directed area of a triangle.
 	// FIXME: primitive may be not a triangle.
 	float mAreaReciprocal;
+
+	DrawContext *mDC;
 };
 
 typedef std::vector<int> IBuffer_v;
@@ -230,10 +232,6 @@ public:
 	int 	x, y;
 	float 	z;
 	int 	mIndex; // used to lookup the color/depth/stencil buffers
-
-	// used to indicate if in is already interpolated or not
-	// FIXME: looks wired, remove this flag
-	bool bValid;
 
 	void *m_priv;
 };

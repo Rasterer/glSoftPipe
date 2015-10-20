@@ -116,6 +116,7 @@ void Clipper::clipping(Batch *bat)
 			prim.mVert[0] = *rr[src][0];
 			prim.mVert[1] = *rr[src][i];
 			prim.mVert[2] = *rr[src][i+1];
+			prim.mDC      = bat->mDC;
 
 			out.push_back(prim);
 		}

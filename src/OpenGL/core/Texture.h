@@ -11,11 +11,12 @@
 
 NS_OPEN_GLSP_OGL()
 
-#define MAX_TEXTURE_UNITS 16
+#define MAX_TEXTURE_UNITS 4
 #define MAX_TEXTURE_MIPMAP_LEVELS 6
 
 
 class  GLContext;
+class  DrawContext;
 struct TextureState;
 struct TextureMipmap;
 class  Texture;
@@ -78,13 +79,20 @@ struct TextureMipmap
 	uint32_t mBytesPerTexel;
 	unsigned mFormat;
 
+	int mRefCount;
+
 	Texture *mpTex;
 };
 
 class Texture: public NameItem
 {
 public:
+	Texture();
+
 	Texture(TextureTarget target);
+
+	Texture& operator=(const Texture &rhs);
+
 	virtual ~Texture();
 
 	bool ValidateState();
@@ -161,7 +169,7 @@ public:
 					int border, unsigned format, unsigned type,
 					const void *pixels);
 
-	bool validateTextureState(Shader *pVS, Shader *pFS);
+	bool validateTextureState(Shader *pVS, Shader *pFS, DrawContext *dc);
 
 private:
 	TextureBindingPoint* getBindingPoint(unsigned unit, unsigned target);

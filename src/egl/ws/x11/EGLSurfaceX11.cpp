@@ -112,6 +112,8 @@ bool EGLSurfaceX11::swapBuffers()
 	const EGLDisplayX11 *pDisp = static_cast<const EGLDisplayX11 *>(&getDisplay());
 	xcb_connection_t *c = pDisp->getXCBConnection();
 
+	bool ret = pDisp->getEGLBridge()->swapBuffers();
+
 	cookie = ::xcb_dri2_swap_buffers_unchecked(c, mXDrawable, 0, 0, 0, 0, 0, 0);
 	reply  = ::xcb_dri2_swap_buffers_reply(c, cookie, NULL);
 
@@ -126,8 +128,6 @@ bool EGLSurfaceX11::swapBuffers()
 		::drm_intel_bo_unreference(mCurrentBO);
 		mCurrentBO = NULL;
 	}
-
-	bool ret = pDisp->getEGLBridge()->swapBuffers();
 
 	return ret && swap_count != -1;
 }

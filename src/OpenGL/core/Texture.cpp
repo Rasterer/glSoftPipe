@@ -1,4 +1,5 @@
 #include "Texture.h"
+#include "DrawEngine.h"
 
 #include <cmath>
 #include <cstring>
@@ -602,7 +603,8 @@ TextureMipmap::TextureMipmap():
 	mResident(false),
 	mWidth(0),
 	mHeight(0),
-	mBytesPerTexel(0)
+	mBytesPerTexel(0),
+	mRefCount(1)
 {
 	mMem.size = 0;
 	mMem.addr = NULL;
@@ -612,6 +614,14 @@ TextureMipmap::~TextureMipmap()
 {
 	if(mResident)
 		free(mMem.addr);
+}
+
+Texture::Texture():
+	mpMipmap(NULL),
+	mAvailableMipmaps(0),
+	mNumLayers(0), // FIXME: set layer num correctly
+	mIsComplete(false)
+{
 }
 
 Texture::Texture(TextureTarget target):
@@ -633,10 +643,30 @@ Texture::Texture(TextureTarget target):
 	}
 }
 
+Texture& Texture::operator=(const Texture &rhs)
+{
+	memcpy(this, &rhs, sizeof(Texture));
+
+	for(uint32_t i = 0; i < mNumMipmaps; ++i)
+	{
+		mpMipmap[i].mRefCount++;
+	}
+
+	return *this;
+}
+
 Texture::~Texture()
 {
 	if(mpMipmap)
-		delete []mpMipmap;
+	{
+		for(uint32_t i = 0; i < mNumMipmaps; ++i)
+		{
+			mpMipmap[i].mRefCount--;
+		}
+
+		if(mpMipmap->mRefCount == 0)
+			delete []mpMipmap;
+	}
 }
 
 // TODO: add support for other targets
@@ -1059,7 +1089,7 @@ void TextureMachine::TexParameterfv(GLContext *gc, unsigned target, unsigned pna
 	pTex->TexParameterfv(pname, params);
 }
 
-bool TextureMachine::validateTextureState(Shader *pVS, Shader *pFS)
+bool TextureMachine::validateTextureState(Shader *pVS, Shader *pFS, DrawContext *dc)
 {
 	assert(pVS && pFS);
 
@@ -1094,7 +1124,7 @@ bool TextureMachine::validateTextureState(Shader *pVS, Shader *pFS)
 			if(pTex == &mDefaultTexture || !(pTex->ValidateState()))
 				return false;
 
-			pFS->SetupTextureInfo(unit, pTex);
+			dc->mTextures[unit] = *pTex;
 		}
 	}
 

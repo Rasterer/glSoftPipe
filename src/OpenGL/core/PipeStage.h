@@ -14,7 +14,6 @@ class DrawContext;
 class PipeStage
 {
 public:
-	PipeStage() = default;
 	PipeStage(const std::string &name, const DrawEngine& de);
 	virtual ~PipeStage() = default;
 
@@ -33,10 +32,30 @@ public:
 	// mutators
 	PipeStage* setNextStage(PipeStage *stage) { mNextStage = stage; return stage; }
 
-private:
+protected:
 	const DrawEngine& mDrawEngine;
 	PipeStage *mNextStage;
 	const std::string mName;
 };
+
+
+// TODO:
+class PipeStageChain: public PipeStage
+{
+public:
+	PipeStageChain(const std::string &name, const DrawEngine& de);
+	~PipeStageChain() = default;
+
+	PipeStage* getFirstChild() const { return mFirstChild; }
+	void setFirstChild(PipeStage *child) { mFirstChild = child; }
+
+	PipeStage* getLastChild() const { return mLastChild; }
+	void setLastChild(PipeStage *child) { mLastChild = child; }
+
+protected:
+	PipeStage *mFirstChild;
+	PipeStage *mLastChild;
+};
+
 
 NS_CLOSE_GLSP_OGL();

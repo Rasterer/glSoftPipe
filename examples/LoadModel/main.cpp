@@ -55,7 +55,11 @@ public:
 	}
 
 private:
-	mat4 mWVP;
+	mat4  mWVP;
+	GLint miPos;
+	GLint miTexCoor;
+	GLint mgl_Position;
+	GLint moTexCoor;
 };
 
 class simpleFragmentShader: public FragmentShader
@@ -86,6 +90,9 @@ private:
 
 private:
 	sampler2D mSampler;
+	GLint     mgl_Position;
+	GLint     moTexCoor;
+	GLint     mFragColor;
 };
 
 class simpleShaderFactory: public ShaderFactory
@@ -242,6 +249,7 @@ int main(int argc, char **argv)
 	glLinkProgram(prog);
 	glUseProgram(prog);
 	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
 
 	GLint WVPLocation     = glGetUniformLocation(prog, "mWVP");
 	GLint samplerLocation = glGetUniformLocation(prog, "mSampler");

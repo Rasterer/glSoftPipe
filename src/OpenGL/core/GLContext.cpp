@@ -31,26 +31,16 @@ GLAPI void APIENTRY glEnable (GLenum cap)
 
 NS_OPEN_GLSP_OGL()
 
-static pthread_key_t TLSKey;
-
-void initTLS()
-{
-	pthread_key_create(&TLSKey, NULL);
-}
-
-void deinitTLS()
-{
-	pthread_key_delete(TLSKey);
-}
+static GLContext *sGC = nullptr;
 
 static void setCurrentContext(void *gc)
 {
-	pthread_setspecific(TLSKey, gc);
+	sGC = static_cast<GLContext *>(gc);
 }
 
 GLContext* getCurrentContext()
 {
-	return (GLContext *)pthread_getspecific(TLSKey);
+	return sGC;
 }
 
 void* CreateContext(void *EglCtx, int major, int minor)
@@ -65,14 +55,14 @@ void DestroyContext(void *_gc)
 	GLContext *_del = static_cast<GLContext *>(_gc);
 
 	if(gc == _del)
-		__SET_CONTEXT(NULL);
+		__SET_CONTEXT(nullptr);
 
 	delete _del;
 }
 
 void MakeCurrent(void *gc)
 {
-	__SET_CONTEXT(gc);
+	setCurrentContext(gc);
 }
 
 GLContext::GLContext(void *EglCtx, int major, int minor):
@@ -83,6 +73,19 @@ GLContext::GLContext(void *EglCtx, int major, int minor):
 	mVersionMinor(minor)
 {
 	initGC();
+}
+
+GLContext::~GLContext()
+{
+	if (mRT.pDepthBuffer)
+	{
+		free(mRT.pDepthBuffer);
+	}
+
+	if (mRT.pStencilBuffer)
+	{
+		free(mRT.pStencilBuffer);
+	}
 }
 
 void GLContext::initGC()

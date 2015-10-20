@@ -13,6 +13,7 @@ class GLContext;
 // TODO: tunning
 // Set this macro to a big enough number to disable multi batch dispatching.
 #define VERTEX_CACHE_EMIT_THRESHHOLD 12
+//#define VERTEX_CACHE_EMIT_THRESHHOLD 0xFFFFFFFF
 
 class VertexFetcher: public PipeStage
 {

@@ -5,6 +5,7 @@
 #include <cfloat>
 #include <cmath>
 #include <list>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -16,28 +17,12 @@
 #include "common/glsp_debug.h"
 
 
-
 NS_OPEN_GLSP_OGL()
 
 using glm::vec3;
 using glm::vec4;
 
 const RenderTarget *gRT = NULL;
-
-Rasterizer::Rasterizer():
-	PipeStage("Rasterizing", DrawEngine::getDrawEngine())
-{
-}
-
-void Rasterizer::emit(void *data)
-{
-	DrawContext *dc = static_cast<DrawContext *>(data);
-	onRasterizing(dc);
-}
-
-void Rasterizer::finalize()
-{
-}
 
 class PerspectiveCorrectInterpolater: public Interpolater
 {
@@ -51,6 +36,12 @@ public:
 	// Should be invoked before onInterpolating()
 	virtual void CalculateRadiences(Gradience *pGrad);
 
+	void onInterpolating(const float in,
+				 		const float &gradX,
+				 		const float &gradY,
+				 		float stepX, float stepY,
+				 		float &out);
+
 	virtual void onInterpolating(const fsInput &in,
 								 const fsInput &gradX,
 								 const fsInput &gradY,
@@ -58,67 +49,111 @@ public:
 								 fsInput &out);
 
 	// step 1 in X or Y axis
-	virtual void onInterpolating(fsInput &in,
-								 const fsInput &grad);
+	virtual void onInterpolating(const fsInput &in,
+								 const fsInput &grad,
+								 float x,
+								 fsInput &out);
 
 private:
-	static inline void PerspectiveCorrect(const fsInput &in, fsInput &out);
+	static inline void PerspectiveCorrect(fsInput &in);
 };
 
-void Interpolater::emit(void *data)
-{
-	Fsio &fsio = *static_cast<Fsio *>(data);
-	const Gradience *pGrad = fsio.mpGrad;
-	fsInput &start = *static_cast<fsInput *>(fsio.m_priv);
 
-	if(!fsio.bValid)
+// Fragment shader hook
+class FSHook: public PipeStage
+{
+public:
+	FSHook():
+		PipeStage("FragmentShader hook", DrawEngine::getDrawEngine())
 	{
-		onInterpolating(start, pGrad->mGradiencesX);
-		fsio.bValid = true;
 	}
 
-	getNextStage()->emit(data);
-}
+	~FSHook() = default;
 
-void Interpolater::finalize()
-{
-}
+	virtual void emit(void *data);
+	virtual void finalize() { }
+
+private:
+
+};
+
 
 // active edge table implementation
 // TODO: tile-based implementation
 class ScanlineRasterizer: public Rasterizer
 {
 public:
-	ScanlineRasterizer(): Rasterizer()
+	friend class RasterizerWrapper;
+	class span;
+	class edge;
+	class triangle;
+	class SRHelper;
+
+	typedef std::unordered_map<int, std::vector<edge *> > GlobalEdgeTableY;
+	typedef std::list<edge *> ActiveEdgeTableY;
+	typedef std::list<span *> ActiveEdgeTableX;
+
+	ScanlineRasterizer():
+		Rasterizer(),
+		pfnHSR(HiddenSurfaceRemoval),
+		mFShook(),
+		mBlockPool(::glsp::ThreadPool::get().getThreadsNumber() / 2  +
+			::glsp::ThreadPool::get().getThreadsNumber())
 	{
 	}
 
 	virtual ~ScanlineRasterizer() = default;
 
+	PipeStage* getFShook() { return &mFShook; }
+
 protected:
 	virtual void onRasterizing(DrawContext *dc);
 
 private:
-	class edge;
-	class triangle;
-	class span;
-	class SRHelper;
+	// Associate with the task dispatch
+	class LargeBlockPoolForTaskDispatch
+	{
+	public:
+		LargeBlockPoolForTaskDispatch(int slots);
+		~LargeBlockPoolForTaskDispatch();
 
-	static bool compareFunc(edge *pEdge1, edge *pEdge2);
+		void* allocate(int index, size_t size);
+		void deallocate(int index);
+
+	private:
+		struct PoolMetaData {
+			void 		 *mStorage;
+			unsigned int  mSize;
+			volatile bool mbInUse;
+		};
+
+		PoolMetaData *mMetaData;
+		const int     mSlotsNum;
+	};
 
 	SRHelper* createGET(DrawContext *dc);
 	void scanConversion(SRHelper *hlp);
 	void activateEdgesFromGET(SRHelper *hlp, int y);
 	void removeEdgeFromAET(SRHelper *hlp, int y);
-	//void sortAETbyX();
 
 	// perspective-correct interpolation
 	void interpolate(glm::vec3 &coeff, Primitive& prim, fsInput& result);
 	void traversalAET(SRHelper *hlp, int y);
 	void advanceEdgesInAET(SRHelper *hlp);
 
+	void RenderPointFromOneSpan(span &sp, int x, int y);
+
 	void finalize(SRHelper *hlp);
+
+	static void HiddenSurfaceRemoval(ScanlineRasterizer *pSR, const ActiveEdgeTableX &aetx, int x, int y);
+	static void HiddenSurfaceRemovalTranslucent(ScanlineRasterizer *pSR, const ActiveEdgeTableX &aetx, int x, int y);
+
+	void (*pfnHSR)(ScanlineRasterizer *pSR, const ActiveEdgeTableX &aetx, int x, int y);
+	FSHook mFShook;
+
+	LargeBlockPoolForTaskDispatch mBlockPool;
 };
+
 
 class ScanlineRasterizer::triangle
 {
@@ -146,6 +181,144 @@ private:
 	edge *mActiveEdge1;
 };
 
+
+class ScanlineRasterizer::edge
+{
+public:
+	edge(triangle *pParent):
+		mParent(pParent),
+		bActive(false)
+	{
+	}
+	~edge() = default;
+
+	float x;
+	float dx;
+	int ymax;
+	triangle *mParent;
+	bool bActive;
+};
+
+
+class ScanlineRasterizer::span
+{
+public:
+	span(int x1, int x2, triangle *pParent):
+		xleft(x1),
+		xright(x2),
+		mParent(pParent),
+		bInterpolated(false)
+	{
+	}
+	~span() = default;
+
+	int xleft;
+	int xright;
+	float mCurrentZ;
+	triangle *mParent;
+	bool bInterpolated;
+
+	fsInput mStart;
+};
+
+
+class ScanlineRasterizer::SRHelper
+{
+public:
+	SRHelper() = default;
+	~SRHelper() = default;
+
+	int ymin;
+	int ymax;
+	std::vector<triangle *> mTri;
+
+	// global edges table
+	GlobalEdgeTableY mGET;
+	// active edges table
+	ActiveEdgeTableY mAET;
+};
+
+
+ScanlineRasterizer::LargeBlockPoolForTaskDispatch::LargeBlockPoolForTaskDispatch(int slots):
+	mSlotsNum(slots)
+{
+	mMetaData = static_cast<PoolMetaData *>(calloc(sizeof(PoolMetaData), mSlotsNum));
+
+	if (!mMetaData)
+		assert(false);
+}
+
+
+ScanlineRasterizer::LargeBlockPoolForTaskDispatch::~LargeBlockPoolForTaskDispatch()
+{
+	for(int i = 0; i < mSlotsNum; ++i)
+	{
+		while(mMetaData[i].mbInUse)
+			std::this_thread::yield();
+
+		if(mMetaData[i].mStorage)
+			free(mMetaData[i].mStorage);
+	}
+
+	free(mMetaData);
+}
+
+
+void* ScanlineRasterizer::LargeBlockPoolForTaskDispatch::allocate(int index, size_t size)
+{
+	index %= mSlotsNum;
+
+	while(mMetaData[index].mbInUse)
+		std::this_thread::yield();
+
+	if (mMetaData[index].mSize < size)
+	{
+		GLSP_DPF(GLSP_DPF_LEVEL_DEBUG, "reallocate memory block %d -> %zu\n",
+			mMetaData[index].mSize, ALIGN(size, 4096));
+
+		free(mMetaData[index].mStorage);
+
+		mMetaData[index].mSize    = ALIGN(size, 4096);
+		mMetaData[index].mStorage = malloc(mMetaData[index].mSize);
+		mMetaData[index].mbInUse  = true;
+
+		if(!mMetaData[index].mStorage)
+			assert(false);
+	}
+
+	mMetaData[index].mbInUse  = true;
+	return mMetaData[index].mStorage;
+}
+
+
+void ScanlineRasterizer::LargeBlockPoolForTaskDispatch::deallocate(int index)
+{
+	index %= mSlotsNum;
+
+	assert(mMetaData[index].mbInUse);
+
+	mMetaData[index].mbInUse = false;
+}
+
+
+Rasterizer::Rasterizer():
+	PipeStage("Rasterizing", DrawEngine::getDrawEngine())
+{
+}
+
+
+void Rasterizer::emit(void *data)
+{
+	DrawContext *dc = static_cast<DrawContext *>(data);
+	onRasterizing(dc);
+}
+
+
+void Rasterizer::finalize()
+{
+}
+
+
 /*
  * Calculate the barycentric coodinates of point P in this triangle
  *
@@ -169,6 +342,7 @@ vec3 ScanlineRasterizer::triangle::calculateBC(float xp, float yp)
 	//return vec3(mMatrix * vec3(xp, yp, 1.0));
 }
 
+
 void ScanlineRasterizer::triangle::setActiveEdge(edge *pEdge)
 {
 	if(!mActiveEdge0)
@@ -186,6 +360,7 @@ void ScanlineRasterizer::triangle::setActiveEdge(edge *pEdge)
 	}
 }
 
+
 void ScanlineRasterizer::triangle::unsetActiveEdge(edge *pEdge)
 {
 	if(pEdge == mActiveEdge0)
@@ -197,6 +372,7 @@ void ScanlineRasterizer::triangle::unsetActiveEdge(edge *pEdge)
 		GLSP_DPF(GLSP_DPF_LEVEL_ERROR, "This edge is not active\n");
 	}
 }
+
 
 ScanlineRasterizer::edge* ScanlineRasterizer::triangle::getAdjcentEdge(edge *pEdge)
 {
@@ -211,64 +387,12 @@ ScanlineRasterizer::edge* ScanlineRasterizer::triangle::getAdjcentEdge(edge *pEd
 	return NULL;
 }
 
-class ScanlineRasterizer::edge
-{
-public:
-	edge(triangle *pParent):
-		mParent(pParent),
-		bActive(false) 
-	{
-	}
-	~edge() = default;
-
-	float x;
-	float dx;
-	int ymax;
-	triangle *mParent;
-	bool bActive;
-};
-
-
-class ScanlineRasterizer::span
-{
-public:
-	span(float x1, float x2, triangle *pParent):
-		xleft(x1),
-		xright(x2),
-		mParent(pParent)
-	{
-	}
-	~span() = default;
-
-	float xleft;
-	float xright;
-	triangle *mParent;
-
-	fsInput mStart;
-};
-
-class ScanlineRasterizer::SRHelper
-{
-public:
-	SRHelper() = default;
-	~SRHelper() = default;
-
-	int ymin;
-	int ymax;
-	std::vector<triangle *> mTri;
-
-	typedef std::unordered_map<int, std::vector<edge *> > GlobalEdgeTable;
-	typedef std::list<edge *> ActiveEdgeTable;
-	// global edges table
-	GlobalEdgeTable mGET;
-	// active edges table
-	ActiveEdgeTable mAET;
-};
 
 Interpolater::Interpolater():
 	PipeStage("Interpolating", DrawEngine::getDrawEngine())
 {
 }
+
 
 RasterizerWrapper::RasterizerWrapper():
 	PipeStage("Rasterizer Wrapper", DrawEngine::getDrawEngine()),
@@ -291,6 +415,7 @@ RasterizerWrapper::RasterizerWrapper():
 	dynamic_cast<Rasterizer *>(mpRasterizer)->SetInterpolater(interp);
 }
 
+
 RasterizerWrapper::~RasterizerWrapper()
 {
 	delete mpFBWriter;
@@ -304,15 +429,18 @@ RasterizerWrapper::~RasterizerWrapper()
 	delete mpRasterizer;
 }
 
+
 void RasterizerWrapper::initPipeline()
 {
 	setNextStage(mpRasterizer);
 }
 
+
 void RasterizerWrapper::linkPipeStages(GLContext *gc)
 {
 	int enables = gc->mState.mEnables;
 	FragmentShader *pFS = gc->mPM.getCurrentProgram()->getFS();
+	PipeStage *pFShook = static_cast<ScanlineRasterizer *>(mpRasterizer)->getFShook();
 
 	PipeStage *last = NULL;
 
@@ -325,15 +453,15 @@ void RasterizerWrapper::linkPipeStages(GLContext *gc)
 		{
 			mpRasterizer ->setNextStage(mpDepthTest);
 			mpDepthTest  ->setNextStage(mpInterpolate);
-			last = mpInterpolate->setNextStage(pFS);
+			last = mpInterpolate->setNextStage(pFShook);
 		}
 		else
 		{
 			mpRasterizer ->setNextStage(mpInterpolate);
-			mpInterpolate->setNextStage(pFS);
+			mpInterpolate->setNextStage(pFShook);
 
 			if(enables & GLSP_SCISSOR_TEST)
-				last = pFS->setNextStage(mpScissorTest);
+				last = pFShook->setNextStage(mpScissorTest);
 
 			if((enables & GL_STENCIL_TEST))
 				last = last->setNextStage(mpStencilTest);
@@ -344,17 +472,27 @@ void RasterizerWrapper::linkPipeStages(GLContext *gc)
 	else
 	{
 		mpRasterizer ->setNextStage(mpInterpolate);
-		last = mpInterpolate->setNextStage(pFS);
+		last = mpInterpolate->setNextStage(pFShook);
 	}
 
 	if(enables & GLSP_BLEND)
+	{
+		static_cast<ScanlineRasterizer *>(mpRasterizer)->pfnHSR =
+			&ScanlineRasterizer::HiddenSurfaceRemovalTranslucent;
 		last = last->setNextStage(mpBlender);
+	}
+	else
+	{
+		static_cast<ScanlineRasterizer *>(mpRasterizer)->pfnHSR =
+			&ScanlineRasterizer::HiddenSurfaceRemoval;
+	}
 
 	if(enables & GLSP_DITHER)
 		last = last->setNextStage(mpDither);
 
 	last = last->setNextStage(mpFBWriter);
 }
+
 
 void RasterizerWrapper::emit(void *data)
 {
@@ -364,14 +502,53 @@ void RasterizerWrapper::emit(void *data)
 	getNextStage()->emit(dc);
 }
 
+
 void RasterizerWrapper::finalize()
 {
 }
 
+
+void Interpolater::emit(void *data)
+{
+	Fsio &fsio = *static_cast<Fsio *>(data);
+	const Gradience *pGrad = fsio.mpGrad;
+	ScanlineRasterizer::span &sp =
+		*static_cast<ScanlineRasterizer::span *>(fsio.m_priv);
+	fsInput &start = sp.mStart;
+
+	onInterpolating(start, pGrad->mGradiencesX, float(fsio.x - sp.xleft), fsio.in);
+
+	getNextStage()->emit(data);
+}
+
+
+void Interpolater::finalize()
+{
+}
+
+
+void FSHook::emit(void *data)
+{
+	Fsio &fsio = *static_cast<Fsio *>(data);
+	ScanlineRasterizer::span &sp = *static_cast<ScanlineRasterizer::span *>(fsio.m_priv);
+	DrawContext *dc = sp.mParent->mPrim.mDC;
+
+	FragmentShader *pFS = dc->mFS;
+	pFS->attachTextures(dc->mTextures);
+
+	pFS->emit(&fsio);
+
+	getNextStage()->emit(&fsio);
+}
+
+
 ScanlineRasterizer::SRHelper* ScanlineRasterizer::createGET(DrawContext *dc)
 {
 	GLContext *gc = dc->gc;
-	Primlist  &pl = dc->mOrderUnpreservedPrimtivesFifo;
+	DrawEngine &de = DrawEngine::getDrawEngine();
+	Primlist  &pl = de.mOrderUnpreservedPrimtivesFifo;
+
+	GLSP_DPF(GLSP_DPF_LEVEL_DEBUG, "ScanlineRasterizer::createGET start\n");
 
 	SRHelper *hlp = new SRHelper();
 
@@ -423,8 +600,11 @@ ScanlineRasterizer::SRHelper* ScanlineRasterizer::createGET(DrawContext *dc)
 			pEdge->x    = lvert->x + ((ystart + 0.5f) - lvert->y) * pEdge->dx;
 			pEdge->ymax = floor(hvert->y - 0.5f);
 
-			hlp->ymin = std::min(ystart, hlp->ymin);
-			hlp->ymax = std::max(pEdge->ymax, hlp->ymax);
+			if(hlp->ymin > ystart)
+				hlp->ymin = ystart;
+
+			if(hlp->ymax < pEdge->ymax)
+				hlp->ymax = pEdge->ymax;
 
 			auto iter = get.find(ystart);
 			if(iter == get.end())
@@ -447,19 +627,25 @@ void ScanlineRasterizer::activateEdgesFromGET(SRHelper *hlp, int y)
 	if(it != get.end())
 	{
 		auto &vGET = it->second;
-		
-		std::for_each(vGET.begin(), vGET.end(),
-					[&aet] (edge *pEdge)
-					{
-						pEdge->mParent->setActiveEdge(pEdge);
-						aet.push_back(pEdge);
-					});
+		assert(!vGET.empty());
+
+		for(edge *pEdge: vGET)
+		{
+			pEdge->mParent->setActiveEdge(pEdge);
+			aet.push_back(pEdge);
+		}
+
+		hlp->mAET.sort(
+			[](const edge *pEdge1, const edge *pEdge2) -> bool
+			{
+				return pEdge1->x < pEdge2->x;
+			});
 	}
 
-	for(auto it = aet.begin(); it != aet.end(); it++)
-	{
-		(*it)->bActive = true;
-	}
+	assert(aet.empty() || aet.size() % 2 == 0);
+
+	for(edge *pEdge: aet)
+		pEdge->bActive = true;
 
 	return;
 }
@@ -486,18 +672,6 @@ void ScanlineRasterizer::removeEdgeFromAET(SRHelper *hlp, int y)
 	return;
 }
 
-bool ScanlineRasterizer::compareFunc(edge *pEdge1, edge *pEdge2)
-{
-	return (pEdge1->x <= pEdge2->x);
-}
-
-#if 0
-void ScanlineRasterizer::sortAETbyX()
-{
-	sort(mAET.begin(), mAET.end(), (static_cast<bool (*)(edge *, edge *)>(this->compareFunc)));
-	return;
-}
-#endif
 
 // Perspective-correct interpolation
 // Vp/wp = A*(V1/w1) + B*(V2/w2) + C*(V3/w3)
@@ -526,11 +700,84 @@ void ScanlineRasterizer::interpolate(vec3& coeff, Primitive& prim, fsInput& resu
 	}
 }
 
+void ScanlineRasterizer::RenderPointFromOneSpan(span &sp, int x, int y)
+{
+	const triangle &tri = *(sp.mParent);
+	const Primitive &prim = tri.mPrim;
+	const vec4& pos0 = prim.mVert[0].position();
+
+	size_t size = prim.mVert[0].size();
+	//sp.mStart.resize(size);
+
+	if(!sp.bInterpolated)
+	{
+		mpInterpolate->onInterpolating(tri.mGrad.mStarts[0],
+				   tri.mGrad.mGradiencesX,
+				   tri.mGrad.mGradiencesY,
+				   sp.xleft + 0.5f - pos0.x,
+				   y + 0.5f - pos0.y,
+				   sp.mStart);
+
+		sp.bInterpolated = true;
+	}
+
+	Fsio fsio;
+	fsio.mpGrad 	= &tri.mGrad;
+	fsio.x 			= x;
+	fsio.y 			= y;
+	fsio.mIndex 	= (gRT->height - y - 1) * gRT->width + x;
+	fsio.m_priv 	= (void *)&sp;
+	fsio.z 			= sp.mCurrentZ;
+	fsio.in.resize(size);
+
+	getNextStage()->emit(&fsio);
+}
+
+
+void ScanlineRasterizer::HiddenSurfaceRemoval(ScanlineRasterizer *pSR,
+	const ActiveEdgeTableX &aetx, int x, int y)
+{
+	assert(!aetx.empty());
+
+	span *sp = aetx.front();
+	int  idx = (gRT->height - y - 1) * gRT->width + x;
+
+	// early Z test
+	__GET_CONTEXT();
+	if(!(gc->mState.mEnables & GLSP_DEPTH_TEST) ||
+		sp->mCurrentZ < gRT->pDepthBuffer[idx])
+	{
+		pSR->RenderPointFromOneSpan(*sp, x, y);
+	}
+}
+
+void ScanlineRasterizer::HiddenSurfaceRemovalTranslucent(ScanlineRasterizer *pSR,
+	const ActiveEdgeTableX &aetx, int x, int y)
+{
+	assert(!aetx.empty());
+	int idx = (gRT->height - y - 1) * gRT->width + x;
+
+	// early Z test
+	__GET_CONTEXT();
+	for(span *sp: aetx)
+	{
+		if(!(gc->mState.mEnables & GLSP_DEPTH_TEST) ||
+			sp->mCurrentZ < gRT->pDepthBuffer[idx])
+		{
+			pSR->RenderPointFromOneSpan(*sp, x, y);
+		}
+	}
+}
+
 void ScanlineRasterizer::traversalAET(SRHelper *hlp, int y)
 {
-	SRHelper::ActiveEdgeTable &aet = hlp->mAET;
-	std::vector<span> *pSpans = new std::vector<span>;
+	int span_count = 0;
+	ActiveEdgeTableY &aet = hlp->mAET;
 
+	assert(aet.size() % 2 == 0);
+	void *spans = mBlockPool.allocate(y, sizeof(span) * aet.size() / 2);
+
+	// Note that AET has been sorted from left to right.
 	for(auto it = aet.begin(); it != aet.end(); it++)
 	{
 		if((*it)->bActive != true)
@@ -545,75 +792,141 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, int y)
 		pEdge->bActive        = false;
 		pAdjcentEdge->bActive = false;
 
-		float xleft = fmin(pEdge->x, pAdjcentEdge->x);
-		float xright = fmax(pEdge->x, pAdjcentEdge->x);
-
-		if(xright - xleft < 1.0f)
+#if 1
+		// NOTE: Comment out this if there is artifact.
+		if(fabs(pAdjcentEdge->x - pEdge->x) < 0.001f)
 			continue;
+#endif
 
-		pSpans->push_back(span(xleft, xright, pParent));
+		int xleft = ceil(pEdge->x - 0.5f);
+		int xright = ceil(pAdjcentEdge->x - 0.5f);
+
+		void *raw = reinterpret_cast<span *>(spans) + span_count;
+		new(raw) span(xleft, xright, pParent);
+		span_count++;
 	}
 
-	auto handler = [this, y](void *data)
+	auto handler = [this, y, span_count](void *data)
 	{
-		std::vector<span> *spans = static_cast<std::vector<span> *>(data);
-		Fsio fsio;
-		fsio.y = y;
+		ActiveEdgeTableX aetx;
+		span *sp = static_cast<span *>(data);
+		int curr = 0;
+		int x = sp[0].xleft;
 
-		for(auto &sp: *spans)
+		for(int i = 0; i < span_count; ++i)
 		{
-			const triangle &tri = *(sp.mParent);
-			const Primitive &prim = tri.mPrim;
-			const vec4& pos0 = prim.mVert[0].position();
+			const Gradience &grad = sp[i].mParent->mGrad;
+			const vec4& pos0 = sp[i].mParent->mPrim.mVert[0].position();
+			sp[i].mStart.resize(grad.mGradiencesX.size());
 
-			size_t size = prim.mVert[0].size();
+			static_cast<PerspectiveCorrectInterpolater *>(mpInterpolate)->onInterpolating(grad.mStarts[0][0].z,
+							grad.mGradiencesX[0].z,
+							grad.mGradiencesY[0].z,
+							sp[i].xleft + 0.5f - pos0.x,
+							y + 0.5f - pos0.y,
+							sp[i].mStart[0].z);
 
-			int x = ceil(sp.xleft - 0.5f);
-
-			fsio.mpGrad 	= &tri.mGrad;
-			fsio.x 			= x;
-			fsio.m_priv 	= (void *)&sp.mStart;
-			fsio.in.resize(size);
-			sp.mStart.resize(size);
-
-			mpInterpolate->onInterpolating(fsio.mpGrad->mStarts[0],
-										   fsio.mpGrad->mGradiencesX,
-										   fsio.mpGrad->mGradiencesY,
-										   x + 0.5f - pos0.x,
-										   y + 0.5f - pos0.y,
-										   sp.mStart);
-
-			fsio.z 		= sp.mStart[0].z;
-			fsio.bValid = true;
-			fsio.mIndex = (gRT->height - fsio.y - 1) * gRT->width + fsio.x;
-
-			// top-left filling convention
-			int xmax = ceil(sp.xright - 0.5f);
-
-			do
-			{
-				fsio.mIndex = (gRT->height - fsio.y - 1) * gRT->width + x;
-
-				getNextStage()->emit(&fsio);
-
-				// Info for Z test
-				fsio.x  = ++x;
-				fsio.z += tri.mGrad.mGradiencesX[0].z;
-
-				fsio.bValid = false;
-			}
-			while (x < xmax);
+			sp[i].mCurrentZ = sp[i].mStart[0].z;
 		}
 
-		delete spans;
+		while (x < sp[span_count - 1].xright)
+		{
+			bool added = false, rmFront = false;
+
+			auto it = aetx.begin();
+			while(it != aetx.end())
+			{
+				if(x >= (*it)->xright)
+				{
+					if(*it == aetx.front())
+						rmFront = true;
+
+					it = aetx.erase(it);
+				}
+				else
+				{
+					it++;
+				}
+			}
+
+			for(span *sp: aetx)
+			{
+				const Gradience &grad = sp->mParent->mGrad;
+				sp->mCurrentZ += grad.mGradiencesX[0].z;
+			}
+			for (; curr < span_count; ++curr)
+			{
+				if (sp[curr].xleft == x)
+				{
+					if(aetx.empty() || (!rmFront && sp[curr].mCurrentZ <= aetx.front()->mCurrentZ))
+						aetx.push_front(&sp[curr]);
+					else
+						aetx.push_back(&sp[curr]);
+
+					added = true;
+				}
+				else
+				{
+					break;
+				}
+			}
+
+			if (aetx.empty())
+			{
+				x = sp[curr].xleft;
+				continue;
+			}
+
+			if (aetx.size() >= 2)
+			{
+				if (rmFront && this->pfnHSR == &HiddenSurfaceRemoval)
+				{
+					ActiveEdgeTableX::const_iterator nearest_iter = aetx.begin();
+
+					for (ActiveEdgeTableX::const_iterator iter = aetx.begin(); iter != aetx.end(); ++iter)
+					{
+						if((*iter)->mCurrentZ < (*nearest_iter)->mCurrentZ)
+						nearest_iter = iter;
+					}
+
+					if (nearest_iter != aetx.begin())
+						aetx.splice(aetx.cbegin(), aetx, nearest_iter);
+				}
+				else if (added && this->pfnHSR == &HiddenSurfaceRemovalTranslucent)
+				{
+					aetx.sort(
+						[](const span *pSpan1, const span *pSpan2) -> bool
+						{
+							return pSpan1->mCurrentZ < pSpan2->mCurrentZ;
+						});
+				}
+			}
+
+			this->pfnHSR(this, aetx, x, y);
+			x++;
+		}
+
+		for(curr = 0; curr < span_count; ++curr)
+			sp[curr].~span();
+
+		this->mBlockPool.deallocate(y);
 	};
 
-	::glsp::ThreadPool &threadPool = ::glsp::ThreadPool::get();
-	WorkItem *pWork = threadPool.CreateWork(handler, pSpans);
-	threadPool.AddWork(pWork);
+	if (span_count > 0)
+	{
+		::glsp::ThreadPool &threadPool = ::glsp::ThreadPool::get();
+		WorkItem *pWork = threadPool.CreateWork(handler, spans);
+		threadPool.AddWork(pWork);
+	}
+	else
+	{
+		GLSP_DPF(GLSP_DPF_LEVEL_DEBUG, "no spans\n");
+		mBlockPool.deallocate(y);
+	}
 
 	return;
 }
+
 
 void ScanlineRasterizer::advanceEdgesInAET(SRHelper *hlp)
 {
@@ -631,12 +944,13 @@ void ScanlineRasterizer::scanConversion(SRHelper *hlp)
 	{
 		removeEdgeFromAET(hlp, i);
 		activateEdgesFromGET(hlp, i);
-		//sortAETbyX();
 		traversalAET(hlp, i);
 		advanceEdgesInAET(hlp);
 	}
 
 	::glsp::ThreadPool::get().waitForAllTaskDone();
+
+	GLSP_DPF(GLSP_DPF_LEVEL_DEBUG, "scanConversion done!\n");
 }
 
 void ScanlineRasterizer::finalize(SRHelper *hlp)
@@ -672,16 +986,13 @@ void PerspectiveCorrectInterpolater::emit(void *data)
 {
 	Fsio &fsio = *static_cast<Fsio *>(data);
 	const Gradience *pGrad = fsio.mpGrad;
-	fsInput &start = *static_cast<fsInput *>(fsio.m_priv);
+	ScanlineRasterizer::span &sp =
+		*static_cast<ScanlineRasterizer::span *>(fsio.m_priv);
+	fsInput &start = sp.mStart;
 
-	// FIXME: find a better way
-	if(!fsio.bValid)
-	{
-		onInterpolating(start, pGrad->mGradiencesX);
-		fsio.bValid = true;
-	}
+	onInterpolating(start, pGrad->mGradiencesX, float(fsio.x - sp.xleft), fsio.in);
 
-	PerspectiveCorrect(start, fsio.in);
+	PerspectiveCorrect(fsio.in);
 
 	getNextStage()->emit(data);
 }
@@ -775,6 +1086,16 @@ void PerspectiveCorrectInterpolater::CalculateRadiences(Gradience *pGrad)
 }
 
 void PerspectiveCorrectInterpolater::onInterpolating(
+									const float in,
+							 		const float &gradX,
+							 		const float &gradY,
+							 		float stepX, float stepY,
+							 		float &out)
+{
+	out = in + gradX * stepX + gradY * stepY;
+}
+
+void PerspectiveCorrectInterpolater::onInterpolating(
 									const fsInput &in,
 							 		const fsInput &gradX,
 							 		const fsInput &gradY,
@@ -796,31 +1117,29 @@ void PerspectiveCorrectInterpolater::onInterpolating(
 }
 
 void PerspectiveCorrectInterpolater::onInterpolating(
-									fsInput &in,
-							 		const fsInput &grad)
+									const fsInput &in,
+							 		const fsInput &grad,
+							 		float x,
+							 		fsInput &out)
 {
 	assert(grad.size() == in.size());
 
 	// OPT: performance issue with operator overloading?
-	in += grad;
+	out = in + grad * x;
 }
 
-void PerspectiveCorrectInterpolater::PerspectiveCorrect(const fsInput &in, fsInput &out)
+void PerspectiveCorrectInterpolater::PerspectiveCorrect(fsInput &in)
 {
-	assert(in.size() == out.size());
-
-	out[0] = in[0];
-
 	float z = 1.0f / in[0].w;
 
-	out[0].w = z;
+	in[0].w = z;
 
 	// *= operator overload impl
 	// out *= z;
 
 	for(size_t i = 1; i < in.size(); ++i)
 	{
-		out[i] = in[i] * z;
+		in[i] *= z;
 	}
 }
 

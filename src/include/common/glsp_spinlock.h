@@ -7,6 +7,10 @@
 #include "glsp_defs.h"
 
 
+#define cpu_relax() \
+	asm volatile("pause\n": : :"memory")
+
+
 namespace glsp {
 
 
@@ -29,35 +33,45 @@ public:
 	{
 		while(mLock.test_and_set())
 		{
+#ifndef NDEBUG
 			// Detect recursively locking
 			assert(mOwner != std::this_thread::get_id());
+#endif
+			cpu_relax();
 		}
-
+#ifndef NDEBUG
 		mOwner = std::this_thread::get_id();
+#endif
 	}
 
 	bool try_lock()
 	{
 		if(!mLock.test_and_set())
 		{
+#ifndef NDEBUG
 			mOwner = std::this_thread::get_id();
+#endif
 			return true;
 		}
 		else
 		{
+#ifndef NDEBUG
 			// Detect recursively locking
 			assert(mOwner != std::this_thread::get_id());
+#endif
 			return false;
 		}
 	}
 
 	void unlock()
 	{
+#ifndef NDEBUG
 		// Detect unlocking a lock ownerd by others
 		assert(mOwner == std::this_thread::get_id());
 
 		// Reset the owner to a nonjoinable thread's id.
 		mOwner = std::thread().get_id();
+#endif
 		mLock.clear();
 	}
 

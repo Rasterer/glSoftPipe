@@ -87,8 +87,10 @@ public:
 								 fsInput &out) = 0;
 
 	// step 1 in X or Y axis
-	virtual void onInterpolating(fsInput &in,
-								 const fsInput &grad) = 0;
+	virtual void onInterpolating(const fsInput &in,
+								 const fsInput &grad,
+								 float x,
+								 fsInput &out) = 0;
 };
 
 

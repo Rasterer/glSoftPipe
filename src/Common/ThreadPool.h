@@ -51,6 +51,8 @@ public:
 
 	uint32_t getDoneWorks() const { return mDoneWorks; }
 
+	int getThreadsNumber() const { return mThreadsNum; }
+
 	/* NOTE:
 	 * This method should be called only after all producer threads
 	 * have dispatched all pending tasks.

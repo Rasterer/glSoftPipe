@@ -36,10 +36,11 @@ GLAPI void APIENTRY glDrawArrays (GLenum mode, GLint first, GLsizei count)
 	if(!de->validateState(dc))
 		return;
 
+	dc->m_pNext = de->getDrawContextList();
+	de->setDrawContextList(dc);
 	de->prepareToDraw(dc);
 	de->emit(dc);
 
-	delete dc;
 	gc->mDC = NULL;
 }
 
@@ -63,10 +64,11 @@ GLAPI void APIENTRY glDrawElements (GLenum mode, GLsizei count, GLenum type, con
 	if(!de->validateState(dc))
 		return;
 
+	dc->m_pNext = de->getDrawContextList();
+	de->setDrawContextList(dc);
 	de->prepareToDraw(dc);
 	de->emit(dc);
 
-	delete dc;
 	gc->mDC = NULL;
 }
 
@@ -96,14 +98,14 @@ public:
 
 void GeometryFinalStageForMultithreading::emit(void *data)
 {
+	DrawEngine &de = DrawEngine::getDrawEngine();
 	Batch *bat = static_cast<Batch *>(data);
-	DrawContext *dc = bat->mDC;
 
 	{
-		dc->mFifoLock.lock();
-		dc->mOrderUnpreservedPrimtivesFifo.splice(
-			dc->mOrderUnpreservedPrimtivesFifo.end(), bat->mPrims);
-		dc->mFifoLock.unlock();
+		de.mFifoLock.lock();
+		de.mOrderUnpreservedPrimtivesFifo.splice(
+			de.mOrderUnpreservedPrimtivesFifo.end(), bat->mPrims);
+		de.mFifoLock.unlock();
 	}
 
 	delete bat;
@@ -127,7 +129,9 @@ public:
 		// Wait for all the geometry tasks done.
 		::glsp::ThreadPool::get().waitForAllTaskDone();
 
-		getNextStage()->emit(dc);
+		// NOTE: used to switch b/w immediate render and deferred render.
+		// Defer and accumulate the primitive lists.
+		//getNextStage()->emit(dc);
 	}
 
 	virtual void finalize() { }
@@ -141,6 +145,7 @@ private:
 };
 
 DrawEngine::DrawEngine():
+	mDrawContextList(NULL),
 	mFirstStage(NULL),
 	mpEGLDisplay(NULL),
 	mpBridge(NULL)
@@ -149,8 +154,6 @@ DrawEngine::DrawEngine():
 
 DrawEngine::~DrawEngine()
 {
-	deinitTLS();
-
 	delete mVertexFetcher;
 	delete mPrimAsbl;
 	delete mClipper;
@@ -174,15 +177,13 @@ void DrawEngine::init(void *dpy, IEGLBridge *bridge)
 	bridge->makeCurrent = MakeCurrent;
 	bridge->swapBuffers = swapBuffers;
 
-	initTLS();
-
 	mpBridge = bridge;
-
-	initPipeline();
 
 	::glsp::ThreadPool &threadPool = ::glsp::ThreadPool::get();
 
 	threadPool.Initialize();
+
+	initPipeline();
 }
 
 void DrawEngine::initPipeline()
@@ -266,8 +267,10 @@ bool DrawEngine::validateState(DrawContext *dc)
 	VertexShader   *pVS = gc->mPM.getCurrentProgram()->getVS();
 	FragmentShader *pFS = gc->mPM.getCurrentProgram()->getFS();
 
-	if(!gc->mTM.validateTextureState(pVS, pFS))
+	if(!gc->mTM.validateTextureState(pVS, pFS, dc))
 		ret = false;
+
+	dc->mFS = pFS;
 
 	return ret;
 }
@@ -293,7 +296,8 @@ void DrawEngine::beginFrame(GLContext *gc)
 		gc->applyViewport(0, 0, rt.width, rt.height);
 	}
 
-	rt.pDepthBuffer = (float *)malloc(rt.width * rt.height * sizeof(float));
+	if(!rt.pDepthBuffer)
+		rt.pDepthBuffer = (float *)malloc(rt.width * rt.height * sizeof(float));
 	// TODO: impl stencil buffer
 	rt.pStencilBuffer = NULL;
 
@@ -324,35 +328,6 @@ void DrawEngine::prepareToDraw(DrawContext *dc)
 	}
 
 	linkPipeStages(gc);
-
-#if 0
-	// TODO(done): use real view port state
-	if(!(gc->mEmitFlag & EMIT_FLAG_VIEWPORT))
-	{
-		mMapper->setViewPort(0, 0,
-							 gc->mRT.width,
-							 gc->mRT.height);
-	}
-	else
-	{
-		// FIXME: how to draw if viewport exceed the buffer boundary
-		int w = gc->mState.mViewport.width;
-		int h = gc->mState.mViewport.height;
-
-		if((gc->mState.mViewport.x + gc->mState.mViewport.width) >
-			gc->mRT.width)
-			w = gc->mRT.width - gc->mState.mViewport.x;
-
-		if((gc->mState.mViewport.y + gc->mState.mViewport.height) >
-			gc->mRT.height)
-			h = gc->mRT.height - gc->mState.mViewport.y;
-
-
-		mMapper->setViewPort(gc->mState.mViewport.x,
-							 gc->mState.mViewport.y,
-							 w, h);
-	}
-#endif
 }
 
 void DrawEngine::emit(DrawContext *dc)
@@ -362,18 +337,30 @@ void DrawEngine::emit(DrawContext *dc)
 
 bool DrawEngine::SwapBuffers()
 {
+	DrawContext *dc = mDrawContextList;
+
+	getRastStage()->emit(dc);
+
+	while(dc)
+	{
+		DrawContext *tmp = dc;
+		dc = dc->m_pNext;
+		delete tmp;
+	}
+	mDrawContextList = NULL;
+	mOrderUnpreservedPrimtivesFifo.clear();
+
 	__GET_CONTEXT();
 
 	gc->mbInFrame = false;
 
-	free(gc->mRT.pDepthBuffer);
+	//free(gc->mRT.pDepthBuffer);
+	//gc->mRT.pDepthBuffer = NULL;
 	gc->mRT.pColorBuffer = NULL;
-	gc->mRT.pDepthBuffer = NULL;
 	gc->mRT.pStencilBuffer = NULL;
 
 	return true;
 }
-
 
 NS_CLOSE_GLSP_OGL()
 

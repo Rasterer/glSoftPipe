@@ -69,6 +69,7 @@ class GLContext
 {
 public:
 	GLContext(void *EglCtx, int major, int minor);
+	~GLContext();
 
 	void applyViewport(int x, int y, int width, int height);
 
@@ -100,8 +101,6 @@ private:
 	void initGC();
 };
 
-void initTLS();
-void deinitTLS();
 GLContext *getCurrentContext();
 void* CreateContext(void *EglCtx, int major, int minor);
 void DestroyContext(void *gc);

@@ -1,6 +1,7 @@
 #include "ThreadPool.h"
 
 #include <cassert>
+#include <mutex>
 #include <utility>
 
 #ifdef __linux__

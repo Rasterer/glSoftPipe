@@ -43,6 +43,7 @@ void PrimitiveAssembler::assemble(Batch *bat)
 		tri.mVert[0]	= out[*(it + 0)];
 		tri.mVert[1]	= out[*(it + 1)];
 		tri.mVert[2]	= out[*(it + 2)];
+		tri.mDC         = bat->mDC;
 
 		++iter;
 	}

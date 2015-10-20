@@ -31,18 +31,16 @@ typedef std::map<std::string, int> VarMap;
 // APP should use these two macros to define its own variables(name and type)
 // for vertex shader varying: To make life easy, glPosition should come first!
 #define DECLARE_IN(type, attr)	\
-	this->declareInput(#attr, typeid(type));
+	m##attr = this->declareInput(#attr, typeid(type));	\
 
 #define RESOLVE_IN(type, attr, input)	\
-	int l_##attr = this->resolveInput(#attr, typeid(type));	\
-	type   &attr = reinterpret_cast<type &>(input.getReg(l_##attr));
+	type   &attr = reinterpret_cast<type &>(input.getReg(m##attr));
 
 #define DECLARE_OUT(type, attr)	\
-	this->declareOutput(#attr, typeid(type));
+	m##attr = this->declareOutput(#attr, typeid(type));
 
 #define RESOLVE_OUT(type, varying, output)	\
-	int l_##varying = this->resolveOutput(#varying, typeid(type));	\
-	type   &varying = reinterpret_cast<type &>(output.getReg(l_##varying));
+	type   &varying = reinterpret_cast<type &>(output.getReg(m##varying));
 
 #define DECLARE_UNIFORM(uni)	\
 	this->declareUniform(#uni, &uni);
@@ -56,7 +54,7 @@ typedef std::map<std::string, int> VarMap;
 // i.e. there is only one texture coordinate in an vertex array.
 #define DECLARE_TEXTURE_COORD(type, attr)	\
 	this->SetTextureCoordLocation();			\
-	this->declareInput(#attr, typeid(type));	\
+	m##attr = this->declareInput(#attr, typeid(type));	\
 
 
 typedef unsigned int sampler1D;
@@ -130,9 +128,9 @@ protected:
 	template <class T>
 	void declareUniform(const std::string &name, T *constant);
 
-	void declareInput(const std::string &name, const std::type_info &type);
+	int declareInput(const std::string &name, const std::type_info &type);
 	int resolveInput(const std::string &name, const std::type_info &type);
-	void declareOutput(const std::string &name, const std::type_info &type);
+	int declareOutput(const std::string &name, const std::type_info &type);
 	int resolveOutput(const std::string &name, const std::type_info &type);
 
 	void declareSampler();
@@ -140,7 +138,7 @@ protected:
 
 	unsigned getOutRegsNum() const { return mOutRegs.size(); }
 
-	inline glm::vec4 texture2D(sampler2D sampler, const glm::vec2 &coord)
+	glm::vec4 texture2D(sampler2D sampler, const glm::vec2 &coord)
 	{
 		glm::vec4 res;
 
@@ -169,7 +167,7 @@ private:
 	// TODO: only sampler2D() support so far
 	Texture* mTexs[MAX_TEXTURE_UNITS];
 
-	static const int kMaxSamplers = 16;
+	static const int kMaxSamplers = 4;
 	bool		bHasSampler;
 	int			mNumSamplers;
 	unsigned	mSamplerLoc[kMaxSamplers];
@@ -272,12 +270,24 @@ public:
 
 	bool getDiscardFlag() const { return bHasDiscard; }
 
+	void attachTextures(Texture *tex) { mTextures = tex; }
+
+	glm::vec4 texture2D(sampler2D sampler, const glm::vec2 &coord)
+	{
+		glm::vec4 res;
+
+		mTextures[sampler].m_pfnTexture2D(this, &mTextures[sampler], coord, res);
+
+		return res;
+	}
+
 private:
 	virtual void execute(fsInput& in, fsOutput& out);
 
 	void SetDiscardFlag() { bHasDiscard = true; }
 
 	bool bHasDiscard;
+	Texture* mTextures;
 };
 
 class Program: public NameItem

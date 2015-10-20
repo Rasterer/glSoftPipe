@@ -6,6 +6,7 @@
 #include "Rasterizer.h"
 #include "Texture.h"
 #include "khronos/GL/glcorearb.h"
+#include "common/glsp_debug.h"
 
 
 using std::string;
@@ -116,12 +117,14 @@ Shader::ShaderType Shader::OGLShaderTypeToInternal(unsigned type)
 	}
 }
 
-void Shader::declareInput(const string &name, const type_info &type)
+int Shader::declareInput(const string &name, const type_info &type)
 {
-	mInRegsMap[name] = mInRegs.size();
+	int tmp = mInRegs.size();;
+	mInRegsMap[name] = tmp;
 	mInRegs.push_back(VertexInfo(name, type));
 
 	assert(mInRegs.size() <= MAX_VERTEX_ATTRIBS);
+	return tmp;
 }
 
 int Shader::resolveInput(const string &name, const type_info &type)
@@ -137,10 +140,13 @@ int Shader::resolveInput(const string &name, const type_info &type)
 	return -1;
 }
 
-void Shader::declareOutput(const string &name, const type_info &type)
+int Shader::declareOutput(const string &name, const type_info &type)
 {
-	mOutRegsMap[name] = mOutRegs.size();
+	int tmp = mOutRegs.size();
+	mOutRegsMap[name] = tmp;
 	mOutRegs.push_back(VertexInfo(name, type));
+
+	return tmp;
 }
 
 int Shader::resolveOutput(const string &name, const type_info &type)
@@ -242,7 +248,7 @@ void FragmentShader::emit(void *data)
 
 	execute(pFsio->in, pFsio->out);
 
-	getNextStage()->emit(pFsio);
+	//getNextStage()->emit(pFsio);
 }
 
 void FragmentShader::compile()

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DataFlow.h"
+#include "Texture.h"
 #include "common/glsp_defs.h"
 #include "common/glsp_spinlock.h"
 
@@ -21,6 +22,7 @@ class FaceCuller;
 class RasterizerWrapper;
 class PipeStage;
 class GeometryStageWrapper;
+class FragmentShader;
 
 namespace glsp {
 	struct IEGLBridge;
@@ -41,8 +43,11 @@ struct DrawContext
 	const void 		*mIndices;
 	GLContext 		*gc;
 
-	::glsp::SpinLock	 mFifoLock;
-	Primlist 	     	 mOrderUnpreservedPrimtivesFifo;
+	// Hold this data for deferred rendering support.
+	FragmentShader 		*mFS;
+	Texture				 mTextures[MAX_TEXTURE_UNITS];
+
+	DrawContext *m_pNext;
 };
 
 /*
@@ -74,6 +79,14 @@ public:
 	// mutators
 	void setFirstStage(PipeStage *stage) { mFirstStage = stage; }
 
+	DrawContext* getDrawContextList() const { return mDrawContextList; }
+	void setDrawContextList(DrawContext *dc) { mDrawContextList = dc; }
+
+	RasterizerWrapper* getRastStage() const { return mRast; }
+
+	::glsp::SpinLock	 mFifoLock;
+	Primlist 	     	 mOrderUnpreservedPrimtivesFifo;
+
 protected:
 	DrawEngine();
 	~DrawEngine();
@@ -95,9 +108,7 @@ private:
 	RasterizerWrapper 		*mRast;
 	GeometryStageWrapper    *mGeometry;
 
-	// TODO(done): Use member pointer may limit the multi-thread use of DrawEngine.
-	// Find a better way
-	// DrawContext			   *mCtx;
+	DrawContext			   *mDrawContextList;
 	PipeStage			   *mFirstStage;
 
 	// EGL related data member
