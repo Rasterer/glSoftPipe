@@ -634,15 +634,15 @@ void ScanlineRasterizer::activateEdgesFromGET(SRHelper *hlp, int y)
 			pEdge->mParent->setActiveEdge(pEdge);
 			aet.push_back(pEdge);
 		}
-
-		hlp->mAET.sort(
-			[](const edge *pEdge1, const edge *pEdge2) -> bool
-			{
-				return pEdge1->x < pEdge2->x;
-			});
 	}
 
 	assert(aet.empty() || aet.size() % 2 == 0);
+
+	hlp->mAET.sort(
+		[](const edge *pEdge1, const edge *pEdge2) -> bool
+		{
+			return pEdge1->x < pEdge2->x;
+		});
 
 	for(edge *pEdge: aet)
 		pEdge->bActive = true;
@@ -772,6 +772,7 @@ void ScanlineRasterizer::HiddenSurfaceRemovalTranslucent(ScanlineRasterizer *pSR
 void ScanlineRasterizer::traversalAET(SRHelper *hlp, int y)
 {
 	int span_count = 0;
+	int xright_max = 0;
 	ActiveEdgeTableY &aet = hlp->mAET;
 
 	assert(aet.size() % 2 == 0);
@@ -801,12 +802,15 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, int y)
 		int xleft = ceil(pEdge->x - 0.5f);
 		int xright = ceil(pAdjcentEdge->x - 0.5f);
 
+		if(xright_max < xright)
+			xright_max = xright;
+
 		void *raw = reinterpret_cast<span *>(spans) + span_count;
 		new(raw) span(xleft, xright, pParent);
 		span_count++;
 	}
 
-	auto handler = [this, y, span_count](void *data)
+	auto handler = [this, y, span_count, xright_max](void *data)
 	{
 		ActiveEdgeTableX aetx;
 		span *sp = static_cast<span *>(data);
@@ -829,10 +833,8 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, int y)
 			sp[i].mCurrentZ = sp[i].mStart[0].z;
 		}
 
-		while (x < sp[span_count - 1].xright)
+		while (x < xright_max)
 		{
-			bool added = false, rmFront = false;
-
 			auto it = aetx.begin();
 			while(it != aetx.end())
 			{
@@ -858,12 +860,7 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, int y)
 			{
 				if (sp[curr].xleft == x)
 				{
-					if(aetx.empty() || (!rmFront && sp[curr].mCurrentZ <= aetx.front()->mCurrentZ))
-						aetx.push_front(&sp[curr]);
-					else
-						aetx.push_back(&sp[curr]);
-
-					added = true;
+					aetx.push_back(&sp[curr]);
 				}
 				else
 				{
@@ -879,7 +876,14 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, int y)
 
 			if (aetx.size() >= 2)
 			{
-				if (rmFront && this->pfnHSR == &HiddenSurfaceRemoval)
+				/* If HSR is enabled, only render the nearest fragment,
+				 * this is what HSR means.
+				 * Else in translucent case, every fragment should be
+				 * emitted to next stage. But before that, we sort the overlapped
+				 * fragments from far to near, so that we can achieve
+				 * submit order independent transparency rendering.
+				 */
+				if (this->pfnHSR == &HiddenSurfaceRemoval)
 				{
 					ActiveEdgeTableX::iterator nearest_iter = aetx.begin();
 
@@ -892,12 +896,12 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, int y)
 					if (nearest_iter != aetx.begin())
 						aetx.splice(aetx.begin(), aetx, nearest_iter);
 				}
-				else if (added && this->pfnHSR == &HiddenSurfaceRemovalTranslucent)
+				else
 				{
 					aetx.sort(
 						[](const span *pSpan1, const span *pSpan2) -> bool
 						{
-							return pSpan1->mCurrentZ < pSpan2->mCurrentZ;
+							return pSpan1->mCurrentZ > pSpan2->mCurrentZ;
 						});
 				}
 			}
