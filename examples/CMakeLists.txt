@@ -30,7 +30,7 @@ ELSE(ImageMagick_Magick++_FOUND)
 	MESSAGE(FATAL_ERROR "ImageMagick package - not found!")
 ENDIF(ImageMagick_Magick++_FOUND)
 
-INCLUDE(/usr/lib/cmake/assimp-3.0/assimp-config.cmake)
+INCLUDE(/usr/lib/cmake/assimp-3.1/assimp-config.cmake)
 
 INCLUDE_DIRECTORIES(${XCB_INCLUDE_PATH}
 					${XLIB_XCB_INCLUDE_PATH}

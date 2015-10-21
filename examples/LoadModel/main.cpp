@@ -257,17 +257,14 @@ int main(int argc, char **argv)
 	float xbias = 10.0f;
 	mat4 scal  = glm::scale(mat4(1.0f), vec3(0.2f, 0.2f, 0.2f));
 	mat4 trans = glm::translate(mat4(1.0f), vec3(0.0f, 0.0f, xbias));
-	//rotate = glm::rotate(world, (float)M_PI * 70 / 180, vec3(0.0f, 1.0f, 0.0f));
-	//rotate = glm::rotate(world, (float)M_PI * 30 / 180, vec3(1.0f, 0.0f, 0.0f));
-	mat4 world = trans * scal;
 	mat4 view = glm::lookAt(vec3(15.0f, 10.0f, -10.0f),
 					   vec3(0.0f, 0.0f, 10.0f),
 					   vec3(0.0f, 1.0f, 0.0f));
 	mat4 project = glm::perspective((float)M_PI * 60.0f / 180.0f, 16.0f / 9.0f, 1.0f, 50.0f); 
+	mat4 tvp   = project * view * trans;
+	mat4 rotate;
+	mat4 wvp;
 
-	mat4 wvp   = project * view * world;
-
-	glUniformMatrix4fv(WVPLocation, 1, false, (float *)&wvp);
 	glUniform1i(samplerLocation, 0);
 	Magick::InitializeMagick(*argv);
 #if 0
@@ -348,23 +345,17 @@ int main(int argc, char **argv)
 #endif
 
 	uint64_t nFrames = 0;
+	float scalar = 0.0f;
 	std::chrono::high_resolution_clock::time_point  beginTime = std::chrono::high_resolution_clock::now();
 	std::chrono::high_resolution_clock::time_point  endTime;
 	while(true)
 	{
-		//xbias += 0.01f;
+		rotate = glm::rotate(mat4(1.0f), (float)M_PI * scalar / 180, vec3(0.0f, 1.0f, 0.0f));
 
-		//mat4 trans = translate(mat4(1.0f), vec3(xbias, 0.0f, 0.0f));
-		//mat4 view = lookAt(vec3(0.0f, 0.0f, -5.0f),
-						   //vec3(0.0f, 0.0f, 1.0f),
-						   //vec3(0.0f, 1.0f, 0.0f));
-		//mat4 project = perspective((float)M_PI * 30.0f / 180.0f, 16.0f / 9.0f, 1.0f, 10.0f); 
+		wvp   = tvp * rotate * scal;
+		glUniformMatrix4fv(WVPLocation, 1, false, (float *)&wvp);
+		scalar += 1.0f;
 
-		//view = view * trans;
-		//glUniformMatrix4fv(viewLocation, 1, false, (float *)&view);
-
-		//glDrawArrays(GL_TRIANGLES, 0, 3);
-		//glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		pMesh->Render();
 		ok = eglSwapBuffers(display, surface);
 
