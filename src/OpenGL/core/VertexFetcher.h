@@ -10,11 +10,6 @@ NS_OPEN_GLSP_OGL()
 class DrawContext;
 class GLContext;
 
-// TODO: tunning
-// Set this macro to a big enough number to disable multi batch dispatching.
-#define VERTEX_CACHE_EMIT_THRESHHOLD 12
-//#define VERTEX_CACHE_EMIT_THRESHHOLD 0xFFFFFFFF
-
 class VertexFetcher: public PipeStage
 {
 public:
@@ -22,7 +17,7 @@ public:
 	virtual ~VertexFetcher() {}
 protected:
 	// Should be called from PipeStage's emit() method
-	virtual void fetchVertex(DrawContext *dc) = 0;
+	virtual void FetchVertex(DrawContext *dc) = 0;
 };
 
 class VertexCachedFetcher: public VertexFetcher
@@ -35,8 +30,7 @@ public:
 	virtual void finalize();
 
 protected:
-	virtual void fetchVertex(DrawContext *dc);
-	void dispatchOneBatch(Batch *bat);
+	virtual void FetchVertex(DrawContext *dc);
 };
 
 NS_CLOSE_GLSP_OGL()

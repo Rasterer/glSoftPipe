@@ -36,7 +36,6 @@ ELSE(assimp_FOUND)
 	MESSAGE(FATAL_ERROR "Looking for assimp - not found")
 ENDIF(assimp_FOUND)
 
-
 INCLUDE_DIRECTORIES(${XCB_INCLUDE_PATH}
 					${XLIB_XCB_INCLUDE_PATH}
 					${ImageMagick_INCLUDE_DIRS}

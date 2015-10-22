@@ -85,7 +85,7 @@ public:
 	RasterizerWrapper* getRastStage() const { return mRast; }
 
 	::glsp::SpinLock	 mFifoLock;
-	Primlist 	     	 mOrderUnpreservedPrimtivesFifo;
+	Primlist 	     	 mOrderUnpreservedPrimList;
 
 protected:
 	DrawEngine();

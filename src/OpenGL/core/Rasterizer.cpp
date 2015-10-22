@@ -546,7 +546,7 @@ ScanlineRasterizer::SRHelper* ScanlineRasterizer::createGET(DrawContext *dc)
 {
 	GLContext *gc = dc->gc;
 	DrawEngine &de = DrawEngine::getDrawEngine();
-	Primlist  &pl = de.mOrderUnpreservedPrimtivesFifo;
+	Primlist  &pl = de.mOrderUnpreservedPrimList;
 
 	GLSP_DPF(GLSP_DPF_LEVEL_DEBUG, "ScanlineRasterizer::createGET start\n");
 
@@ -593,7 +593,15 @@ ScanlineRasterizer::SRHelper* ScanlineRasterizer::createGET(DrawContext *dc)
 				ystart = y0;
 			}
 
-			// apply top-left filling convention
+			/* Apply top-left filling convention
+			 * NOTE:
+			 * Top-left filling convention is not perfect in shared vertices
+			 * in pixel center case, which can be resolved by snapping vertices
+			 * into subpixel grids with fixed point algorithm. But so far
+			 * this case is handled by the depth test, i.e. if one vertex is
+			 * shared between several polygons, it will be rendered only once,
+			 * others are avoided by depth test(exactly near).
+			 */
 			edge *pEdge = new edge(pParent);
 
 			pEdge->dx   = (hvert->x - lvert->x) / (hvert->y - lvert->y);
@@ -840,9 +848,6 @@ void ScanlineRasterizer::traversalAET(SRHelper *hlp, int y)
 			{
 				if(x >= (*it)->xright)
 				{
-					if(*it == aetx.front())
-						rmFront = true;
-
 					it = aetx.erase(it);
 				}
 				else

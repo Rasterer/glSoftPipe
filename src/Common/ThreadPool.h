@@ -52,6 +52,7 @@ public:
 	uint32_t getDoneWorks() const { return mDoneWorks; }
 
 	int getThreadsNumber() const { return mThreadsNum; }
+	int getThreadID() const;
 
 	/* NOTE:
 	 * This method should be called only after all producer threads

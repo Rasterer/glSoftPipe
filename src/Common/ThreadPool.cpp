@@ -11,6 +11,9 @@
 
 namespace glsp {
 
+static std::atomic_int sID(0);
+__thread int g_TlsId = 0;
+
 ThreadPool::ThreadPool():
 	mDoneWorks(0),
 	mRunningWorks(0),
@@ -66,12 +69,13 @@ bool ThreadPool::Initialize()
 		return ret;
 	}
 
+	g_TlsId = -1;
 	mThreadsNum = n;
-
 	mThreads = new std::thread[n];
 
 	auto workerThread = [this]
 	{
+		g_TlsId = sID.fetch_add(1);
 		while(true)
 		{
 			std::unique_lock<SpinLock> lk(mQueueLock);
@@ -146,6 +150,11 @@ bool ThreadPool::AddWork(WorkItem *work)
 	mWorkQueuedCond.notify_one();
 
 	return true;
+}
+
+int ThreadPool::getThreadID() const
+{
+	return g_TlsId;
 }
 
 } // namespace glsp

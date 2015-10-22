@@ -32,6 +32,7 @@ GLAPI void APIENTRY glDrawArrays (GLenum mode, GLint first, GLsizei count)
 	dc->mFirst = first;
 	dc->mCount = count;
 	dc->mDrawType = DrawContext::kArrayDraw;
+	dc->mIndices = 0;
 
 	if(!de->validateState(dc))
 		return;
@@ -101,14 +102,10 @@ void GeometryFinalStageForMultithreading::emit(void *data)
 	DrawEngine &de = DrawEngine::getDrawEngine();
 	Batch *bat = static_cast<Batch *>(data);
 
-	{
-		de.mFifoLock.lock();
-		de.mOrderUnpreservedPrimtivesFifo.splice(
-			de.mOrderUnpreservedPrimtivesFifo.end(), bat->mPrims);
-		de.mFifoLock.unlock();
-	}
-
-	delete bat;
+	de.mFifoLock.lock();
+	de.mOrderUnpreservedPrimList.splice(
+		de.mOrderUnpreservedPrimList.end(), bat->mPrims);
+	de.mFifoLock.unlock();
 }
 
 class GeometryStageWrapper: public PipeStage
@@ -348,7 +345,7 @@ bool DrawEngine::SwapBuffers()
 		delete tmp;
 	}
 	mDrawContextList = NULL;
-	mOrderUnpreservedPrimtivesFifo.clear();
+	mOrderUnpreservedPrimList.clear();
 
 	__GET_CONTEXT();
 
