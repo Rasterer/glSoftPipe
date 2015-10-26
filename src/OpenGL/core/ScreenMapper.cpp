@@ -26,10 +26,10 @@ void ScreenMapper::viewportTransform(Batch *bat)
 {
 	GLContext   *gc = bat->mDC->gc;
 
-	int xCenter = gc->mState.mViewport.xCenter;
-	int yCenter = gc->mState.mViewport.yCenter;
-	int xScale  = gc->mState.mViewport.xScale;
-	int yScale  = gc->mState.mViewport.yScale;
+	const float xCenter = gc->mState.mViewport.xCenter;
+	const float yCenter = gc->mState.mViewport.yCenter;
+	const float xScale  = gc->mState.mViewport.xScale;
+	const float yScale  = gc->mState.mViewport.yScale;
 
 	Primlist &pl = bat->mPrims;
 	Primlist::iterator it = pl.begin();
@@ -48,11 +48,11 @@ void ScreenMapper::viewportTransform(Batch *bat)
 		const vec4 &pos1 = it->mVert[1].position();
 		const vec4 &pos2 = it->mVert[2].position();
 
-		float ex = pos1.x - pos0.x;
-		float ey = pos1.y - pos0.y;
-		float fx = pos2.x - pos0.x;
-		float fy = pos2.y - pos0.y;
-		float area = ex * fy - ey * fx;
+		const float ex = pos1.x - pos0.x;
+		const float ey = pos1.y - pos0.y;
+		const float fx = pos2.x - pos0.x;
+		const float fy = pos2.y - pos0.y;
+		const float area = ex * fy - ey * fx;
 
 		// Discard the triangles whose area are less than 1
 		if(abs(area) <= 1.0f)

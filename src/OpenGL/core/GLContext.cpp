@@ -104,8 +104,8 @@ void GLContext::applyViewport(int x, int y, int width, int height)
 	vp.width  = width;
 	vp.height = height;
 
-	vp.xScale = vp.width  / 2;
-	vp.yScale = vp.height / 2;
+	vp.xScale = vp.width  / 2.0f;
+	vp.yScale = vp.height / 2.0f;
 
 	vp.xCenter = vp.x + vp.xScale;
 	vp.yCenter = vp.y + vp.yScale;

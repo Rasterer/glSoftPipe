@@ -27,10 +27,9 @@ struct GLViewport
 	float zNear, zFar;
 
 	// Used for internal viewport transform
-	// FIXME: Now use fixed point, need use float point instead?
 	// TODO: depth range
-	int   xCenter, yCenter;
-	int   xScale, yScale;
+	float   xCenter, yCenter;
+	float   xScale,  yScale;
 };
 
 struct RenderTarget
