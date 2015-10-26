@@ -31,3 +31,9 @@ inline int fixedpoint_cast<N>(float fp)
 {
 	return (int)(fp * N + 0.5f);
 }
+
+template <typename T>
+inline T clamp(T val, T l, T h)
+{
+	return (val < l) ? l: (val > h) ? h: val;
+}
