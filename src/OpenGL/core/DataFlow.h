@@ -106,6 +106,11 @@ public:
 		return getReg(idx);
 	}
 
+	glm::vec4* data()
+	{
+		return mRegs.data();
+	}
+
 	ShaderRegisterFile& operator+=(const ShaderRegisterFile &rhs);
 	ShaderRegisterFile& operator*=(const float scalar);
 
@@ -130,6 +135,11 @@ struct Primitive
 {
 	Primitive() = default;
 	~Primitive() = default;
+
+	// Move semantics
+	Primitive(Primitive &&rhs);
+
+	Primitive& operator=(Primitive &&rhs);
 
 	enum PrimType
 	{

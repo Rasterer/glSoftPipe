@@ -65,5 +65,33 @@ ShaderRegisterFile operator*(float scalar, const ShaderRegisterFile &v)
 	return std::move(tmp);
 }
 
+Primitive::Primitive(Primitive &&rhs)
+{
+	mType           = rhs.mType;
+	mVertNum        = rhs.mVertNum;
+	mAreaReciprocal = rhs.mAreaReciprocal;
+	mDC             = rhs.mDC;
+
+	for (int i = 0; i < mVertNum; ++i)
+	{
+		mVert[i] = (rhs.mVert[i]);
+	}
+}
+
+Primitive& Primitive::operator=(Primitive &&rhs)
+{
+	mType           = rhs.mType;
+	mVertNum        = rhs.mVertNum;
+	mAreaReciprocal = rhs.mAreaReciprocal;
+	mDC             = rhs.mDC;
+
+	for (int i = 0; i < mVertNum; ++i)
+	{
+		mVert[i] = (rhs.mVert[i]);
+	}
+
+	return *this;
+}
+
 
 NS_CLOSE_GLSP_OGL()

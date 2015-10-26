@@ -118,7 +118,7 @@ void Clipper::clipping(Batch *bat)
 			prim.mVert[2] = *rr[src][i+1];
 			prim.mDC      = bat->mDC;
 
-			out.push_back(prim);
+			out.push_back(std::move(prim));
 		}
 	}
 

@@ -67,6 +67,7 @@ void VertexCachedFetcher::FetchVertex(DrawContext *dc)
 			std::unordered_map<int, int> cacheIndex;
 			Batch bat;
 			bat.mDC = dc;
+			vsInput_v &cache = bat.mVertexCache;
 
 			// OPT: Too many copies 
 			for (int j = 0; i < dc->mCount && j < VERTEX_INDEX_STEP; ++i, ++j)
@@ -80,7 +81,6 @@ void VertexCachedFetcher::FetchVertex(DrawContext *dc)
 				else
 					assert(false);
 
-				vsInput_v &cache = bat.mVertexCache;
 				auto it = cacheIndex.find(idx);
 
 				if(it != cacheIndex.end())
@@ -91,12 +91,10 @@ void VertexCachedFetcher::FetchVertex(DrawContext *dc)
 				{
 					vsInput in;
 
-					in.reserve(pVS->getInRegsNum());
+					in.resize(pVS->getInRegsNum());
 
 					for(size_t j = 0; j < pVS->getInRegsNum(); j++)
 					{
-						vec4 attrib(0.0f, 0.0f, 0.0f, 1.0f);
-
 						if(pVAO->mAttribEnables & (1 << j))
 						{
 							BufferObject *pBO;
@@ -114,18 +112,16 @@ void VertexCachedFetcher::FetchVertex(DrawContext *dc)
 								src = reinterpret_cast<char *>(vas.mOffset);
 								src = src + stride * idx;
 							}
-							std::memcpy(&attrib, src, vas.mAttribSize);
+							std::memcpy((void *)((uintptr_t)(in.data()) + j * sizeof(glm::vec4)), src, vas.mAttribSize);
 						}
 						else // TODO: Impl accessing non-enabled attributes
 						{
 						}
-
-						in.pushReg(attrib);
 					}
 
 					cacheIndex[idx] = cache.size();
 					bat.mIndexBuf.push_back(cache.size());
-					cache.push_back(in);
+					cache.push_back(std::move(in));
 				}
 			}
 
