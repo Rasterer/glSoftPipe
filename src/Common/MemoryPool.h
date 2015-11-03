@@ -6,33 +6,51 @@
 
 namespace glsp {
 
-class RegisterPool
+/* Mutil-threaded memory pool:
+ * The basic data structure is a per-thread memory free list.
+ *
+ * It's common that memory will be allocated from one thread,
+ * and then freed in other threads.
+ * So a global memory cache is instroduced to handle the memory balance.
+ * Without this, the memory metrics in one thread will explode.
+ *
+ * The pool is implemented nearly as lock-free.
+ * It only needs protection when interacting with the global cache.
+ * And its probability of occurrence is below 1/FREE_TO_GLOBAL_CACHE_THRESHHOLD.
+ *
+ * At last, it implements a BoostReclaimAll() interface to free all memory
+ * in one pass, avoid trivial free of small pieces.
+ */
+class MemoryPoolMT
 {
 public:
 	struct MemBlock;
 	struct FreeListNode;
 	struct ThreadMetaData;
 
-	static const int kBlockNum = 4;
-	static const int kBlockSize = 32 * 1024;
-	static constexpr size_t kUnitSizes[kBlockNum] = {32, 64, 128, 256};
+	static const int kBlockNum = 5;
 
-	static RegisterPool& get()
+	static constexpr int    kBlockSize[kBlockNum] = {8 * 1024, 16 * 1024, 32 * 1024, 64 * 1024, 128 * 1024};
+	static constexpr size_t kUnitSizes[kBlockNum] = {16, 32, 64, 128, 256};
+
+	static MemoryPoolMT& get()
 	{
-		static RegisterPool pool;
+		static MemoryPoolMT pool;
 		return pool;
 	}
 
-	void* allocate(const size_t size);
+	void*  allocate(const size_t size);
 	void deallocate(void * const p, const size_t size);
 
+	void BoostReclaimAll();
+
 private:
-	RegisterPool();
-	~RegisterPool() = default;
+	MemoryPoolMT();
+	~MemoryPoolMT() = default;
 
 
-	FreeListNode *mGlobalCache;
-	SpinLock      mPoolLock;
+	FreeListNode *mGlobalCache[kBlockNum];
+	SpinLock      mPoolLock[kBlockNum];
 };
 
 template <typename T>
@@ -89,12 +107,12 @@ public:
 
 	pointer allocate(size_type n) const
 	{
-		return static_cast<pointer>(RegisterPool::get().allocate(n * sizeof(T)));
+		return static_cast<pointer>(MemoryPoolMT::get().allocate(n * sizeof(T)));
 	}
 
 	void deallocate(T * const p, const size_t n) const
 	{
-		RegisterPool::get().deallocate(p, n * sizeof(T));
+		MemoryPoolMT::get().deallocate(p, n * sizeof(T));
 	}
 
 	template <typename U> T * allocate(const size_t n, const U * /* const hint */) const
@@ -108,3 +126,10 @@ private:
 };
 
 } // namespace glsp
+
+
+/* NOTE:
+ * Like the placement new, caller needs to explicitly invoke the
+ * destructor before deallocate.
+ */
+void* operator new(const size_t size, ::glsp::MemoryPoolMT &pool);

@@ -33,12 +33,16 @@ void FaceCuller::culling(Batch *bat)
 
 	while(it != pl.end())
 	{
-		orient_t orient = (it->mAreaReciprocal > 0)? CCW: CW;
+		orient_t orient = ((*it)->mAreaReciprocal > 0)? CCW: CW;
 		face_t face = (mOrient == orient)? FRONT: BACK;
 
 		if((mCullFace & face) != 0)
 		{
+			Primitive *prim = *it;
 			it = pl.erase(it);
+
+			prim->~Primitive();
+			MemoryPoolMT::get().deallocate(prim, sizeof(Primitive));
 		}
 		else
 		{

@@ -5,6 +5,7 @@
 #include "DrawEngine.h"
 #include "Rasterizer.h"
 #include "Texture.h"
+#include "TBDR.h"
 #include "khronos/GL/glcorearb.h"
 #include "common/glsp_debug.h"
 
@@ -222,9 +223,6 @@ void VertexShader::emit(void *data)
 		execute(in[i], out[i]);
 	}
 
-	// Free the memory in Batch.mVertexCache to avoid large memory occupy
-	vsInput_v().swap(in);
-
 	getNextStage()->emit(bat);
 }
 
@@ -240,15 +238,17 @@ FragmentShader::FragmentShader():
 
 void FragmentShader::emit(void *data)
 {
-	Fsio *pFsio = static_cast<Fsio *>(data);
+	Fsio &fsio = *static_cast<Fsio *>(data);
+	const Triangle *tri = static_cast<Triangle *>(fsio.m_priv0);
 
-	m_priv = pFsio;
+	m_priv = &fsio;
 
-	pFsio->out.resize(getOutRegsNum());
+	fsio.out.resize(getOutRegsNum());
+	attachTextures(tri->mPrim.mDC->mTextures);
 
-	execute(pFsio->in, pFsio->out);
+	execute(fsio.in, fsio.out);
 
-	//getNextStage()->emit(pFsio);
+	getNextStage()->emit(data);
 }
 
 void FragmentShader::compile()

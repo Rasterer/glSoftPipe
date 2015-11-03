@@ -41,8 +41,6 @@ public:
 		return instance;
 	}
 
-	bool Initialize();
-
 	bool IsInitialized() const { return bInitialzed; }
 
 	WorkItem* CreateWork(const WorkItem::callback_t &fn, void *data);
@@ -52,7 +50,7 @@ public:
 	uint32_t getDoneWorks() const { return mDoneWorks; }
 
 	int getThreadsNumber() const { return mThreadsNum; }
-	int getThreadID() const;
+	static int getThreadID();
 
 	/* NOTE:
 	 * This method should be called only after all producer threads
@@ -70,6 +68,8 @@ protected:
 
 	ThreadPool(const ThreadPool &rhs) = delete;
 	ThreadPool& operator=(const ThreadPool &rhs) = delete;
+
+	bool Initialize();
 
 private:
 	std::stack<WorkItem *>	mWorkPool;

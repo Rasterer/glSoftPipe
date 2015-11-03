@@ -19,9 +19,19 @@ class Clipper;
 class PerspectiveDivider;
 class ScreenMapper;
 class FaceCuller;
-class RasterizerWrapper;
+class Binning;
+class Rasterizer;
 class PipeStage;
-class GeometryStageWrapper;
+class Interpolater;
+class OwnershipTester;
+class ScissorTester;
+class StencilTester;
+class ZTester;
+class Blender;
+class Dither;
+class FBWriter;
+class GeometryStage;
+class RasterizationStage;
 class FragmentShader;
 
 namespace glsp {
@@ -82,10 +92,9 @@ public:
 	DrawContext* getDrawContextList() const { return mDrawContextList; }
 	void setDrawContextList(DrawContext *dc) { mDrawContextList = dc; }
 
-	RasterizerWrapper* getRastStage() const { return mRast; }
+	RasterizationStage* getRastStage() const { return mRast; }
 
 	::glsp::SpinLock	 mFifoLock;
-	Primlist 	     	 mOrderUnpreservedPrimList;
 
 protected:
 	DrawEngine();
@@ -105,8 +114,21 @@ private:
 	PerspectiveDivider 		*mDivider;
 	ScreenMapper 			*mMapper;
 	FaceCuller 				*mCuller;
-	RasterizerWrapper 		*mRast;
-	GeometryStageWrapper    *mGeometry;
+	Binning  				*mBinning;
+
+	Rasterizer      		*mRasterizer;
+	Interpolater            *mInterpolater;
+	OwnershipTester         *mOwnershipTest;
+	ScissorTester           *mScissorTest;
+	StencilTester           *mStencilTest;
+	ZTester                 *mDepthTest;
+	Blender                 *mBlender;
+	Dither                  *mDither;
+	FBWriter                *mFBWriter;
+
+	// Geometry/Rasterization wrapper
+	GeometryStage           *mGeometry;
+	RasterizationStage      *mRast;
 
 	DrawContext			   *mDrawContextList;
 	PipeStage			   *mFirstStage;

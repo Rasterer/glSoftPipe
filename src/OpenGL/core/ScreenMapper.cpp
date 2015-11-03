@@ -38,15 +38,15 @@ void ScreenMapper::viewportTransform(Batch *bat)
 	{
 		for(size_t i = 0; i < 3; ++i)
 		{
-			vec4 &pos = it->mVert[i].position();
+			vec4 &pos = (*it)->mVert[i].position();
 			pos.x = xCenter + pos.x * xScale;
 			pos.y = yCenter + pos.y * yScale;
 			pos.z = (pos.z + 1) * 0.5f;
 		}
 
-		const vec4 &pos0 = it->mVert[0].position();
-		const vec4 &pos1 = it->mVert[1].position();
-		const vec4 &pos2 = it->mVert[2].position();
+		const vec4 &pos0 = (*it)->mVert[0].position();
+		const vec4 &pos1 = (*it)->mVert[1].position();
+		const vec4 &pos2 = (*it)->mVert[2].position();
 
 		const float ex = pos1.x - pos0.x;
 		const float ey = pos1.y - pos0.y;
@@ -55,13 +55,17 @@ void ScreenMapper::viewportTransform(Batch *bat)
 		const float area = ex * fy - ey * fx;
 
 		// Discard the triangles whose area are less than 1
-		if(abs(area) <= 1.0f)
+		if(abs(area) < 0.1f)
 		{
+			Primitive *prim = *it;
 			it = pl.erase(it);
+
+			prim->~Primitive();
+			MemoryPoolMT::get().deallocate(prim, sizeof(Primitive));
 		}
 		else
 		{
-			it->mAreaReciprocal = 1.0f / area;
+			(*it)->mAreaReciprocal = 1.0f / area;
 			it++;
 		}
 	}

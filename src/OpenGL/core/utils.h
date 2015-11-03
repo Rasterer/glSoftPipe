@@ -14,7 +14,7 @@
 // Watch out for 32 & 64 mix and match!
 #define ALIGN(a, b)       (((a) + ((b) - 1)) & (~((b) - 1)))
 #define ROUND_UP(a, b)    (ALIGN((a), (b)))
-#define ROUND_DOWN(a, b)  ((a) & ~((b) - 1))
+#define ROUND_DOWN(a, b)  ((a) & (~((b) - 1)))
 
 // *.4 fixed point precision
 #define FIXED_POINT4          16
@@ -27,7 +27,7 @@
 #define FIXED_POINT16_SHIFT   16
 
 template <int N>
-inline int fixedpoint_cast<N>(float fp)
+inline int fixedpoint_cast(float fp)
 {
 	return (int)(fp * N + 0.5f);
 }

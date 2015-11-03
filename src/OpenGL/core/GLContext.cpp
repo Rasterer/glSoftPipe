@@ -1,7 +1,8 @@
-#include <pthread.h>
-
-#include "khronos/GL/glcorearb.h"
 #include "GLContext.h"
+
+#include <pthread.h>
+#include "khronos/GL/glcorearb.h"
+#include "common/glsp_debug.h"
 
 
 using glsp::ogl::GLContext;
@@ -12,7 +13,7 @@ GLAPI void APIENTRY glViewport (GLint x, GLint y, GLsizei width, GLsizei height)
 	__GET_CONTEXT();
 	GLViewport &vp = gc->mState.mViewport;
 
-	if(vp.x == y && vp.y == y &&
+	if (vp.x == y && vp.y == y &&
 		vp.width == width && vp.height == height)
 		return;
 	else
@@ -25,22 +26,38 @@ GLAPI void APIENTRY glEnable (GLenum cap)
 {
 	__GET_CONTEXT();
 
-	if(cap == GL_DEPTH_TEST)
-		gc->mState.mEnables |= GLSP_DEPTH_TEST;
+	// TODO: impl other options
+	switch (cap)
+	{
+		case GL_DEPTH_TEST:
+		{
+			gc->mState.mEnables |= GLSP_DEPTH_TEST;
+			break;
+		}
+		case GL_CULL_FACE:
+		{
+			gc->mState.mEnables |= GLSP_CULL_FACE;
+			break;
+		}
+		default:
+		{
+			GLSP_DPF(GLSP_DPF_LEVEL_ERROR, "unknown cap\n");
+		}
+	}
 }
 
 NS_OPEN_GLSP_OGL()
 
-static GLContext *sGC = nullptr;
+GLContext *g_GC = nullptr;
 
 static void setCurrentContext(void *gc)
 {
-	sGC = static_cast<GLContext *>(gc);
+	g_GC = static_cast<GLContext *>(gc);
 }
 
 GLContext* getCurrentContext()
 {
-	return sGC;
+	return g_GC;
 }
 
 void* CreateContext(void *EglCtx, int major, int minor)
@@ -92,7 +109,11 @@ void GLContext::initGC()
 {
 	applyViewport(0, 0, 0, 0);
 
-	mState.mEnables = 0;
+	mState.mEnables    = 0;
+
+	mRT.pColorBuffer   = nullptr;
+	mRT.pDepthBuffer   = nullptr;
+	mRT.pStencilBuffer = nullptr;
 }
 
 void GLContext::applyViewport(int x, int y, int width, int height)

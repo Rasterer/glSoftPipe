@@ -1,6 +1,8 @@
 #include "PrimitiveAssembler.h"
+
 #include "DataFlow.h"
 #include "DrawEngine.h"
+#include "MemoryPool.h"
 
 
 NS_OPEN_GLSP_OGL()
@@ -26,26 +28,28 @@ void PrimitiveAssembler::emit(void *data)
 // 2. Primitive owns vertex
 void PrimitiveAssembler::assemble(Batch *bat)
 {
+	vsInput_v    &in    = bat->mVertexCache;
 	vsOutput_v   &out   = bat->mVsOut;
 	IBuffer_v    &index = bat->mIndexBuf;
 	Primlist     &pl    = bat->mPrims;
 
 	assert(index.size() % 3 == 0);
-	pl.resize(index.size() / 3);
-	Primlist::iterator iter = pl.begin();
+
+	// Free the memory in Batch.mVertexCache to avoid large memory occupy
+	vsInput_v().swap(in);
 
 	for(auto it = index.begin(); it != index.end(); it += 3)
 	{
-		Primitive &tri = *iter;
+		Primitive *prim = new(MemoryPoolMT::get()) Primitive();
 
-		tri.mType		= Primitive::TRIANGLE;
-		tri.mVertNum	= 3;
-		tri.mVert[0]	= out[*(it + 0)];
-		tri.mVert[1]	= out[*(it + 1)];
-		tri.mVert[2]	= out[*(it + 2)];
-		tri.mDC         = bat->mDC;
+		prim->mType		= Primitive::TRIANGLE;
+		prim->mVertNum	= 3;
+		prim->mVert[0]	= out[*(it + 0)];
+		prim->mVert[1]	= out[*(it + 1)];
+		prim->mVert[2]	= out[*(it + 2)];
+		prim->mDC       = bat->mDC;
 
-		++iter;
+		pl.push_back(prim);
 	}
 
 	vsOutput_v().swap(out);

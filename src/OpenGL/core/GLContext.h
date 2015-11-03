@@ -9,6 +9,8 @@
 
 NS_OPEN_GLSP_OGL()
 
+extern GLContext *g_GC;
+
 #define __GET_CONTEXT()		\
 		::glsp::ogl::GLContext *gc = ::glsp::ogl::getCurrentContext();
 

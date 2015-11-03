@@ -11,4 +11,11 @@ PipeStage::PipeStage(const string &name, const DrawEngine& de):
 {
 }
 
+PipeStageChain::PipeStageChain(const std::string &name, const DrawEngine& de):
+	PipeStage(name, de),
+	mFirstChild(nullptr),
+	mLastChild(nullptr)
+{
+}
+
 NS_CLOSE_GLSP_OGL();

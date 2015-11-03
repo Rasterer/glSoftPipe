@@ -255,7 +255,7 @@ int main(int argc, char **argv)
 	GLint samplerLocation = glGetUniformLocation(prog, "mSampler");
 
 	float xbias = 10.0f;
-	mat4 scal  = glm::scale(mat4(1.0f), vec3(0.2f, 0.2f, 0.2f));
+	mat4 scal  = glm::scale(mat4(1.0f), vec3(0.3f, 0.3f, 0.3f));
 	mat4 trans = glm::translate(mat4(1.0f), vec3(0.0f, 0.0f, xbias));
 	mat4 view = glm::lookAt(vec3(15.0f, 10.0f, -10.0f),
 					   vec3(0.0f, 0.0f, 10.0f),

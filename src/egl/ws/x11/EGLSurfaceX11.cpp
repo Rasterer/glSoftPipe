@@ -65,6 +65,10 @@ bool EGLSurfaceX11::getBuffers(void **addr, int *width, int *height)
 											mXDrawable,
 											1,1,attachment);
 	reply = ::xcb_dri2_get_buffers_reply(c, cookie, NULL);
+
+	if (!reply)
+		return false;
+
 	buffers = ::xcb_dri2_get_buffers_buffers(reply);
 
 	*width  = mWidth  = reply->width;

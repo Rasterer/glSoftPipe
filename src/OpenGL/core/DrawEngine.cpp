@@ -1,5 +1,7 @@
 #include "DrawEngine.h"
 
+#include <cstdlib>
+
 #include "khronos/GL/glcorearb.h"
 #include "common/IEGLBridge.h"
 #include "GLContext.h"
@@ -10,6 +12,8 @@
 #include "FaceCuller.h"
 #include "PerspectiveDivider.h"
 #include "ScreenMapper.h"
+#include "TBDR.h"
+#include "PixelBackend.h"
 #include "ThreadPool.h"
 
 using glsp::ogl::DrawEngine;
@@ -84,44 +88,20 @@ bool swapBuffers()
 
 } //namespace
 
-class GeometryFinalStageForMultithreading: public PipeStage
+class GeometryStage: public PipeStageChain
 {
 public:
-	GeometryFinalStageForMultithreading():
-		PipeStage("GeometryFinalStageForMultithreading", DrawEngine::getDrawEngine())
-	{
-	}
-	~GeometryFinalStageForMultithreading() = default;
-
-	virtual void emit(void *data);
-	virtual void finalize() { }
-};
-
-void GeometryFinalStageForMultithreading::emit(void *data)
-{
-	DrawEngine &de = DrawEngine::getDrawEngine();
-	Batch *bat = static_cast<Batch *>(data);
-
-	de.mFifoLock.lock();
-	de.mOrderUnpreservedPrimList.splice(
-		de.mOrderUnpreservedPrimList.end(), bat->mPrims);
-	de.mFifoLock.unlock();
-}
-
-class GeometryStageWrapper: public PipeStage
-{
-public:
-	GeometryStageWrapper():
-		PipeStage("GeometryStageWrapper", DrawEngine::getDrawEngine())
+	GeometryStage():
+		PipeStageChain("GeometryStage", DrawEngine::getDrawEngine())
 	{
 	}
 
-	~GeometryStageWrapper() = default;
+	~GeometryStage() = default;
 
 	virtual void emit(void *data)
 	{
 		DrawContext *dc = static_cast<DrawContext *>(data);
-		m_pSubStages->emit(dc);
+		mFirstChild->emit(dc);
 
 		// Wait for all the geometry tasks done.
 		::glsp::ThreadPool::get().waitForAllTaskDone();
@@ -131,14 +111,26 @@ public:
 		//getNextStage()->emit(dc);
 	}
 
-	virtual void finalize() { }
+private:
+};
 
-	PipeStage* getFinalSubStage() { return &mFinalSubStage; }
-	void setFirstSubStage(PipeStage *child) { m_pSubStages = child; }
+class RasterizationStage: public PipeStageChain
+{
+public:
+	RasterizationStage():
+		PipeStageChain("RasterizationStage", DrawEngine::getDrawEngine())
+	{
+	}
+
+	~RasterizationStage() = default;
+
+	virtual void emit(void *data)
+	{
+		DrawContext *dc = static_cast<DrawContext *>(data);
+		mFirstChild->emit(dc);
+	}
 
 private:
-	PipeStage *m_pSubStages;
-	GeometryFinalStageForMultithreading  mFinalSubStage;
 };
 
 DrawEngine::DrawEngine():
@@ -157,6 +149,17 @@ DrawEngine::~DrawEngine()
 	delete mDivider;
 	delete mMapper;
 	delete mCuller;
+	delete mBinning;
+	delete mRasterizer;
+	delete mInterpolater;
+	delete mOwnershipTest;
+	delete mScissorTest;
+	delete mStencilTest;
+	delete mDepthTest;
+	delete mBlender;
+	delete mDither;
+	delete mFBWriter;
+
 	delete mRast;
 	delete mGeometry;
 }
@@ -176,9 +179,7 @@ void DrawEngine::init(void *dpy, IEGLBridge *bridge)
 
 	mpBridge = bridge;
 
-	::glsp::ThreadPool &threadPool = ::glsp::ThreadPool::get();
-
-	threadPool.Initialize();
+	::glsp::ThreadPool::get();
 
 	initPipeline();
 }
@@ -191,32 +192,39 @@ void DrawEngine::initPipeline()
 	mDivider       = new PerspectiveDivider();
 	mMapper        = new ScreenMapper();
 	mCuller        = new FaceCuller();
-	mRast          = new RasterizerWrapper();
-	mGeometry      = new GeometryStageWrapper();
+	mBinning       = new Binning();
+	mRasterizer    = new TBDR();
 
-	assert(mVertexFetcher &&
-		   mPrimAsbl      &&
-		   mClipper       &&
-		   mDivider       &&
-		   mMapper        &&
-		   mCuller        &&
-		   mRast);
+	mInterpolater  = new PerspectiveCorrectInterpolater();
+	mOwnershipTest = new OwnershipTester();
+	mScissorTest   = new ScissorTester();
+	mStencilTest   = new StencilTester();
+	mDepthTest     = new ZTester();
+	mBlender       = new Blender();
+	mDither        = new Dither();
+	mFBWriter      = new FBWriter();
+
+	mGeometry      = new GeometryStage();
+	mRast          = new RasterizationStage();
 
 	setFirstStage(mGeometry);
 
-	mGeometry->setNextStage(mRast);
 	mPrimAsbl->setNextStage(mClipper);
 	mClipper ->setNextStage(mDivider);
 	mDivider ->setNextStage(mMapper);
 
-	mGeometry->setFirstSubStage(mVertexFetcher);
-	mRast->initPipeline();
+	mGeometry->setFirstChild(mVertexFetcher);
+	mGeometry->setLastChild(mBinning);
+	mGeometry->setNextStage(mRast);
+
+	mRast->setFirstChild(mRasterizer);
 }
 
 void DrawEngine::linkPipeStages(GLContext *gc)
 {
 	int enables = gc->mState.mEnables;
 	VertexShader *pVS = gc->mPM.getCurrentProgram()->getVS();
+	FragmentShader *pFS = gc->mPM.getCurrentProgram()->getFS();
 
 	mVertexFetcher->setNextStage(pVS);
 	pVS->setNextStage(mPrimAsbl);
@@ -224,14 +232,55 @@ void DrawEngine::linkPipeStages(GLContext *gc)
 	if(enables & GLSP_CULL_FACE)
 	{
 		mMapper->setNextStage(mCuller);
-		mCuller->setNextStage(mGeometry->getFinalSubStage());
+		mCuller->setNextStage(mBinning);
 	}
 	else
 	{
-		mMapper->setNextStage(mGeometry->getFinalSubStage());
+		mMapper->setNextStage(mBinning);
 	}
 
-	mRast->linkPipeStages(gc);
+	PipeStage *last = NULL;
+
+	if(enables & GLSP_DEPTH_TEST)
+	{
+		// enable early Z
+		if(!pFS->getDiscardFlag() &&
+			!(enables & GLSP_SCISSOR_TEST) &&
+			!(enables & GLSP_STENCIL_TEST))
+		{
+			mRasterizer ->setNextStage(mDepthTest);
+			mDepthTest  ->setNextStage(mInterpolater);
+			last = mInterpolater->setNextStage(pFS);
+		}
+		else
+		{
+			mRasterizer  ->setNextStage(mInterpolater);
+			mInterpolater->setNextStage(pFS);
+
+			if(enables & GLSP_SCISSOR_TEST)
+				last = pFS->setNextStage(mScissorTest);
+
+			if((enables & GL_STENCIL_TEST))
+				last = last->setNextStage(mStencilTest);
+
+			last = last->setNextStage(mDepthTest);
+		}
+	}
+	else
+	{
+		mRasterizer ->setNextStage(mInterpolater);
+		last = mInterpolater->setNextStage(pFS);
+	}
+
+	if(enables & GLSP_BLEND)
+	{
+		last = last->setNextStage(mBlender);
+	}
+
+	if(enables & GLSP_DITHER)
+		last = last->setNextStage(mDither);
+
+	last = last->setNextStage(mFBWriter);
 }
 
 // OPT: use dirty flag to optimize
@@ -283,7 +332,8 @@ void DrawEngine::beginFrame(GLContext *gc)
 						     &rt.width,
 						     &rt.height))
 	{
-		return;
+		GLSP_DPF(GLSP_DPF_LEVEL_ERROR, "%s: cannot get buffers from x server\n", __func__);
+		std::exit(EXIT_FAILURE);
 	}
 
 	// window resize, reset the viewport
@@ -345,15 +395,11 @@ bool DrawEngine::SwapBuffers()
 		delete tmp;
 	}
 	mDrawContextList = NULL;
-	mOrderUnpreservedPrimList.clear();
 
 	__GET_CONTEXT();
 
 	gc->mbInFrame = false;
-
-	//free(gc->mRT.pDepthBuffer);
-	//gc->mRT.pDepthBuffer = NULL;
-	gc->mRT.pColorBuffer = NULL;
+	gc->mRT.pColorBuffer   = NULL;
 	gc->mRT.pStencilBuffer = NULL;
 
 	return true;

@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "GLContext.h"
+#include "TBDR.h"
 
 
 using glsp::ogl::GLContext;
@@ -310,9 +311,10 @@ TextureTarget TargetToIndex(unsigned target)
 float ComputeLambda(const Shader *pShader, const vec2 &coord, int texW, int texH)
 {
 	const Fsio &fsio = *static_cast<Fsio *>(pShader->getPrivateData());
-	const fsInput &start = *static_cast<fsInput *>(fsio.m_priv);
-	const fsInput &derivativeX = fsio.mpGrad->mGradiencesX;
-	const fsInput &derivativeY = fsio.mpGrad->mGradiencesY;
+	const Triangle *tri = static_cast<Triangle *>(fsio.m_priv0);
+	const fsInput &base = tri->mVert[0].mAttrReciprocal;
+	const fsInput &derivativeX = tri->mGradientX;
+	const fsInput &derivativeY = tri->mGradientY;
 #if 0
 	int texCoordLoc = pShader->GetTextureCoordLocation();
 
@@ -331,24 +333,22 @@ float ComputeLambda(const Shader *pShader, const vec2 &coord, int texW, int texH
 #else
 	// Refer to:
 	// http://www.gamasutra.com/view/feature/3301/runtime_mipmap_filtering.php?print=1
-	const Gradience *pGrad = fsio.mpGrad;
+	const float stepx = fsio.x + 0.5f - base[0].x;
+	const float stepy = fsio.y + 0.5f - base[0].y;
 
-	const float stepx = fsio.x + 0.5f - start[0].x;
-	const float stepy = fsio.y + 0.5f - start[0].y;
-
-	float Z = derivativeX[0].w * stepx + derivativeY[0].w * stepy + start[0].w;
+	float Z = derivativeX[0].w * stepx + derivativeY[0].w * stepy + base[0].w;
 	Z = Z * Z; Z = Z * Z; // Z = pow(Z, 4)
 
-	float ux = pGrad->c + pGrad->a * stepy;
+	float ux = tri->c + tri->a * stepy;
 	ux = ux * ux;
 
-	float vx = pGrad->d + pGrad->b * stepy;
+	float vx = tri->d + tri->b * stepy;
 	vx = vx * vx;
 
-	float uy = pGrad->e - pGrad->a * stepx;
+	float uy = tri->e - tri->a * stepx;
 	uy = uy * uy;
 
-	float vy = pGrad->f - pGrad->b * stepx;
+	float vy = tri->f - tri->b * stepx;
 	vy = vy * vy;
 
 	texW = texW * texW;

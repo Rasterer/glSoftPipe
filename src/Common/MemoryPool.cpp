@@ -1,8 +1,10 @@
 #include "MemoryPool.h"
 
+#include <algorithm>
 #include <cstring>
 #include <mutex>
-#include <common/glsp_debug.h>
+#include <vector>
+#include "common/glsp_debug.h"
 
 
 namespace glsp {
@@ -11,23 +13,23 @@ namespace glsp {
  * Larger means less spinlock operations,
  * but may also waste more memory at the same time.
  */
-#define FREE_TO_GLOBAL_CACHE_THRESHHOLD 256
+#define FREE_TO_GLOBAL_CACHE_THRESHHOLD 64
 
 
-struct RegisterPool::MemBlock
+struct MemoryPoolMT::MemBlock
 {
 	void 	 *mData;
 	void 	 *mCurrent;
 	MemBlock *mNext;
 };
 
-struct RegisterPool::FreeListNode
+struct MemoryPoolMT::FreeListNode
 {
 	FreeListNode *mNext;
 	FreeListNode *mNextBatch;
 };
 
-struct RegisterPool::ThreadMetaData
+struct MemoryPoolMT::ThreadMetaData
 {
 	MemBlock         *mBlocks[kBlockNum];
 	FreeListNode     *mFreeLists[kBlockNum];
@@ -35,22 +37,24 @@ struct RegisterPool::ThreadMetaData
 };
 
 
-constexpr size_t RegisterPool::kUnitSizes[4];
+constexpr int    MemoryPoolMT::kBlockSize[MemoryPoolMT::kBlockNum];
+constexpr size_t MemoryPoolMT::kUnitSizes[MemoryPoolMT::kBlockNum];
 
 // Use "__thread" instead of "thread_local" due to performance concern.
-static __thread RegisterPool::ThreadMetaData sThreadMetaData;
-
+static __thread MemoryPoolMT::ThreadMetaData s_ThreadMetaData;
+static std::vector<MemoryPoolMT::ThreadMetaData *> s_TMDList;
+static SpinLock s_TMDListLock;
 
 
 static void ByeTMD(void)
 {
-	for(int i = 0; i < 4; ++i)
+	for(int i = 0; i < MemoryPoolMT::kBlockNum; ++i)
 	{
-		RegisterPool::MemBlock *pBlock = sThreadMetaData.mBlocks[i];
+		MemoryPoolMT::MemBlock *pBlock = s_ThreadMetaData.mBlocks[i];
 
 		while (pBlock)
 		{
-			RegisterPool::MemBlock *prev = pBlock;
+			MemoryPoolMT::MemBlock *prev = pBlock;
 			free(pBlock->mData);
 			GLSP_DPF(GLSP_DPF_LEVEL_DEBUG, "free register block for idx %d\n", i);
 
@@ -60,13 +64,13 @@ static void ByeTMD(void)
 	}
 }
 
-RegisterPool::RegisterPool():
-	mGlobalCache(nullptr)
+MemoryPoolMT::MemoryPoolMT()
 {
+	std::memset(mGlobalCache, 0, sizeof(mGlobalCache));
 	atexit(ByeTMD);
 }
 
-void* RegisterPool::allocate(const size_t size)
+void* MemoryPoolMT::allocate(const size_t size)
 {
 	// No more than 16 attributes.
 	assert(size <= 16 * 4 * 4);
@@ -80,10 +84,10 @@ void* RegisterPool::allocate(const size_t size)
 		if(size <= kUnitSizes[idx])
 			break;
 	}
-	sThreadMetaData.mAllocCounter[idx]++;
+	s_ThreadMetaData.mAllocCounter[idx]++;
 
-	MemBlock* &pBlock = sThreadMetaData.mBlocks[idx];
-	FreeListNode* &fl = sThreadMetaData.mFreeLists[idx];
+	MemBlock* &pBlock = s_ThreadMetaData.mBlocks[idx];
+	FreeListNode* &fl = s_ThreadMetaData.mFreeLists[idx];
 
 	if (fl)
 	{
@@ -91,46 +95,60 @@ void* RegisterPool::allocate(const size_t size)
 		fl = ((FreeListNode *)ptr)->mNext;
 		return ptr;
 	}
-	else if (pBlock && (uintptr_t)pBlock->mCurrent < (uintptr_t)pBlock->mData + kBlockSize)
+
+	MemBlock *blk = pBlock;
+	while (blk)
 	{
-		ptr = pBlock->mCurrent;
-		pBlock->mCurrent = (void *)((uintptr_t)pBlock->mCurrent + kUnitSizes[idx]);
-		return ptr;
+		if (blk && (uintptr_t)blk->mCurrent < (uintptr_t)blk->mData + kBlockSize[idx])
+		{
+			ptr = blk->mCurrent;
+			blk->mCurrent = (void *)((uintptr_t)blk->mCurrent + kUnitSizes[idx]);
+			return ptr;
+		}
+		blk = blk->mNext;
 	}
-	else if (!pBlock)
+
+	if (!pBlock)
 	{
+		auto it = std::find(s_TMDList.begin(), s_TMDList.end(), &s_ThreadMetaData);
+		if (it == s_TMDList.end())
+		{
+			std::unique_lock<SpinLock> lk(s_TMDListLock);
+			s_TMDList.push_back(&s_ThreadMetaData);
+		}
+
 		goto new_block;
 	}
 
 	{
-		std::unique_lock<SpinLock> lk(mPoolLock);
-		if (mGlobalCache)
+		std::unique_lock<SpinLock> lk(mPoolLock[idx]);
+		if (mGlobalCache[idx])
 		{
-			ptr = mGlobalCache;
-			mGlobalCache = mGlobalCache->mNextBatch;
+			ptr = mGlobalCache[idx];
+			mGlobalCache[idx] = mGlobalCache[idx]->mNextBatch;
 
 			lk.unlock();
 			fl = ((FreeListNode *)ptr)->mNext;
-			sThreadMetaData.mAllocCounter[idx] -= FREE_TO_GLOBAL_CACHE_THRESHHOLD;
+			s_ThreadMetaData.mAllocCounter[idx] -= FREE_TO_GLOBAL_CACHE_THRESHHOLD;
 			return ptr;
 		}
 	}
 
 new_block:
 	MemBlock *pNewBlock = (MemBlock *)malloc(sizeof(MemBlock));
-	pNewBlock->mData = malloc(kBlockSize);
+	pNewBlock->mData    = malloc(kBlockSize[idx]);
 	assert(pNewBlock->mData);
 
 	GLSP_DPF(GLSP_DPF_LEVEL_DEBUG, "allocate register block for idx %d\n", idx);
 
 	pNewBlock->mCurrent = (void *)((uintptr_t)pNewBlock->mData + kUnitSizes[idx]);
-	pNewBlock->mNext = pBlock;
-	pBlock = pNewBlock;
+	pNewBlock->mNext    = pBlock;
+	pBlock              = pNewBlock;
 
 	return pNewBlock->mData;
 }
 
-void RegisterPool::deallocate(void * const p, const size_t size)
+void MemoryPoolMT::deallocate(void * const p, const size_t size)
 {
 	// No more than 16 attributes.
 	assert(size <= 16 * 4 * 4);
@@ -144,22 +162,47 @@ void RegisterPool::deallocate(void * const p, const size_t size)
 			break;
 	}
 
-	((FreeListNode *const)(p))->mNext = sThreadMetaData.mFreeLists[idx];
+	((FreeListNode *const)(p))->mNext = s_ThreadMetaData.mFreeLists[idx];
 
-	if((--sThreadMetaData.mAllocCounter[idx]) > (-FREE_TO_GLOBAL_CACHE_THRESHHOLD))
+	if((--s_ThreadMetaData.mAllocCounter[idx]) > (-FREE_TO_GLOBAL_CACHE_THRESHHOLD))
 	{
-		sThreadMetaData.mFreeLists[idx] = (FreeListNode *)p;
+		s_ThreadMetaData.mFreeLists[idx] = (FreeListNode *)p;
 	}
 	else
 	{
 		{
-			std::lock_guard<SpinLock> lk(mPoolLock);
-			((FreeListNode *const)(p))->mNextBatch = mGlobalCache;
-			mGlobalCache = (FreeListNode *)p;
+			std::lock_guard<SpinLock> lk(mPoolLock[idx]);
+			((FreeListNode *const)(p))->mNextBatch = mGlobalCache[idx];
+			mGlobalCache[idx] = (FreeListNode *)p;
 		}
-		sThreadMetaData.mFreeLists[idx] = nullptr;
-		sThreadMetaData.mAllocCounter[idx] = 0;
+		s_ThreadMetaData.mFreeLists[idx]    = nullptr;
+		s_ThreadMetaData.mAllocCounter[idx] = 0;
 	}
 }
 
+void MemoryPoolMT::BoostReclaimAll()
+{
+	for (ThreadMetaData *tmd: s_TMDList)
+	{
+		for(int i = 0; i < kBlockNum; ++i)
+		{
+			MemBlock *pBlock = tmd->mBlocks[i];
+			while (pBlock)
+			{
+				pBlock->mCurrent = pBlock->mData;
+				pBlock           = pBlock->mNext;
+			}
+
+			tmd->mFreeLists[i]    = nullptr;
+			tmd->mAllocCounter[i] = 0;
+		}
+	}
+	std::memset(mGlobalCache, 0, sizeof(mGlobalCache));
+}
+
 } // namespace glsp
+
+void* operator new(const size_t size, ::glsp::MemoryPoolMT &pool)
+{
+	return pool.allocate(size);
+}

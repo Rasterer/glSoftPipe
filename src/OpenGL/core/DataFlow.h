@@ -2,9 +2,8 @@
 
 #include <list>
 #include <vector>
-#include <utility>
 #include <glm/glm.hpp>
-#include <common/glsp_defs.h>
+#include "common/glsp_defs.h"
 #include "MemoryPool.h"
 
 
@@ -25,7 +24,7 @@ public:
 	// Move semantics
 	ShaderRegisterFile(ShaderRegisterFile &&rhs)
 	{
-		mRegs.swap(rhs.getRegArray());
+		mRegs.swap(rhs.mRegs);
 	}
 	ShaderRegisterFile& operator=(ShaderRegisterFile &&rhs)
 	{
@@ -37,6 +36,7 @@ public:
 	{
 		mRegs.resize(n);
 	}
+
 	glm::vec4& getReg(int location)
 	{
 		assert(location < (int)mRegs.size());
@@ -56,18 +56,18 @@ public:
 	{
 		return mRegs;
 	}
+
 	// glPosition and FragColor are both in the first location,
 	// which can be treat as a union.
 	glm::vec4& position()
 	{
 		return mRegs[0];
 	}
-	glm::vec4& fragcolor()
+	const glm::vec4& position() const
 	{
 		return mRegs[0];
 	}
-
-	const glm::vec4& position() const
+	glm::vec4& fragcolor()
 	{
 		return mRegs[0];
 	}
@@ -129,7 +129,6 @@ typedef ShaderRegisterFile vsOutput;
 typedef ShaderRegisterFile fsInput;
 typedef ShaderRegisterFile fsOutput;
 
-
 // TODO: add operator =
 struct Primitive
 {
@@ -163,7 +162,7 @@ struct Primitive
 
 typedef std::vector<int> IBuffer_v;
 typedef std::vector<vsInput> vsInput_v;
-typedef std::list<Primitive> Primlist;
+typedef std::list<Primitive *> Primlist;
 typedef std::vector<vsOutput> vsOutput_v;
 
 
@@ -237,13 +236,11 @@ public:
 	fsInput in;
 	fsOutput out;
 
-	const Gradience *mpGrad;
-
 	int 	x, y;
 	float 	z;
 	int 	mIndex; // used to lookup the color/depth/stencil buffers
 
-	void *m_priv;
+	void *m_priv0;
 };
 
 NS_CLOSE_GLSP_OGL()

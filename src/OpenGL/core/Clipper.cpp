@@ -1,6 +1,10 @@
 #include "Clipper.h"
+
+#include <utility>
+
 #include "DataFlow.h"
 #include "DrawEngine.h"
+#include "MemoryPool.h"
 #include "utils.h"
 
 
@@ -36,7 +40,7 @@ void Clipper::clipping(Batch *bat)
 	Primlist &pl = bat->mPrims;
 	vsOutput tmp[ARRAY_SIZE(mPlanes) * 4];
 
-	for(auto it = pl.begin(); it != pl.end(); it++)
+	for (Primitive *prim: pl)
 	{
 		// Two round robin intermediate boxes
 		// One src, one dst
@@ -47,16 +51,16 @@ void Clipper::clipping(Batch *bat)
 		int src = 0, dst = 1;
 		int tmpnr = 0;
 
-		assert(it->mType == Primitive::TRIANGLE);
+		assert(prim->mType == Primitive::TRIANGLE);
 
-		rr[src][0] = &(it->mVert[0]);
-		rr[src][1] = &(it->mVert[1]);
-		rr[src][2] = &(it->mVert[2]);
+		rr[src][0] = &(prim->mVert[0]);
+		rr[src][1] = &(prim->mVert[1]);
+		rr[src][2] = &(prim->mVert[2]);
 
 		vertNum[src] = 3;
 		vertNum[dst] = 0;
 
-		for(size_t i = 0; i < ARRAY_SIZE(mPlanes); i++)
+		for (size_t i = 0; i < ARRAY_SIZE(mPlanes); i++)
 		{
 			if(vertNum[src] > 0)
 				dist[0] = dot(rr[src][0]->position(), mPlanes[i]);
@@ -107,22 +111,29 @@ void Clipper::clipping(Batch *bat)
 		assert(vertNum[src] >= 3 && vertNum[src] <= 7);
 
 		// Triangulation
-		for(int i = 1; i < vertNum[src] - 1; i++)
+		// OPT: no clip case can be OPT
+		for (int i = 1; i < vertNum[src] - 1; i++)
 		{
-			Primitive prim;
+			Primitive *new_prim = new(MemoryPoolMT::get()) Primitive();
 
-			prim.mType    = Primitive::TRIANGLE;
-			prim.mVertNum = 3;
-			prim.mVert[0] = *rr[src][0];
-			prim.mVert[1] = *rr[src][i];
-			prim.mVert[2] = *rr[src][i+1];
-			prim.mDC      = bat->mDC;
+			new_prim->mType    = Primitive::TRIANGLE;
+			new_prim->mVertNum = 3;
+			new_prim->mVert[0] = *rr[src][0];
+			new_prim->mVert[1] = *rr[src][i];
+			new_prim->mVert[2] = *rr[src][i+1];
+			new_prim->mDC      = bat->mDC;
 
-			out.push_back(std::move(prim));
+			out.push_back(new_prim);
 		}
 	}
 
 	pl.swap(out);
+
+	for (Primitive *prim: out)
+	{
+		prim->~Primitive();
+		MemoryPoolMT::get().deallocate(prim, sizeof(Primitive));
+	}
 }
 
 // vertex linear interpolation

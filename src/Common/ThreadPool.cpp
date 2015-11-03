@@ -12,7 +12,7 @@
 namespace glsp {
 
 static std::atomic_int sID(0);
-__thread int g_TlsId = 0;
+static __thread int s_TlsId = 0;
 
 ThreadPool::ThreadPool():
 	mDoneWorks(0),
@@ -22,6 +22,20 @@ ThreadPool::ThreadPool():
 	bInitialzed(false),
 	bIsFinalizing(false)
 {
+	int n;
+
+	n = std::thread::hardware_concurrency();
+
+#ifdef __linux__
+	if(!n)
+		n = sysconf(_SC_NPROCESSORS_ONLN);
+#endif
+
+	s_TlsId = n;
+	mThreadsNum = n;
+	mThreads = new std::thread[n];
+
+	Initialize();
 }
 
 ThreadPool::~ThreadPool()
@@ -53,29 +67,9 @@ ThreadPool::~ThreadPool()
 
 bool ThreadPool::Initialize()
 {
-	int n;
-	bool ret = true;
-
-	n = std::thread::hardware_concurrency();
-
-#ifdef __linux__
-	if(!n)
-		n = sysconf(_SC_NPROCESSORS_ONLN);
-#endif
-
-	if(!n)
-	{
-		bInitialzed = ret = false;
-		return ret;
-	}
-
-	g_TlsId = -1;
-	mThreadsNum = n;
-	mThreads = new std::thread[n];
-
 	auto workerThread = [this]
 	{
-		g_TlsId = sID.fetch_add(1);
+		s_TlsId = sID.fetch_add(1);
 		while(true)
 		{
 			std::unique_lock<SpinLock> lk(mQueueLock);
@@ -108,10 +102,10 @@ bool ThreadPool::Initialize()
 		}
 	};
 
-	for(int i = 0; i < n; ++i)
+	for(int i = 0; i < mThreadsNum; ++i)
 		mThreads[i] = std::thread(workerThread);
 
-	return bInitialzed = ret;
+	return true;
 }
 
 WorkItem* ThreadPool::CreateWork(const WorkItem::callback_t &work, void *data)
@@ -152,9 +146,9 @@ bool ThreadPool::AddWork(WorkItem *work)
 	return true;
 }
 
-int ThreadPool::getThreadID() const
+int ThreadPool::getThreadID()
 {
-	return g_TlsId;
+	return s_TlsId;
 }
 
 } // namespace glsp
