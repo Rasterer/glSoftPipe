@@ -56,11 +56,7 @@ public:
 	 * This method should be called only after all producer threads
 	 * have dispatched all pending tasks.
 	 */
-	void waitForAllTaskDone() const
-	{
-		while(!mWorkQueue.empty() || mRunningWorks)
-			std::this_thread::yield();
-	}
+	void waitForAllTaskDone();
 
 protected:
 	ThreadPool();
@@ -81,6 +77,7 @@ private:
 	// TODO (Done): replace mutex with spinlock
 	SpinLock					mQueueLock;
 	std::condition_variable_any	mWorkQueuedCond;
+	std::condition_variable_any	mAllTaskDoneCond;
 
 	int				mThreadsNum;
 	std::thread    *mThreads;

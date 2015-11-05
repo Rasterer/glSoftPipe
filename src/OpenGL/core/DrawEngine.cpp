@@ -179,8 +179,6 @@ void DrawEngine::init(void *dpy, IEGLBridge *bridge)
 
 	mpBridge = bridge;
 
-	::glsp::ThreadPool::get();
-
 	initPipeline();
 }
 

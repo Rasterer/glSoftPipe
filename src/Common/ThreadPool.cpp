@@ -27,7 +27,7 @@ ThreadPool::ThreadPool():
 	n = std::thread::hardware_concurrency();
 
 #ifdef __linux__
-	if(!n)
+	if (!n)
 		n = sysconf(_SC_NPROCESSORS_ONLN);
 #endif
 
@@ -50,14 +50,14 @@ ThreadPool::~ThreadPool()
 
 	mWorkQueuedCond.notify_all();
 
-	for(int i = 0; i < mThreadsNum; ++i)
+	for (int i = 0; i < mThreadsNum; ++i)
 	{
 		mThreads[i].join();
 	}
 
 	delete []mThreads;
 
-	while(!mWorkPool.empty())
+	while (!mWorkPool.empty())
 	{
 		WorkItem *pWork = mWorkPool.top();
 		mWorkPool.pop();
@@ -70,20 +70,20 @@ bool ThreadPool::Initialize()
 	auto workerThread = [this]
 	{
 		s_TlsId = sID.fetch_add(1);
-		while(true)
+		while (true)
 		{
 			std::unique_lock<SpinLock> lk(mQueueLock);
 	
-			if(mWorkQueue.empty())
+			if (mWorkQueue.empty())
 			{
 				mWorkQueuedCond.wait(lk);
 			}
 
 			// This thread may be wake up by terminate signal.
-			if(bIsFinalizing)
+			if (bIsFinalizing)
 				break;
 
-			if(mWorkQueue.empty())
+			if (mWorkQueue.empty())
 				continue;
 
 			mRunningWorks++;
@@ -95,14 +95,17 @@ bool ThreadPool::Initialize()
 			pWork->mCallback(pWork->mData);
 
 			lk.lock();
-			mRunningWorks--;
 			mDoneWorks++;
-			assert(mRunningWorks >= 0 && mRunningWorks <= (uint32_t)mThreadsNum);
+			assert(mRunningWorks > 0 && mRunningWorks <= (uint32_t)mThreadsNum);
+
+			if (--mRunningWorks == 0 && mWorkQueue.empty())
+				mAllTaskDoneCond.notify_one();
+
 			mWorkPool.push(pWork);
 		}
 	};
 
-	for(int i = 0; i < mThreadsNum; ++i)
+	for (int i = 0; i < mThreadsNum; ++i)
 		mThreads[i] = std::thread(workerThread);
 
 	return true;
@@ -112,12 +115,12 @@ WorkItem* ThreadPool::CreateWork(const WorkItem::callback_t &work, void *data)
 {
 	std::lock_guard<SpinLock> lk(mQueueLock);
 
-	if(bIsFinalizing)
+	if (bIsFinalizing)
 		return NULL;
 
 	WorkItem *pWork;
 
-	if(mWorkPool.empty())
+	if (mWorkPool.empty())
 	{
 		pWork = new WorkItem;
 	}
@@ -136,7 +139,7 @@ bool ThreadPool::AddWork(WorkItem *work)
 {
 	std::lock_guard<SpinLock> lk(mQueueLock);
 
-	if(bIsFinalizing || !work)
+	if (bIsFinalizing || !work)
 		return false;
 
 	mWorkQueue.push_back(work);
@@ -144,6 +147,14 @@ bool ThreadPool::AddWork(WorkItem *work)
 	mWorkQueuedCond.notify_one();
 
 	return true;
+}
+
+void ThreadPool::waitForAllTaskDone()
+{
+	std::unique_lock<SpinLock> lk(mQueueLock);
+
+	while (!mWorkQueue.empty() || mRunningWorks)
+		mAllTaskDoneCond.wait(lk);
 }
 
 int ThreadPool::getThreadID()
