@@ -19,12 +19,6 @@ static std::vector<Triangle *> s_FullCoverDispList[MAX_TILES_IN_HEIGHT][MAX_TILE
 static ::glsp::SpinLock s_DispListLock;
 static ::glsp::SpinLock s_FullCoverDispListLock;
 
-typedef Triangle  *PixelPrimMap[MACRO_TILE_SIZE][MACRO_TILE_SIZE];
-typedef float           ZBuffer[MACRO_TILE_SIZE][MACRO_TILE_SIZE];
-
-static PixelPrimMap s_PixelPrimMap[8];
-static ZBuffer           s_ZBuffer[8];
-
 
 Binning::Binning():
 	PipeStage("Binning", DrawEngine::getDrawEngine())
@@ -358,6 +352,18 @@ Triangle::Triangle(Primitive &prim):
 TBDR::TBDR():
 	Rasterizer()
 {
+	const int thread_number = ThreadPool::get().getThreadsNumber();
+
+	mPixelPrimMap = (PixelPrimMap *)malloc(sizeof(PixelPrimMap) * thread_number);
+	mZBuffer      = (ZBuffer      *)malloc(sizeof(ZBuffer     ) * thread_number);
+
+	assert(mPixelPrimMap && mZBuffer);
+}
+
+TBDR::~TBDR()
+{
+	free(mZBuffer);
+	free(mPixelPrimMap);
 }
 
 void TBDR::onRasterizing(DrawContext *dc)
@@ -386,8 +392,8 @@ void TBDR::onRasterizing(DrawContext *dc)
 
 void TBDR::ProcessMacroTile(int x, int y)
 {
-	PixelPrimMap &pp_map = s_PixelPrimMap[ThreadPool::getThreadID()];
-	ZBuffer      &z_buf  = s_ZBuffer     [ThreadPool::getThreadID()];
+	PixelPrimMap &pp_map = mPixelPrimMap[ThreadPool::getThreadID()];
+	ZBuffer      &z_buf  = mZBuffer     [ThreadPool::getThreadID()];
 
 	std::vector<Triangle *> &disp_list      = s_DispList[y][x];
 	std::vector<Triangle *> &full_disp_list = s_FullCoverDispList[y][x];

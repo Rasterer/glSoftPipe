@@ -86,14 +86,20 @@ class TBDR: public Rasterizer
 {
 public:
 	TBDR();
-	~TBDR() = default;
+	~TBDR();
 
 	virtual void finalize();
 
 private:
+	typedef Triangle  *PixelPrimMap[MACRO_TILE_SIZE][MACRO_TILE_SIZE];
+	typedef float           ZBuffer[MACRO_TILE_SIZE][MACRO_TILE_SIZE];
+
 	virtual void onRasterizing(DrawContext *dc);
 	void ProcessMacroTile(int x, int y);
 	void RenderOnePixel(Triangle *tri, int x, int y, float z);
+
+	PixelPrimMap  *mPixelPrimMap;
+	ZBuffer       *mZBuffer;
 };
 
 class PerspectiveCorrectInterpolater: public Interpolater
