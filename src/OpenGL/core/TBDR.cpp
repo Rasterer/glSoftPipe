@@ -49,12 +49,10 @@ void Binning::onBinning(Batch *bat)
 		{
 			for (int x = xmin; x <= tri->xmax; x += MACRO_TILE_SIZE)
 			{
-				// FIXME: need consider the conversion from pixel coords to fixed-point coords
-				// But so far, looks OK.
-				const int xleft   = x << FIXED_POINT4_SHIFT;
-				const int ybottom = y << FIXED_POINT4_SHIFT;
-				const int xright  = (x + MACRO_TILE_SIZE - 1) << FIXED_POINT4_SHIFT;
-				const int ytop    = (y + MACRO_TILE_SIZE - 1) << FIXED_POINT4_SHIFT;
+				const int & xleft   = x;
+				const int & ybottom = y;
+				const int & xright  = x + MACRO_TILE_SIZE - 1;
+				const int & ytop    = y + MACRO_TILE_SIZE - 1;
 
 				const int left_bottom_v0  = tri->mVert[0].mFactorA * xleft  + tri->mVert[0].mFactorB * ybottom + tri->mVert[0].mFactorC;
 				const int left_top_v0     = tri->mVert[0].mFactorA * xleft  + tri->mVert[0].mFactorB * ytop    + tri->mVert[0].mFactorC;
@@ -199,6 +197,7 @@ Triangle::Triangle(Primitive &prim):
 	vsOutput *v1;
 	vsOutput *v2;
 
+	// Always make (v0,v1,v2) counter-closewise
 	if (prim.mAreaReciprocal > 0.0f)
 	{
 		v0 = &prim.mVert[0];
@@ -212,6 +211,10 @@ Triangle::Triangle(Primitive &prim):
 		v2 = &prim.mVert[0];
 	}
 
+	/* Fixed point rasterization algorithm
+	 * 4bit subpixel grid precision.
+	 * TODO: Need guard-band to avoid integer overflow.
+	 */
 	const int x0 = fixedpoint_cast<FIXED_POINT4>(v0->position().x);
 	const int y0 = fixedpoint_cast<FIXED_POINT4>(v0->position().y);
 
@@ -221,14 +224,70 @@ Triangle::Triangle(Primitive &prim):
 	const int x2 = fixedpoint_cast<FIXED_POINT4>(v2->position().x);
 	const int y2 = fixedpoint_cast<FIXED_POINT4>(v2->position().y);
 
+	const int x1x0 = x1 - x0;
+	const int x2x1 = x2 - x1;
+	const int x0x2 = x0 - x2;
+
+	const int y0y1 = y0 - y1;
+	const int y1y2 = y1 - y2;
+	const int y2y0 = y2 - y0;
+
+	int C0 = x1 * y2 - x2 * y1;
+	int C1 = x2 * y0 - x0 * y2;
+	int C2 = x0 * y1 - x1 * y0;
+
+	/* Apply top-left filling convention
+	 * It's worth memtioning that for shared vertices case,
+	 * the vertices will be drawn only if them are shared
+	 * between top left edges, i.e. top-left or left-left.
+	 * Other kind of shared vertices, like top-right, left-bottom,
+	 * will all be abandoned.
+	 */
+	if (y1y2 > 0 || (y1y2 == 0 && x2x1 < 0))  C0++;
+	if (y2y0 > 0 || (y2y0 == 0 && x0x2 < 0))  C1++;
+	if (y0y1 > 0 || (y0y1 == 0 && x1x0 < 0))  C2++;
+
+
+	/* We add an offset to C0, because, we need take into
+	 * account the conversion between fixed-point coordinates
+	 * (origin is the left bottom of the screen) and the pixel
+	 * coordinates(center of a pixel grid).
+	 */
+	mVert[0].mFactorA = y1y2 << FIXED_POINT4_SHIFT;
+	mVert[0].mFactorB = x2x1 << FIXED_POINT4_SHIFT;
+	mVert[0].mFactorC = C0 + (y1y2 << (FIXED_POINT4_SHIFT - 1)) + (x2x1 << (FIXED_POINT4_SHIFT - 1));
+
+	mVert[1].mFactorA = y2y0 << FIXED_POINT4_SHIFT;
+	mVert[1].mFactorB = x0x2 << FIXED_POINT4_SHIFT;
+	mVert[1].mFactorC = C1 + (y2y0 << (FIXED_POINT4_SHIFT - 1)) + (x0x2 << (FIXED_POINT4_SHIFT - 1));
+
+	mVert[2].mFactorA = y0y1 << FIXED_POINT4_SHIFT;
+	mVert[2].mFactorB = x1x0 << FIXED_POINT4_SHIFT;
+	mVert[2].mFactorC = C2 + (y0y1 << (FIXED_POINT4_SHIFT - 1)) + (x1x0 << (FIXED_POINT4_SHIFT - 1));
+
+	xmin = (std::min({x0, x1, x2}) >> FIXED_POINT4_SHIFT);
+	ymin = (std::min({y0, y1, y2}) >> FIXED_POINT4_SHIFT);
+	xmax = ((ROUND_UP(std::max({x0, x1, x2}), FIXED_POINT4) >> FIXED_POINT4_SHIFT) - 1);
+	ymax = ((ROUND_UP(std::max({y0, y1, y2}), FIXED_POINT4) >> FIXED_POINT4_SHIFT) - 1);
+
+	xmin = clamp(xmin, 0, g_GC->mRT.width  - 1);
+	xmax = clamp(xmax, 0, g_GC->mRT.width  - 1);
+	ymin = clamp(ymin, 0, g_GC->mRT.height - 1);
+	ymax = clamp(ymax, 0, g_GC->mRT.height - 1);
+
+	// The attr/w can be interpolated linearly.
 	const float ZReciprocal0 = 1.0f / v0->position().w;
 	const float ZReciprocal1 = 1.0f / v1->position().w;
 	const float ZReciprocal2 = 1.0f / v2->position().w;
 
 	const size_t size = v0->getRegsNum();
+
 	mVert[0].mAttrReciprocal.resize(size);
 	mVert[1].mAttrReciprocal.resize(size);
 	mVert[2].mAttrReciprocal.resize(size);
+
+	mGradientX.resize(size);
+	mGradientY.resize(size);
 
 	mVert[0].mAttrReciprocal.position().x = v0->position().x;
 	mVert[0].mAttrReciprocal.position().y = v0->position().y;
@@ -251,47 +310,6 @@ Triangle::Triangle(Primitive &prim):
 		mVert[1].mAttrReciprocal.getReg(i) = v1->getReg(i) * ZReciprocal1;
 		mVert[2].mAttrReciprocal.getReg(i) = v2->getReg(i) * ZReciprocal2;
 	}
-
-	const int x1x0 = x1 - x0;
-	const int x2x1 = x2 - x1;
-	const int x0x2 = x0 - x2;
-
-	const int y0y1 = y0 - y1;
-	const int y1y2 = y1 - y2;
-	const int y2y0 = y2 - y0;
-
-	int C0 = x1 * y2 - x2 * y1;
-	int C1 = x2 * y0 - x0 * y2;
-	int C2 = x0 * y1 - x1 * y0;
-
-	if (y0y1 > 0 || (y0y1 == 0 && x1x0 < 0))  C2++;
-	if (y1y2 > 0 || (y1y2 == 0 && x2x1 < 0))  C0++;
-	if (y2y0 > 0 || (y2y0 == 0 && x0x2 < 0))  C1++;
-
-	mVert[0].mFactorA = y1y2;
-	mVert[0].mFactorB = x2x1;
-	mVert[0].mFactorC = C0;
-
-	mVert[1].mFactorA = y2y0;
-	mVert[1].mFactorB = x0x2;
-	mVert[1].mFactorC = C1;
-
-	mVert[2].mFactorA = y0y1;
-	mVert[2].mFactorB = x1x0;
-	mVert[2].mFactorC = C2;
-
-	xmin = (std::min({x0, x1, x2}) >> FIXED_POINT4_SHIFT);
-	ymin = (std::min({y0, y1, y2}) >> FIXED_POINT4_SHIFT);
-	xmax = (ROUND_UP(std::max({x0, x1, x2}), FIXED_POINT4) >> FIXED_POINT4_SHIFT);
-	ymax = (ROUND_UP(std::max({y0, y1, y2}), FIXED_POINT4) >> FIXED_POINT4_SHIFT);
-
-	xmin = clamp(xmin, 0, g_GC->mRT.width  - 1);
-	xmax = clamp(xmax, 0, g_GC->mRT.width  - 1);
-	ymin = clamp(ymin, 0, g_GC->mRT.height - 1);
-	ymax = clamp(ymax, 0, g_GC->mRT.height - 1);
-
-	mGradientX.resize(size);
-	mGradientY.resize(size);
 
 	const float y1y2f = (v1->position().y - v2->position().y) * prim.mAreaReciprocal;
 	const float y2y0f = (v2->position().y - v0->position().y) * prim.mAreaReciprocal;
@@ -489,26 +507,14 @@ void TBDR::ProcessMacroTile(int x, int y)
 		}
 #endif
 #if 1
-		const int A0 = tri->mVert[0].mFactorA << FIXED_POINT4_SHIFT;
-		const int A1 = tri->mVert[1].mFactorA << FIXED_POINT4_SHIFT;
-		const int A2 = tri->mVert[2].mFactorA << FIXED_POINT4_SHIFT;
-		const int B0 = tri->mVert[0].mFactorB << FIXED_POINT4_SHIFT;
-		const int B1 = tri->mVert[1].mFactorB << FIXED_POINT4_SHIFT;
-		const int B2 = tri->mVert[2].mFactorB << FIXED_POINT4_SHIFT;
-
 		for (int yp = y, i = 0; i < MICRO_TILES_IN_MACRO_TILE; yp += MICRO_TILE_SIZE, ++i)
 		{
 			for (int xp = x, j = 0; j < MICRO_TILES_IN_MACRO_TILE; xp += MICRO_TILE_SIZE, ++j)
 			{
-				//const int xleft   = (xp << FIXED_POINT4_SHIFT) + FIXED_POINT4 / 2;
-				//const int ybottom = (yp << FIXED_POINT4_SHIFT) + FIXED_POINT4 / 2;
-				//const int xright  = ((xp + MICRO_TILE_SIZE - 1) << FIXED_POINT4_SHIFT) + FIXED_POINT4 / 2;
-				//const int ytop    = ((yp + MICRO_TILE_SIZE - 1) << FIXED_POINT4_SHIFT) + FIXED_POINT4 / 2;
-
-				const int xleft   = (xp << FIXED_POINT4_SHIFT);
-				const int ybottom = (yp << FIXED_POINT4_SHIFT);
-				const int xright  = ((xp + MICRO_TILE_SIZE - 1) << FIXED_POINT4_SHIFT);
-				const int ytop    = ((yp + MICRO_TILE_SIZE - 1) << FIXED_POINT4_SHIFT);
+				const int & xleft   = xp;
+				const int & ybottom = yp;
+				const int & xright  = xp + MICRO_TILE_SIZE - 1;
+				const int & ytop    = yp + MICRO_TILE_SIZE - 1;
 
 				int left_bottom_v0  = tri->mVert[0].mFactorA * xleft  + tri->mVert[0].mFactorB * ybottom + tri->mVert[0].mFactorC;
 				int left_top_v0     = tri->mVert[0].mFactorA * xleft  + tri->mVert[0].mFactorB * ytop    + tri->mVert[0].mFactorC;
@@ -608,14 +614,14 @@ void TBDR::ProcessMacroTile(int x, int y)
 										pp_map[yoff][xoff] = tri;
 									}
 								}
-								sum0 += A0;
-								sum1 += A1;
-								sum2 += A2;
+								sum0 += tri->mVert[0].mFactorA;
+								sum1 += tri->mVert[1].mFactorA;
+								sum2 += tri->mVert[2].mFactorA;
 							}
 
-							left_bottom_v0 += B0;
-							left_bottom_v1 += B1;
-							left_bottom_v2 += B2;
+							left_bottom_v0 += tri->mVert[0].mFactorB;
+							left_bottom_v1 += tri->mVert[1].mFactorB;
+							left_bottom_v2 += tri->mVert[2].mFactorB;
 						}
 					}
 				}
