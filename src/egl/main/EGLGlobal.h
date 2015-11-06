@@ -4,7 +4,7 @@
 
 #include <khronos/EGL/egl.h>
 #include <khronos/EGL/eglext.h>
-#include <common/glsp_defs.h>
+#include <glsp_defs.h>
 
 
 NS_OPEN_GLSP_EGL()

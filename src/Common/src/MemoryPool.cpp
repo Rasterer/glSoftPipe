@@ -4,7 +4,9 @@
 #include <cstring>
 #include <mutex>
 #include <vector>
-#include "common/glsp_debug.h"
+
+#include "compiler.h"
+#include "glsp_debug.h"
 
 
 namespace glsp {
@@ -40,8 +42,8 @@ struct MemoryPoolMT::ThreadMetaData
 constexpr int    MemoryPoolMT::kBlockSize[MemoryPoolMT::kBlockNum];
 constexpr size_t MemoryPoolMT::kUnitSizes[MemoryPoolMT::kBlockNum];
 
-// Use "__thread" instead of "thread_local" due to performance concern.
-static __thread MemoryPoolMT::ThreadMetaData s_ThreadMetaData;
+// Use self-defined "THREAD_LOCAL" instead of "thread_local" due to performance concern in gcc.
+static THREAD_LOCAL MemoryPoolMT::ThreadMetaData s_ThreadMetaData;
 static std::vector<MemoryPoolMT::ThreadMetaData *> s_TMDList;
 static SpinLock s_TMDListLock;
 
@@ -81,7 +83,7 @@ void* MemoryPoolMT::allocate(const size_t size)
 
 	for (idx = 0; idx < kBlockNum; ++idx)
 	{
-		if(size <= kUnitSizes[idx])
+		if (size <= kUnitSizes[idx])
 			break;
 	}
 	s_ThreadMetaData.mAllocCounter[idx]++;
@@ -99,7 +101,7 @@ void* MemoryPoolMT::allocate(const size_t size)
 	MemBlock *blk = pBlock;
 	while (blk)
 	{
-		if (blk && (uintptr_t)blk->mCurrent < (uintptr_t)blk->mData + kBlockSize[idx])
+		if (LIKELY(blk && (uintptr_t)blk->mCurrent < (uintptr_t)blk->mData + kBlockSize[idx]))
 		{
 			ptr = blk->mCurrent;
 			blk->mCurrent = (void *)((uintptr_t)blk->mCurrent + kUnitSizes[idx]);
@@ -108,7 +110,7 @@ void* MemoryPoolMT::allocate(const size_t size)
 		blk = blk->mNext;
 	}
 
-	if (!pBlock)
+	if (UNLIKELY(!pBlock))
 	{
 		auto it = std::find(s_TMDList.begin(), s_TMDList.end(), &s_ThreadMetaData);
 		if (it == s_TMDList.end())
@@ -122,7 +124,7 @@ void* MemoryPoolMT::allocate(const size_t size)
 
 	{
 		std::unique_lock<SpinLock> lk(mPoolLock[idx]);
-		if (mGlobalCache[idx])
+		if (LIKELY(mGlobalCache[idx]))
 		{
 			ptr = mGlobalCache[idx];
 			mGlobalCache[idx] = mGlobalCache[idx]->mNextBatch;
@@ -164,7 +166,7 @@ void MemoryPoolMT::deallocate(void * const p, const size_t size)
 
 	((FreeListNode *const)(p))->mNext = s_ThreadMetaData.mFreeLists[idx];
 
-	if((--s_ThreadMetaData.mAllocCounter[idx]) > (-FREE_TO_GLOBAL_CACHE_THRESHHOLD))
+	if(LIKELY((--s_ThreadMetaData.mAllocCounter[idx]) > (-FREE_TO_GLOBAL_CACHE_THRESHHOLD)))
 	{
 		s_ThreadMetaData.mFreeLists[idx] = (FreeListNode *)p;
 	}

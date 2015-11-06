@@ -2,8 +2,7 @@
 
 #include "DataFlow.h"
 #include "Texture.h"
-#include "common/glsp_defs.h"
-#include "common/glsp_spinlock.h"
+#include "glsp_defs.h"
 
 
 namespace glsp {
@@ -93,8 +92,6 @@ public:
 	void setDrawContextList(DrawContext *dc) { mDrawContextList = dc; }
 
 	RasterizationStage* getRastStage() const { return mRast; }
-
-	::glsp::SpinLock	 mFifoLock;
 
 protected:
 	DrawEngine();

@@ -2,8 +2,7 @@
 
 #include <cstdlib>
 
-#include "khronos/GL/glcorearb.h"
-#include "common/IEGLBridge.h"
+#include "IEGLBridge.h"
 #include "GLContext.h"
 #include "VertexFetcher.h"
 #include "Rasterizer.h"
@@ -15,6 +14,7 @@
 #include "TBDR.h"
 #include "PixelBackend.h"
 #include "ThreadPool.h"
+#include "khronos/GL/glcorearb.h"
 
 using glsp::ogl::DrawEngine;
 using glsp::ogl::DrawContext;

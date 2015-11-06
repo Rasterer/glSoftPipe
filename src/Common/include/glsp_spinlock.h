@@ -4,11 +4,8 @@
 #include <cassert>
 #include <thread>
 
+#include "arch.h"
 #include "glsp_defs.h"
-
-
-#define cpu_relax() \
-	asm volatile("pause\n": : :"memory")
 
 
 namespace glsp {

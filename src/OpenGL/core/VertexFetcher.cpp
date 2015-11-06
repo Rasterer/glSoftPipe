@@ -10,7 +10,6 @@
 #include "DrawEngine.h"
 #include "VertexArrayObject.h"
 #include "ThreadPool.h"
-#include "common/glsp_defs.h"
 #include "khronos/GL/glcorearb.h"
 
 

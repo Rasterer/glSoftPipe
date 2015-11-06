@@ -13,6 +13,7 @@ extern "C" {
 
 #include "khronos/EGL/egl.h"
 #include "EGLDisplayBase.h"
+#include "glsp_defs.h"
 
 NS_OPEN_GLSP_EGL()
 

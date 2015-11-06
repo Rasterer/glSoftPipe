@@ -1,7 +1,8 @@
 #pragma once
 
 #include <cstddef>
-#include "common/glsp_spinlock.h"
+
+#include "glsp_spinlock.h"
 
 
 namespace glsp {

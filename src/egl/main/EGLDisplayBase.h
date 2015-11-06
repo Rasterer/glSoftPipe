@@ -2,9 +2,9 @@
 
 #include <vector>
 
+#include "glsp_defs.h"
+#include "IEGLBridge.h"
 #include "khronos/EGL/egl.h"
-#include "common/glsp_defs.h"
-#include "common/IEGLBridge.h"
 
 
 NS_OPEN_GLSP_EGL()

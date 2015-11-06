@@ -2,7 +2,8 @@
 
 #include <list>
 #include <unordered_map>
-#include "common/glsp_defs.h"
+
+#include "glsp_defs.h"
 
 
 NS_OPEN_GLSP_OGL()

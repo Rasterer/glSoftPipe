@@ -1,7 +1,7 @@
 #pragma once
 
 #include "khronos/EGL/egl.h"
-#include "common/glsp_defs.h"
+#include "glsp_defs.h"
 #include "EGLDisplayBase.h"
 
 NS_OPEN_GLSP_EGL()

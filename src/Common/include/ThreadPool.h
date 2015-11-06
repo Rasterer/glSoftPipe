@@ -6,7 +6,7 @@
 #include <stack>
 #include <thread>
 
-#include "common/glsp_spinlock.h"
+#include "glsp_spinlock.h"
 
 
 

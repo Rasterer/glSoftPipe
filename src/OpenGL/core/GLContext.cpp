@@ -1,8 +1,7 @@
 #include "GLContext.h"
 
-#include <pthread.h>
+#include "glsp_debug.h"
 #include "khronos/GL/glcorearb.h"
-#include "common/glsp_debug.h"
 
 
 using glsp::ogl::GLContext;

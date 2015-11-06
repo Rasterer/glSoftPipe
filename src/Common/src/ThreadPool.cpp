@@ -4,15 +4,14 @@
 #include <mutex>
 #include <utility>
 
-#ifdef __linux__
-#include <unistd.h>
-#endif
+#include "compiler.h"
+#include "os.h"
 
 
 namespace glsp {
 
 static std::atomic_int sID(0);
-static __thread int s_TlsId = 0;
+static THREAD_LOCAL int s_TlsId = 0;
 
 ThreadPool::ThreadPool():
 	mDoneWorks(0),
@@ -26,10 +25,8 @@ ThreadPool::ThreadPool():
 
 	n = std::thread::hardware_concurrency();
 
-#ifdef __linux__
 	if (!n)
-		n = sysconf(_SC_NPROCESSORS_ONLN);
-#endif
+		n = OSGetProcessorsNum();
 
 	s_TlsId = n;
 	mThreadsNum = n;

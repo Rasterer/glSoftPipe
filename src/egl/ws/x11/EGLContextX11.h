@@ -3,7 +3,7 @@
 #include <xcb/xcb.h>
 
 #include "EGLContextBase.h"
-#include "common/glsp_defs.h"
+#include "glsp_defs.h"
 
 
 NS_OPEN_GLSP_EGL()

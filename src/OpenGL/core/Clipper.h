@@ -2,7 +2,7 @@
 
 #include <glm/glm.hpp>
 
-#include <common/glsp_defs.h>
+#include "glsp_defs.h"
 #include "PipeStage.h"
 #include "DataFlow.h"
 

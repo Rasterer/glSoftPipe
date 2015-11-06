@@ -2,7 +2,7 @@
 
 #include "Rasterizer.h"
 #include "PipeStage.h"
-#include "common/glsp_defs.h"
+#include "glsp_defs.h"
 
 
 // 64x64

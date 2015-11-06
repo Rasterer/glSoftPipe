@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "common/glsp_defs.h"
-#include "common/glsp_debug.h"
+#include "glsp_defs.h"
+#include "glsp_debug.h"
 
 
 NS_OPEN_GLSP_OGL()

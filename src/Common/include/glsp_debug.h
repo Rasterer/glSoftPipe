@@ -1,10 +1,9 @@
 #pragma once
 
+#include <cassert>
 #include <cstdio>
-#include <sys/types.h>
-#include <linux/unistd.h>
-#include <sys/syscall.h>
-#include <unistd.h>
+
+#include "os.h"
 
 
 #define GLSP_DPF_LEVEL_FATAL      1
@@ -30,7 +29,7 @@
 	do 											\
 	{											\
 		if (level <= GLSP_DPF_LEVEL_DEFAULT)	\
-			std::printf("T[%#lx]: " fmt, ::syscall( __NR_gettid ), ##__VA_ARGS__);	\
+			std::printf("T[%#lx]: " fmt, OSGetThreadID(), ##__VA_ARGS__);	\
 	} while (0)
 
 
@@ -41,7 +40,7 @@
 		if(!(cond))								\
 		{										\
 			std::printf(fmt, ##__VA_ARGS__);	\
-			assert(false);						\
+			std::assert(false);					\
 		}										\
 	} while (0);
 #else

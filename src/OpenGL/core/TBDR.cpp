@@ -8,7 +8,7 @@
 #include "GLContext.h"
 #include "DrawEngine.h"
 #include "utils.h"
-#include "common/glsp_spinlock.h"
+#include "glsp_spinlock.h"
 
 
 NS_OPEN_GLSP_OGL()

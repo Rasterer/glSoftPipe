@@ -5,9 +5,6 @@
 
 NS_OPEN_GLSP_OGL()
 
-using glm::vec3;
-using glm::vec4;
-
 Rasterizer::Rasterizer():
 	PipeStage("Rasterizing", DrawEngine::getDrawEngine())
 {

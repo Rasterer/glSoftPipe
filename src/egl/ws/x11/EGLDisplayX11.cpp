@@ -8,7 +8,6 @@
 
 #include "EGLContextX11.h"
 #include "EGLSurfaceX11.h"
-#include "common/glsp_defs.h"
 #include "khronos/EGL/egl.h"
 
 

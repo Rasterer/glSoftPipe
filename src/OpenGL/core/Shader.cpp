@@ -7,7 +7,6 @@
 #include "Texture.h"
 #include "TBDR.h"
 #include "khronos/GL/glcorearb.h"
-#include "common/glsp_debug.h"
 
 
 using std::string;

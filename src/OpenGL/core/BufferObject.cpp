@@ -2,11 +2,10 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "khronos/GL/glcorearb.h"
-#include "common/glsp_defs.h"
 #include "BufferObject.h"
 #include "GLContext.h"
-#include "common/glsp_debug.h"
+#include "glsp_debug.h"
+#include "khronos/GL/glcorearb.h"
 
 
 using namespace std;

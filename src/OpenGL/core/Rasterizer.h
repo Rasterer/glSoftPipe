@@ -1,7 +1,6 @@
 #pragma once
 
-#include <glm/glm.hpp>
-#include <common/glsp_defs.h>
+#include "glsp_defs.h"
 #include "Shader.h"
 
 

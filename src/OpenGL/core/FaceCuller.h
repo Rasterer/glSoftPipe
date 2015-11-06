@@ -1,6 +1,6 @@
 #pragma once
 
-#include <common/glsp_defs.h>
+#include "glsp_defs.h"
 
 #include "PipeStage.h"
 

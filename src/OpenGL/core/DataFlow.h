@@ -3,7 +3,8 @@
 #include <list>
 #include <vector>
 #include <glm/glm.hpp>
-#include "common/glsp_defs.h"
+
+#include "glsp_defs.h"
 #include "MemoryPool.h"
 
 
