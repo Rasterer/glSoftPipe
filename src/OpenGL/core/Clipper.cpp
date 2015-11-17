@@ -6,87 +6,119 @@
 #include "DrawEngine.h"
 #include "MemoryPool.h"
 #include "utils.h"
+#include "compiler.h"
 
 
 NS_OPEN_GLSP_OGL()
 
 using glm::vec4;
 
+
+
+const glm::vec4 Clipper::sPlanes[Clipper::MAX_PLANES] = {
+	[Clipper::PLANE_NEAR     ] = glm::vec4( 0.0f,  0.0f,  1.0f, 1.0f),
+	[Clipper::PLANE_FAR      ] = glm::vec4( 0.0f,  0.0f, -1.0f, 1.0f),
+	[Clipper::PLANE_LEFT     ] = glm::vec4( 1.0f,  0.0f,  0.0f, 1.0f),
+	[Clipper::PLANE_RIGHT    ] = glm::vec4(-1.0f,  0.0f,  0.0f, 1.0f),
+	[Clipper::PLANE_BOTTOM   ] = glm::vec4( 0.0f,  1.0f,  0.0f, 1.0f),
+	[Clipper::PLANE_TOP      ] = glm::vec4( 0.0f, -1.0f,  0.0f, 1.0f),
+	[Clipper::PLANE_ZEROW    ] = glm::vec4( 0.0f,  0.0f,  0.0f, 1.0f),
+	//[Clipper::PLANE_GB_LEFT  ] = glm::vec4( 0.0f, -1.0f,  0.0f, 1.0f),
+	//[Clipper::PLANE_GB_RIGHT ] = glm::vec4( 0.0f, -1.0f,  0.0f, 1.0f),
+	//[Clipper::PLANE_GB_BOTTOM] = glm::vec4( 0.0f, -1.0f,  0.0f, 1.0f),
+	//[Clipper::PLANE_GB_TOP   ] = glm::vec4( 0.0f, -1.0f,  0.0f, 1.0f)
+};
+
 Clipper::Clipper():
 	PipeStage("Clipping", DrawEngine::getDrawEngine())
 {
-	mPlanes[0] = vec4(0.0f, 0.0f, 1.0f, 1.0f);	// near plane
-	mPlanes[1] = vec4(0.0f, 0.0f, -1.0f, 1.0f);	// far  plane
-	mPlanes[2] = vec4(1.0f, 0.0f, 0.0f, 1.0f);	// left plane
-	mPlanes[3] = vec4(-1.0f, 0.0f, 0.0f, 1.0f);	// right plane
-	mPlanes[4] = vec4(0.0f, 1.0f, 0.0f, 1.0f);	// bottom plane
-	mPlanes[5] = vec4(0.0f, -1.0f, 0.0f, 1.0f);	// top plane
 }
 
 void Clipper::emit(void *data)
 {
 	Batch *bat = static_cast<Batch *>(data);
 
-	clipping(bat);
+	onClipping(bat);
 
 	getNextStage()->emit(bat);
 }
 
-// FIXME: account for clip coord (0, 0, 0, 0)
-// TODO: guard-band clipping
-void Clipper::clipping(Batch *bat)
+// Compute Cohen-Sutherland style outcodes.
+void Clipper::ComputeOutcodesFrustum(const Primitive &prim, int outcodes[3])
 {
-	Primlist out;
-	Primlist &pl = bat->mPrims;
-	vsOutput tmp[ARRAY_SIZE(mPlanes) * 4];
+	float dist[3];
 
-	for (Primitive *prim: pl)
+	for (int i = PLANE_NEAR; i <= PLANE_ZEROW; ++i)
 	{
-		// Two round robin intermediate boxes
-		// One src, one dst
-		// Next loop, switch!
-		vsOutput *rr[2][6];
-		int vertNum[2];
-		float dist[2];
-		int src = 0, dst = 1;
-		int tmpnr = 0;
+		dist[0] = glm::dot(prim.mVert[0].position(), sPlanes[i]);
+		dist[1] = glm::dot(prim.mVert[1].position(), sPlanes[i]);
+		dist[2] = glm::dot(prim.mVert[2].position(), sPlanes[i]);
 
-		assert(prim->mType == Primitive::TRIANGLE);
+		if (i == PLANE_ZEROW)
+		{
+			// Plane w > 0, use "<=" to get rid of clip space (0, 0, 0, 0),
+			// which is a degenerate triangle and can be thrown way directly
+			if (dist[0] <= 0.0f)	outcodes[0] |= (1 << i);
+			if (dist[1] <= 0.0f)	outcodes[1] |= (1 << i);
+			if (dist[2] <= 0.0f)	outcodes[2] |= (1 << i);
+		}
+		else
+		{
+			if (dist[0] < 0.0f)		outcodes[0] |= (1 << i);
+			if (dist[1] < 0.0f)		outcodes[1] |= (1 << i);
+			if (dist[2] < 0.0f)		outcodes[2] |= (1 << i);
+		}
+	}
+}
 
-		rr[src][0] = &(prim->mVert[0]);
-		rr[src][1] = &(prim->mVert[1]);
-		rr[src][2] = &(prim->mVert[2]);
+// TODO: guard-band clipping
+void Clipper::ClipAgainstFrustum(Primitive &prim, int outcodes_union, Primlist &out)
+{
+	/* Two round robin intermediate boxes
+	 * One src, one dst. Next loop, reverse!
+	 */
+	vsOutput tmp[6 * 2];
+	vsOutput *rr[2][6];
+	int vertNum[2];
+	float dist[2];
+	int src = 0, dst = 1;
+	int tmpnr = 0;
 
-		vertNum[src] = 3;
-		vertNum[dst] = 0;
+	assert(prim.mType == Primitive::TRIANGLE);
 
-		for (size_t i = 0; i < ARRAY_SIZE(mPlanes); i++)
+	rr[src][0] = &(prim.mVert[0]);
+	rr[src][1] = &(prim.mVert[1]);
+	rr[src][2] = &(prim.mVert[2]);
+
+	vertNum[src] = 3;
+
+	for (int i = PLANE_NEAR; i <= PLANE_TOP; ++i)
+	{
+		if (outcodes_union & ( 1 << i))
 		{
 			if(vertNum[src] > 0)
-				dist[0] = dot(rr[src][0]->position(), mPlanes[i]);
+				dist[0] = glm::dot(rr[src][0]->position(), sPlanes[i]);
 
 			vertNum[dst] = 0;
 
 			for(int j = 0; j < vertNum[src]; j++)
 			{
 				int k = (j + 1) % vertNum[src];
-				dist[1] = dot(rr[src][k]->position(), mPlanes[i]);
+				dist[1] = dot(rr[src][k]->position(), sPlanes[i]);
 
 				// Can not use unified linear interpolation equation.
 				// Otherwise, if clip AB and BA, the results will be different.
 				// Here we solve this by clip an edge in a fixed direction: from inside out
 				if(dist[0] >= 0.0f)
 				{
-					rr[dst][vertNum[dst]] = rr[src][j];
-					++vertNum[dst];
+					rr[dst][vertNum[dst]++] = rr[src][j];
 
 					if(dist[1] < 0.0f)
 					{
 						vsOutput *new_vert = &tmp[tmpnr++];
 
 						vertexLerp(*new_vert, *rr[src][j], *rr[src][k], dist[0] / (dist[0] - dist[1]));
-						rr[dst][vertNum[dst]] = new_vert;
-						++vertNum[dst];
+						rr[dst][vertNum[dst]++] = new_vert;
 					}
 				}
 				else if(dist[1] >= 0.0f)
@@ -94,8 +126,7 @@ void Clipper::clipping(Batch *bat)
 					vsOutput *new_vert = &tmp[tmpnr++];
 
 					vertexLerp(*new_vert, *rr[src][k], *rr[src][j], dist[1] / (dist[1] - dist[0]));
-					rr[dst][vertNum[dst]] = new_vert;
-					++vertNum[dst];
+					rr[dst][vertNum[dst]++] = new_vert;
 				}
 
 				dist[0] = dist[1];
@@ -104,14 +135,13 @@ void Clipper::clipping(Batch *bat)
 			src = (src + 1) & 0x1;
 			dst = (dst + 1) & 0x1;
 		}
+	}
 
-		if(vertNum[src] == 0)
-			continue;
-
-		assert(vertNum[src] >= 3 && vertNum[src] <= 7);
+	if(vertNum[src] > 0)
+	{
+		assert(vertNum[src] >= 3 && vertNum[src] <= 6);
 
 		// Triangulation
-		// OPT: no clip case can be OPT
 		for (int i = 1; i < vertNum[src] - 1; i++)
 		{
 			Primitive *new_prim = new(MemoryPoolMT::get()) Primitive();
@@ -119,12 +149,64 @@ void Clipper::clipping(Batch *bat)
 			new_prim->mType    = Primitive::TRIANGLE;
 			new_prim->mVertNum = 3;
 			new_prim->mVert[0] = *rr[src][0];
-			new_prim->mVert[1] = *rr[src][i];
+			new_prim->mVert[1] = std::move(*rr[src][i]); /* OPT to avoid copy */
 			new_prim->mVert[2] = *rr[src][i+1];
-			new_prim->mDC      = bat->mDC;
+			new_prim->mDC      = prim.mDC;
 
 			out.push_back(new_prim);
 		}
+	}
+}
+
+void Clipper::onClipping(Batch *bat)
+{
+	Primlist out;
+	Primlist &pl = bat->mPrims;
+
+	auto it = pl.begin();
+	while (it != pl.end())
+	{
+		int   outcodes[3] = {0, 0, 0};
+		int   outcodes_union;
+		Primitive *prim = *it;
+
+		ComputeOutcodesFrustum(*prim, outcodes);
+
+		// trivially accepted
+		if ((outcodes_union = (outcodes[0] | outcodes[1] | outcodes[2])) == 0)
+		{
+			out.push_back(prim);
+			it = pl.erase(it);
+
+			continue;
+		}
+		++it;
+
+		// trivially rejected
+		if (outcodes[0] & outcodes[1] & outcodes[2])
+		{
+			continue;
+		}
+
+		/* A bit tricky here:
+		 * Consider this particular outcode b1000000:
+		 * -w <= x <= w (true)
+		 * -w <= y <= w (true)
+		 * -w <= z <= w (true)
+		 * w > 0        (false)
+		 *
+		 * This can derive that (x, y, z, w) = (0, 0, 0, 0).
+		 * So it's an efficient way to catch this degenerated case.
+		 */
+		if (UNLIKELY(outcodes[0] == (1 << PLANE_ZEROW) &&
+					 outcodes[1] == (1 << PLANE_ZEROW) &&
+					 outcodes[2] == (1 << PLANE_ZEROW)))
+		{
+			continue;
+		}
+
+		// need to do clipping
+		ClipAgainstFrustum(*prim, outcodes_union, out);
 	}
 
 	pl.swap(out);
