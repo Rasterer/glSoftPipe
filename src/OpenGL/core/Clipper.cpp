@@ -5,7 +5,6 @@
 #include "DataFlow.h"
 #include "DrawEngine.h"
 #include "MemoryPool.h"
-#include "utils.h"
 #include "compiler.h"
 
 
@@ -15,7 +14,7 @@ using glm::vec4;
 
 
 
-const glm::vec4 Clipper::sPlanes[Clipper::MAX_PLANES] = {
+glm::vec4 Clipper::sPlanes[Clipper::MAX_PLANES] = {
 	[Clipper::PLANE_NEAR     ] = glm::vec4( 0.0f,  0.0f,  1.0f, 1.0f),
 	[Clipper::PLANE_FAR      ] = glm::vec4( 0.0f,  0.0f, -1.0f, 1.0f),
 	[Clipper::PLANE_LEFT     ] = glm::vec4( 1.0f,  0.0f,  0.0f, 1.0f),
@@ -23,10 +22,10 @@ const glm::vec4 Clipper::sPlanes[Clipper::MAX_PLANES] = {
 	[Clipper::PLANE_BOTTOM   ] = glm::vec4( 0.0f,  1.0f,  0.0f, 1.0f),
 	[Clipper::PLANE_TOP      ] = glm::vec4( 0.0f, -1.0f,  0.0f, 1.0f),
 	[Clipper::PLANE_ZEROW    ] = glm::vec4( 0.0f,  0.0f,  0.0f, 1.0f),
-	//[Clipper::PLANE_GB_LEFT  ] = glm::vec4( 0.0f, -1.0f,  0.0f, 1.0f),
-	//[Clipper::PLANE_GB_RIGHT ] = glm::vec4( 0.0f, -1.0f,  0.0f, 1.0f),
-	//[Clipper::PLANE_GB_BOTTOM] = glm::vec4( 0.0f, -1.0f,  0.0f, 1.0f),
-	//[Clipper::PLANE_GB_TOP   ] = glm::vec4( 0.0f, -1.0f,  0.0f, 1.0f)
+	[Clipper::PLANE_GB_LEFT  ] = glm::vec4( 1.0f,  0.0f,  0.0f, 0.0f),
+	[Clipper::PLANE_GB_RIGHT ] = glm::vec4(-1.0f,  0.0f,  0.0f, 0.0f),
+	[Clipper::PLANE_GB_BOTTOM] = glm::vec4( 0.0f,  1.0f,  0.0f, 0.0f),
+	[Clipper::PLANE_GB_TOP   ] = glm::vec4( 0.0f, -1.0f,  0.0f, 0.0f)
 };
 
 Clipper::Clipper():
@@ -43,7 +42,7 @@ void Clipper::emit(void *data)
 	getNextStage()->emit(bat);
 }
 
-// Compute Cohen-Sutherland style outcodes.
+// Compute Cohen-Sutherland style outcodes against the view frustum
 void Clipper::ComputeOutcodesFrustum(const Primitive &prim, int outcodes[3])
 {
 	float dist[3];
@@ -71,8 +70,32 @@ void Clipper::ComputeOutcodesFrustum(const Primitive &prim, int outcodes[3])
 	}
 }
 
-// TODO: guard-band clipping
-void Clipper::ClipAgainstFrustum(Primitive &prim, int outcodes_union, Primlist &out)
+// Compute outcodes against the guard band
+void Clipper::ComputeOutcodesGuardband(const Primitive &prim, int outcodes[3])
+{
+	float dist[3];
+
+	for (int i = PLANE_GB_LEFT; i <= PLANE_GB_TOP; ++i)
+	{
+		dist[0] = glm::dot(prim.mVert[0].position(), sPlanes[i]);
+		dist[1] = glm::dot(prim.mVert[1].position(), sPlanes[i]);
+		dist[2] = glm::dot(prim.mVert[2].position(), sPlanes[i]);
+
+		if (dist[0] < 0.0f)		outcodes[0] |= (1 << i);
+		if (dist[1] < 0.0f)		outcodes[1] |= (1 << i);
+		if (dist[2] < 0.0f)		outcodes[2] |= (1 << i);
+	}
+}
+
+
+/* NOTE:
+ * When guard band is used, need clip against guard band
+ * rather than view frustum. Otherwise, there will be cracks
+ * on the shared edge between two triangles(one is inside
+ * guard band, while another intersects with guard band)
+ * after snapping to subpixel grids.
+ */
+void Clipper::ClipAgainstGuardband(Primitive &prim, int outcodes_union, Primlist &out)
 {
 	/* Two round robin intermediate boxes
 	 * One src, one dst. Next loop, reverse!
@@ -92,49 +115,49 @@ void Clipper::ClipAgainstFrustum(Primitive &prim, int outcodes_union, Primlist &
 
 	vertNum[src] = 3;
 
-	for (int i = PLANE_NEAR; i <= PLANE_TOP; ++i)
+	unsigned int i;
+	while (_BitScanForward(&i, outcodes_union))
 	{
-		if (outcodes_union & ( 1 << i))
+		outcodes_union &= ~(1 << i);
+
+		if(vertNum[src] > 0)
+			dist[0] = glm::dot(rr[src][0]->position(), sPlanes[i]);
+
+		vertNum[dst] = 0;
+
+		for(int j = 0; j < vertNum[src]; j++)
 		{
-			if(vertNum[src] > 0)
-				dist[0] = glm::dot(rr[src][0]->position(), sPlanes[i]);
+			int k = (j + 1) % vertNum[src];
+			dist[1] = dot(rr[src][k]->position(), sPlanes[i]);
 
-			vertNum[dst] = 0;
-
-			for(int j = 0; j < vertNum[src]; j++)
+			// Can not use unified linear interpolation equation.
+			// Otherwise, if clip AB and BA, the results will be different.
+			// Here we solve this by clip an edge in a fixed direction: from inside out
+			if(dist[0] >= 0.0f)
 			{
-				int k = (j + 1) % vertNum[src];
-				dist[1] = dot(rr[src][k]->position(), sPlanes[i]);
+				rr[dst][vertNum[dst]++] = rr[src][j];
 
-				// Can not use unified linear interpolation equation.
-				// Otherwise, if clip AB and BA, the results will be different.
-				// Here we solve this by clip an edge in a fixed direction: from inside out
-				if(dist[0] >= 0.0f)
-				{
-					rr[dst][vertNum[dst]++] = rr[src][j];
-
-					if(dist[1] < 0.0f)
-					{
-						vsOutput *new_vert = &tmp[tmpnr++];
-
-						vertexLerp(*new_vert, *rr[src][j], *rr[src][k], dist[0] / (dist[0] - dist[1]));
-						rr[dst][vertNum[dst]++] = new_vert;
-					}
-				}
-				else if(dist[1] >= 0.0f)
+				if(dist[1] < 0.0f)
 				{
 					vsOutput *new_vert = &tmp[tmpnr++];
 
-					vertexLerp(*new_vert, *rr[src][k], *rr[src][j], dist[1] / (dist[1] - dist[0]));
+					vertexLerp(*new_vert, *rr[src][j], *rr[src][k], dist[0] / (dist[0] - dist[1]));
 					rr[dst][vertNum[dst]++] = new_vert;
 				}
+			}
+			else if(dist[1] >= 0.0f)
+			{
+				vsOutput *new_vert = &tmp[tmpnr++];
 
-				dist[0] = dist[1];
+				vertexLerp(*new_vert, *rr[src][k], *rr[src][j], dist[1] / (dist[1] - dist[0]));
+				rr[dst][vertNum[dst]++] = new_vert;
 			}
 
-			src = (src + 1) & 0x1;
-			dst = (dst + 1) & 0x1;
+			dist[0] = dist[1];
 		}
+
+		src = (src + 1) & 0x1;
+		dst = (dst + 1) & 0x1;
 	}
 
 	if(vertNum[src] > 0)
@@ -167,19 +190,19 @@ void Clipper::onClipping(Batch *bat)
 	while (it != pl.end())
 	{
 		int   outcodes[3] = {0, 0, 0};
-		int   outcodes_union;
 		Primitive *prim = *it;
 
 		ComputeOutcodesFrustum(*prim, outcodes);
 
 		// trivially accepted
-		if ((outcodes_union = (outcodes[0] | outcodes[1] | outcodes[2])) == 0)
+		if ((outcodes[0] | outcodes[1] | outcodes[2]) == 0)
 		{
 			out.push_back(prim);
 			it = pl.erase(it);
 
 			continue;
 		}
+		auto orig_it = it;
 		++it;
 
 		// trivially rejected
@@ -205,8 +228,20 @@ void Clipper::onClipping(Batch *bat)
 			continue;
 		}
 
-		// need to do clipping
-		ClipAgainstFrustum(*prim, outcodes_union, out);
+		ComputeOutcodesGuardband(*prim, outcodes);
+
+		unsigned outcodes_union = (outcodes[0] | outcodes[1] | outcodes[2]) & kGBClipMask;
+
+		if (LIKELY(outcodes_union == 0))
+		{
+			out.push_back(prim);
+			it = pl.erase(orig_it);
+		}
+		else
+		{
+			// need to do clipping
+			ClipAgainstGuardband(*prim, outcodes_union, out);
+		}
 	}
 
 	pl.swap(out);
@@ -232,6 +267,12 @@ void Clipper::vertexLerp(vsOutput &new_vert,
 	{
 		new_vert[i] = vert1[i] * (1 - t)  + vert2[i] * t;
 	}
+}
+
+void Clipper::ComputeGuardband(float width, float height)
+{
+	sPlanes[PLANE_GB_LEFT  ].w = sPlanes[PLANE_GB_RIGHT ].w = GUARDBAND_WIDTH  / width;
+	sPlanes[PLANE_GB_BOTTOM].w = sPlanes[PLANE_GB_TOP   ].w = GUARDBAND_HEIGHT / height;
 }
 
 void Clipper::finalize()

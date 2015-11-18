@@ -1,3 +1,5 @@
+#pragma once
+
 #define EQUAL(a, b) (abs((a) - (b)) <= FLT_EPSILON)
 
 #define SWAP(a, b, tmp) {	\

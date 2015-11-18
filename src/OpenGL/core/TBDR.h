@@ -3,6 +3,7 @@
 #include "Rasterizer.h"
 #include "PipeStage.h"
 #include "glsp_defs.h"
+#include "utils.h"
 
 
 // 64x64
@@ -21,6 +22,9 @@
 
 #define MAX_TILES_IN_WIDTH        (MAX_RASTERIZATION_WIDTH  >> MACRO_TILE_SIZE_SHIFT)
 #define MAX_TILES_IN_HEIGHT       (MAX_RASTERIZATION_HEIGHT >> MACRO_TILE_SIZE_SHIFT)
+
+#define RAST_SUBPIXEL_BITS  FIXED_POINT4_SHIFT
+#define RAST_SUBPIXELS      FIXED_POINT4
 
 
 NS_OPEN_GLSP_OGL()

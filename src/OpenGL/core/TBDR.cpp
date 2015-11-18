@@ -7,7 +7,6 @@
 #include "MemoryPool.h"
 #include "GLContext.h"
 #include "DrawEngine.h"
-#include "utils.h"
 #include "glsp_spinlock.h"
 
 
@@ -69,30 +68,30 @@ void Binning::onBinning(Batch *bat)
 				const int right_bottom_v2 = tri->mVert[2].mFactorA * xright + tri->mVert[2].mFactorB * ybottom + tri->mVert[2].mFactorC;
 				const int right_top_v2    = tri->mVert[2].mFactorA * xright + tri->mVert[2].mFactorB * ytop    + tri->mVert[2].mFactorC;
 
-				const bool positive_half0  = (left_bottom_v0  >  0) &&
-											 (left_top_v0     >  0) &&
-											 (right_bottom_v0 >  0) &&
-											 (right_top_v0    >  0);
-				const bool negative_half0  = (left_bottom_v0  <= 0) &&
-											 (left_top_v0     <= 0) &&
-											 (right_bottom_v0 <= 0) &&
-											 (right_top_v0    <= 0);
-				const bool positive_half1  = (left_bottom_v1  >  0) &&
-											 (left_top_v1     >  0) &&
-											 (right_bottom_v1 >  0) &&
-											 (right_top_v1    >  0);
-				const bool negative_half1  = (left_bottom_v1  <= 0) &&
-											 (left_top_v1     <= 0) &&
-											 (right_bottom_v1 <= 0) &&
-											 (right_top_v1    <= 0);
-				const bool positive_half2  = (left_bottom_v2  >  0) &&
-											 (left_top_v2     >  0) &&
-											 (right_bottom_v2 >  0) &&
-											 (right_top_v2    >  0);
-				const bool negative_half2  = (left_bottom_v2  <= 0) &&
-											 (left_top_v2     <= 0) &&
-											 (right_bottom_v2 <= 0) &&
-											 (right_top_v2    <= 0);
+				const bool positive_half0  = (left_bottom_v0  >= 0) &&
+											 (left_top_v0     >= 0) &&
+											 (right_bottom_v0 >= 0) &&
+											 (right_top_v0    >= 0);
+				const bool negative_half0  = (left_bottom_v0  <  0) &&
+											 (left_top_v0     <  0) &&
+											 (right_bottom_v0 <  0) &&
+											 (right_top_v0    <  0);
+				const bool positive_half1  = (left_bottom_v1  >= 0) &&
+											 (left_top_v1     >= 0) &&
+											 (right_bottom_v1 >= 0) &&
+											 (right_top_v1    >= 0);
+				const bool negative_half1  = (left_bottom_v1  <  0) &&
+											 (left_top_v1     <  0) &&
+											 (right_bottom_v1 <  0) &&
+											 (right_top_v1    <  0);
+				const bool positive_half2  = (left_bottom_v2  >= 0) &&
+											 (left_top_v2     >= 0) &&
+											 (right_bottom_v2 >= 0) &&
+											 (right_top_v2    >= 0);
+				const bool negative_half2  = (left_bottom_v2  <  0) &&
+											 (left_top_v2     <  0) &&
+											 (right_bottom_v2 <  0) &&
+											 (right_top_v2    <  0);
 				// This macro tile is totally outside the triangle
 				if (negative_half0 || negative_half1 || negative_half2)
 				{
@@ -212,17 +211,15 @@ Triangle::Triangle(Primitive &prim):
 	}
 
 	/* Fixed point rasterization algorithm
-	 * 4bit subpixel grid precision.
-	 * TODO: Need guard-band to avoid integer overflow.
 	 */
-	const int x0 = fixedpoint_cast<FIXED_POINT4>(v0->position().x);
-	const int y0 = fixedpoint_cast<FIXED_POINT4>(v0->position().y);
+	const int x0 = fixedpoint_cast<RAST_SUBPIXELS>(v0->position().x);
+	const int y0 = fixedpoint_cast<RAST_SUBPIXELS>(v0->position().y);
 
-	const int x1 = fixedpoint_cast<FIXED_POINT4>(v1->position().x);
-	const int y1 = fixedpoint_cast<FIXED_POINT4>(v1->position().y);
+	const int x1 = fixedpoint_cast<RAST_SUBPIXELS>(v1->position().x);
+	const int y1 = fixedpoint_cast<RAST_SUBPIXELS>(v1->position().y);
 
-	const int x2 = fixedpoint_cast<FIXED_POINT4>(v2->position().x);
-	const int y2 = fixedpoint_cast<FIXED_POINT4>(v2->position().y);
+	const int x2 = fixedpoint_cast<RAST_SUBPIXELS>(v2->position().x);
+	const int y2 = fixedpoint_cast<RAST_SUBPIXELS>(v2->position().y);
 
 	const int x1x0 = x1 - x0;
 	const int x2x1 = x2 - x1;
@@ -243,9 +240,9 @@ Triangle::Triangle(Primitive &prim):
 	 * Other kind of shared vertices, like top-right, left-bottom,
 	 * will all be abandoned.
 	 */
-	if (y1y2 > 0 || (y1y2 == 0 && x2x1 < 0))  C0++;
-	if (y2y0 > 0 || (y2y0 == 0 && x0x2 < 0))  C1++;
-	if (y0y1 > 0 || (y0y1 == 0 && x1x0 < 0))  C2++;
+	if (y1y2 > 0 || (y1y2 == 0 && x2x1 < 0))  C0--;
+	if (y2y0 > 0 || (y2y0 == 0 && x0x2 < 0))  C1--;
+	if (y0y1 > 0 || (y0y1 == 0 && x1x0 < 0))  C2--;
 
 
 	/* We add an offset to C0, because, we need take into
@@ -253,22 +250,22 @@ Triangle::Triangle(Primitive &prim):
 	 * (origin is the left bottom of the screen) and the pixel
 	 * coordinates(center of a pixel grid).
 	 */
-	mVert[0].mFactorA = y1y2 << FIXED_POINT4_SHIFT;
-	mVert[0].mFactorB = x2x1 << FIXED_POINT4_SHIFT;
-	mVert[0].mFactorC = C0 + (y1y2 << (FIXED_POINT4_SHIFT - 1)) + (x2x1 << (FIXED_POINT4_SHIFT - 1));
+	mVert[0].mFactorA = y1y2 << RAST_SUBPIXEL_BITS;
+	mVert[0].mFactorB = x2x1 << RAST_SUBPIXEL_BITS;
+	mVert[0].mFactorC = C0 + (y1y2 << (RAST_SUBPIXEL_BITS - 1)) + (x2x1 << (RAST_SUBPIXEL_BITS - 1));
 
-	mVert[1].mFactorA = y2y0 << FIXED_POINT4_SHIFT;
-	mVert[1].mFactorB = x0x2 << FIXED_POINT4_SHIFT;
-	mVert[1].mFactorC = C1 + (y2y0 << (FIXED_POINT4_SHIFT - 1)) + (x0x2 << (FIXED_POINT4_SHIFT - 1));
+	mVert[1].mFactorA = y2y0 << RAST_SUBPIXEL_BITS;
+	mVert[1].mFactorB = x0x2 << RAST_SUBPIXEL_BITS;
+	mVert[1].mFactorC = C1 + (y2y0 << (RAST_SUBPIXEL_BITS - 1)) + (x0x2 << (RAST_SUBPIXEL_BITS - 1));
 
-	mVert[2].mFactorA = y0y1 << FIXED_POINT4_SHIFT;
-	mVert[2].mFactorB = x1x0 << FIXED_POINT4_SHIFT;
-	mVert[2].mFactorC = C2 + (y0y1 << (FIXED_POINT4_SHIFT - 1)) + (x1x0 << (FIXED_POINT4_SHIFT - 1));
+	mVert[2].mFactorA = y0y1 << RAST_SUBPIXEL_BITS;
+	mVert[2].mFactorB = x1x0 << RAST_SUBPIXEL_BITS;
+	mVert[2].mFactorC = C2 + (y0y1 << (RAST_SUBPIXEL_BITS - 1)) + (x1x0 << (RAST_SUBPIXEL_BITS - 1));
 
-	xmin = (std::min({x0, x1, x2}) >> FIXED_POINT4_SHIFT);
-	ymin = (std::min({y0, y1, y2}) >> FIXED_POINT4_SHIFT);
-	xmax = ((ROUND_UP(std::max({x0, x1, x2}), FIXED_POINT4) >> FIXED_POINT4_SHIFT) - 1);
-	ymax = ((ROUND_UP(std::max({y0, y1, y2}), FIXED_POINT4) >> FIXED_POINT4_SHIFT) - 1);
+	xmin = (std::min({x0, x1, x2}) >> RAST_SUBPIXEL_BITS);
+	ymin = (std::min({y0, y1, y2}) >> RAST_SUBPIXEL_BITS);
+	xmax = ((ROUND_UP(std::max({x0, x1, x2}), RAST_SUBPIXELS) >> RAST_SUBPIXEL_BITS) - 1);
+	ymax = ((ROUND_UP(std::max({y0, y1, y2}), RAST_SUBPIXELS) >> RAST_SUBPIXEL_BITS) - 1);
 
 	xmin = clamp(xmin, 0, g_GC->mRT.width  - 1);
 	xmax = clamp(xmax, 0, g_GC->mRT.width  - 1);
@@ -531,30 +528,30 @@ void TBDR::ProcessMacroTile(int x, int y)
 				int right_bottom_v2 = tri->mVert[2].mFactorA * xright + tri->mVert[2].mFactorB * ybottom + tri->mVert[2].mFactorC;
 				int right_top_v2    = tri->mVert[2].mFactorA * xright + tri->mVert[2].mFactorB * ytop    + tri->mVert[2].mFactorC;
 
-				const bool positive_half0  = (left_bottom_v0  >  0) &&
-											 (left_top_v0     >  0) &&
-											 (right_bottom_v0 >  0) &&
-											 (right_top_v0    >  0);
-				const bool negative_half0  = (left_bottom_v0  <= 0) &&
-											 (left_top_v0     <= 0) &&
-											 (right_bottom_v0 <= 0) &&
-											 (right_top_v0    <= 0);
-				const bool positive_half1  = (left_bottom_v1  >  0) &&
-											 (left_top_v1     >  0) &&
-											 (right_bottom_v1 >  0) &&
-											 (right_top_v1    >  0);
-				const bool negative_half1  = (left_bottom_v1  <= 0) &&
-											 (left_top_v1     <= 0) &&
-											 (right_bottom_v1 <= 0) &&
-											 (right_top_v1    <= 0);
-				const bool positive_half2  = (left_bottom_v2  >  0) &&
-											 (left_top_v2     >  0) &&
-											 (right_bottom_v2 >  0) &&
-											 (right_top_v2    >  0);
-				const bool negative_half2  = (left_bottom_v2  <= 0) &&
-											 (left_top_v2     <= 0) &&
-											 (right_bottom_v2 <= 0) &&
-											 (right_top_v2    <= 0);
+				const bool positive_half0  = (left_bottom_v0  >= 0) &&
+											 (left_top_v0     >= 0) &&
+											 (right_bottom_v0 >= 0) &&
+											 (right_top_v0    >= 0);
+				const bool negative_half0  = (left_bottom_v0  <  0) &&
+											 (left_top_v0     <  0) &&
+											 (right_bottom_v0 <  0) &&
+											 (right_top_v0    <  0);
+				const bool positive_half1  = (left_bottom_v1  >= 0) &&
+											 (left_top_v1     >= 0) &&
+											 (right_bottom_v1 >= 0) &&
+											 (right_top_v1    >= 0);
+				const bool negative_half1  = (left_bottom_v1  <  0) &&
+											 (left_top_v1     <  0) &&
+											 (right_bottom_v1 <  0) &&
+											 (right_top_v1    <  0);
+				const bool positive_half2  = (left_bottom_v2  >= 0) &&
+											 (left_top_v2     >= 0) &&
+											 (right_bottom_v2 >= 0) &&
+											 (right_top_v2    >= 0);
+				const bool negative_half2  = (left_bottom_v2  <  0) &&
+											 (left_top_v2     <  0) &&
+											 (right_bottom_v2 <  0) &&
+											 (right_top_v2    <  0);
 
 				// Micro tile is totally outside the triangle
 				if (negative_half0 || negative_half1 || negative_half2)

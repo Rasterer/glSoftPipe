@@ -4,12 +4,17 @@
 
 #include "glsp_defs.h"
 #include "PipeStage.h"
-#include "DataFlow.h"
+#include "TBDR.h"
 
 NS_OPEN_GLSP_OGL()
 
 class Batch;
 class vertex_data;
+
+// TODO:
+// *.4 fixed point numbers conresponds to a 8096x8096 guard band.
+#define GUARDBAND_WIDTH  8096
+#define GUARDBAND_HEIGHT 8096
 
 class Clipper: public PipeStage
 {
@@ -43,17 +48,27 @@ public:
 
 	virtual void emit(void *data);
 	virtual void finalize();
+
+	static void ComputeGuardband(float width, float height);
+
 private:
 	static void onClipping(Batch *bat);
-	static void ClipAgainstFrustum(Primitive &prim, int outcodes_union, Primlist &out);
-	static void ComputeOutcodesFrustum(const Primitive &prim, int outcodes[]);
+	static void ClipAgainstGuardband(Primitive &prim, int outcodes_union, Primlist &out);
+	static void ComputeOutcodesFrustum(const Primitive &prim, int outcodes[3]);
+	static void ComputeOutcodesGuardband(const Primitive &prim, int outcodes[3]);
 	static void vertexLerp(vsOutput &new_vert,
 			  vsOutput &vert1,
 			  vsOutput &vert2,
 			  float t);
 
 private:
-	static const glm::vec4 sPlanes[MAX_PLANES];
+	static glm::vec4 sPlanes[MAX_PLANES];
+	static const int kGBClipMask =  (1 << PLANE_NEAR)      |
+									(1 << PLANE_FAR)       |
+									(1 << PLANE_GB_LEFT)   |
+									(1 << PLANE_GB_RIGHT)  |
+									(1 << PLANE_GB_BOTTOM) |
+									(1 << PLANE_GB_TOP);
 };
 
 NS_CLOSE_GLSP_OGL()

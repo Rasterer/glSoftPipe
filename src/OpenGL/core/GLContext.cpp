@@ -1,5 +1,7 @@
 #include "GLContext.h"
 
+#include "DrawEngine.h"
+#include "Clipper.h"
 #include "glsp_debug.h"
 #include "khronos/GL/glcorearb.h"
 
@@ -129,6 +131,8 @@ void GLContext::applyViewport(int x, int y, int width, int height)
 
 	vp.xCenter = vp.x + vp.xScale;
 	vp.yCenter = vp.y + vp.yScale;
+
+	DrawEngine::getDrawEngine().GetClipper().ComputeGuardband(width, height);
 }
 
 

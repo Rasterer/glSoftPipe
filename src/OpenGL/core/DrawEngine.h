@@ -92,6 +92,7 @@ public:
 	void setDrawContextList(DrawContext *dc) { mDrawContextList = dc; }
 
 	RasterizationStage* getRastStage() const { return mRast; }
+	Clipper& GetClipper() const { return *mClipper; }
 
 protected:
 	DrawEngine();

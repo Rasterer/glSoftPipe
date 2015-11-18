@@ -54,8 +54,8 @@ void ScreenMapper::viewportTransform(Batch *bat)
 		const float fy = pos2.y - pos0.y;
 		const float area = ex * fy - ey * fx;
 
-		// Discard the triangles whose area are less than 1
-		if(abs(area) < 0.1f)
+		// Discard degenerate triangles
+		if(abs(area) == 0.0f)
 		{
 			Primitive *prim = *it;
 			it = pl.erase(it);
