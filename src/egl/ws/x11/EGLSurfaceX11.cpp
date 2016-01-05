@@ -5,6 +5,7 @@
 #include <X11/Xlib-xcb.h>
 #include <xcb/dri2.h>
 #include "EGLDisplayX11.h"
+#include "compiler.h"
 
 
 NS_OPEN_GLSP_EGL()
@@ -74,21 +75,25 @@ bool EGLSurfaceX11::getBuffers(void **addr, int *width, int *height)
 	*width  = mWidth  = reply->width;
 	*height = mHeight = reply->height;
 
-	if(mCurrentBO)
-	{
-		::drm_intel_bo_unreference(mCurrentBO);
-		mCurrentBO = NULL;
-	}
-
 	drm_intel_bufmgr *pBufMgr = pDisp->getDrmBufMgr();
 
-	mCurrentBO = ::drm_intel_bo_gem_create_from_name(pBufMgr,
-													 "egl_from_handle",
-													 buffers->name);
+	if (LIKELY(mBufferCache.find(buffers->name) != mBufferCache.end()))
+	{
+		::drm_intel_gem_bo_start_gtt_access(mBufferCache[buffers->name], 1);
 
-	::drm_intel_gem_bo_map_gtt(mCurrentBO);
+		mCurrentBO = mBufferCache[buffers->name];
+		*addr = mCurrentBO->virt;
+	}
+	else
+	{
+		mCurrentBO = ::drm_intel_bo_gem_create_from_name(pBufMgr,
+														 "egl_from_handle",
+														 buffers->name);
 
-	*addr = mCurrentBO->virt;
+		::drm_intel_gem_bo_map_gtt(mCurrentBO);
+		mBufferCache[buffers->name] = mCurrentBO;
+		*addr = mCurrentBO->virt;
+	}
 
 	free(reply);
 
@@ -127,20 +132,16 @@ bool EGLSurfaceX11::swapBuffers()
 		free(reply);
 	}
 
-	if(mCurrentBO)
-	{
-		::drm_intel_bo_unreference(mCurrentBO);
-		mCurrentBO = NULL;
-	}
+	mCurrentBO = NULL;
 
 	return ret && swap_count != -1;
 }
 
 EGLSurfaceX11::~EGLSurfaceX11()
 {
-	if(mCurrentBO)
+	for (auto &bo: mBufferCache)
 	{
-		::drm_intel_bo_unreference(mCurrentBO);
+		::drm_intel_bo_unreference(bo.second);
 	}
 }
 

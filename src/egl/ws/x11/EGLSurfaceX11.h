@@ -2,6 +2,8 @@
 
 #define _XSERVER64
 
+#include <unordered_map>
+
 #include <xf86drm.h>
 #include <xcb/xcb.h>
 #include "EGLSurfaceBase.h"
@@ -32,6 +34,7 @@ private:
 	::xcb_gcontext_t mXContext;
 
 	::drm_intel_bo  *mCurrentBO;
+	std::unordered_map<uint32_t, ::drm_intel_bo *> mBufferCache;
 };
 
 NS_CLOSE_GLSP_EGL()
