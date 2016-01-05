@@ -14,8 +14,7 @@
 
 // b should be power of 2.
 // Watch out for 32 & 64 mix and match!
-#define ALIGN(a, b)       (((a) + ((b) - 1)) & (~((b) - 1)))
-#define ROUND_UP(a, b)    (ALIGN((a), (b)))
+#define ROUND_UP(a, b)       (((a) + ((b) - 1)) & (~((b) - 1)))
 #define ROUND_DOWN(a, b)  ((a) & (~((b) - 1)))
 
 // *.4 fixed point precision

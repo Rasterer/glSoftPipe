@@ -38,6 +38,7 @@ void ScreenMapper::viewportTransform(Batch *bat)
 	{
 		for(size_t i = 0; i < 3; ++i)
 		{
+			// TODO: snap to sub-pixel grids
 			vec4 &pos = (*it)->mVert[i].position();
 			pos.x = xCenter + pos.x * xScale;
 			pos.y = yCenter + pos.y * yScale;

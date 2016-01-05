@@ -88,6 +88,11 @@ private:
 		FragColor = texture2D(mSampler, oTexCoor);
 	}
 
+	virtual void OnExecuteSIMD(__m128 in[], __m128 out[])
+	{
+		texture2D(mSampler, in[4], in[4 + 1], out);
+	}
+
 private:
 	sampler2D mSampler;
 	GLint     mgl_Position;
@@ -151,7 +156,7 @@ int main(int argc, char **argv)
 			XCB_COPY_FROM_PARENT,
 			window,
 			screen->root,
-			0, 0, 1280, 720,
+			0, 0, 1664, 980,
 			0,
 			XCB_WINDOW_CLASS_INPUT_OUTPUT,
 			screen->root_visual,

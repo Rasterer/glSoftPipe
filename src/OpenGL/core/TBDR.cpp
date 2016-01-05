@@ -8,6 +8,7 @@
 #include "GLContext.h"
 #include "DrawEngine.h"
 #include "glsp_spinlock.h"
+#include "compiler.h"
 
 
 NS_OPEN_GLSP_OGL()
@@ -124,20 +125,119 @@ void Binning::finalize()
 {
 }
 
+static inline void CalculatePlaneEquation(__m128 &A, __m128 &lambda0, __m128 &B, __m128 &lambda1, __m128 &C)
+{
+#if defined(__AVX2_)
+	// FMA, relaxed floating-point precision
+	C = _mm_fmadd_ps(A, lambda0, C);
+	C = _mm_fmadd_ps(B, lambda1, C);
+#else 
+	__m128 vTmp = _mm_mul_ps(A, lambda0);
+	C           = _mm_add_ps(C, vTmp);
+	vTmp        = _mm_mul_ps(B, lambda1);
+	C           = _mm_add_ps(C, vTmp);
+#endif
+}
+
 void PerspectiveCorrectInterpolater::emit(void *data)
+{
+	//onInterpolatingSISD(data);
+	onInterpolatingSIMD(data);
+	getNextStage()->emit(data);
+}
+
+void PerspectiveCorrectInterpolater::onInterpolatingSISD(void *data)
 {
 	Fsio &fsio = *static_cast<Fsio *>(data);
 	const Triangle *tri = static_cast<Triangle *>(fsio.m_priv0);
-	const fsInput &base = tri->mVert[0].mAttrReciprocal;
+	size_t size = tri->mPrim.mVert[0].getRegsNum();
 
-	onInterpolating(base,
-					tri->mGradientX,
-					tri->mGradientY,
-					fsio.x + 0.5f - base.position().x,
-					fsio.y + 0.5f - base.position().y,
-					fsio.in);
+	const float &stepx = fsio.x;
+	const float &stepy = fsio.y;
+	float w     = tri->mWRecipGradientX * stepx + tri->mWRecipGradientY * stepy + tri->mWRecipAtOrigin;
+	w = 1.0f / w;
 
-	getNextStage()->emit(data);
+	float pcbc0 = tri->mPCBCOnW0GradientX * stepx + tri->mPCBCOnW0GradientY * stepy + tri->mPCBCOnW0AtOrigin;
+	float pcbc1 = tri->mPCBCOnW1GradientX * stepx + tri->mPCBCOnW1GradientY * stepy + tri->mPCBCOnW1AtOrigin;
+
+	pcbc0 *= w;
+	pcbc1 *= w;
+
+	for (size_t i = 1; i < size; ++i)
+	{
+		fsio.in[i] = tri->mVert2->getReg(i) + tri->mAttrPlaneEquationA[i] * pcbc0 + tri->mAttrPlaneEquationB[i] * pcbc1;
+	}
+}
+
+void PerspectiveCorrectInterpolater::onInterpolatingSIMD(void *data)
+{
+	Fsiosimd &fsio = *static_cast<Fsiosimd *>(data);
+	const Triangle *tri = static_cast<Triangle *>(fsio.m_priv0);
+	size_t size = tri->mPrim.mVert[0].getRegsNum();
+	__m128 vX = _mm_cvtepi32_ps(_mm_set_epi32(fsio.x, fsio.x + 1, fsio.x,     fsio.x + 1));
+	__m128 vY = _mm_cvtepi32_ps(_mm_set_epi32(fsio.y, fsio.y,     fsio.y + 1, fsio.y + 1));
+
+	__m128 vGradX = _mm_set_ps1(tri->mWRecipGradientX);
+	__m128 vGradY = _mm_set_ps1(tri->mWRecipGradientY);
+	__m128 vW     = _mm_set_ps1(tri->mWRecipAtOrigin);
+	CalculatePlaneEquation(vGradX, vX, vGradY, vY, vW);
+	vW = _mm_rcp_ps(vW);
+
+	vGradX        = _mm_set_ps1(tri->mPCBCOnW0GradientX);
+	vGradY        = _mm_set_ps1(tri->mPCBCOnW0GradientY);
+	__m128 vPCBC0 = _mm_set_ps1(tri->mPCBCOnW0AtOrigin);
+	CalculatePlaneEquation(vGradX, vX, vGradY, vY, vPCBC0);
+	vPCBC0 = _mm_mul_ps(vPCBC0, vW);
+
+	vGradX        = _mm_set_ps1(tri->mPCBCOnW1GradientX);
+	vGradY        = _mm_set_ps1(tri->mPCBCOnW1GradientY);
+	__m128 vPCBC1 = _mm_set_ps1(tri->mPCBCOnW1AtOrigin);
+	CalculatePlaneEquation(vGradX, vX, vGradY, vY, vPCBC1);
+	vPCBC1 = _mm_mul_ps(vPCBC1, vW);
+
+	//float __attribute__((aligned(16))) pcbc0[4];
+	//float __attribute__((aligned(16))) pcbc1[4];
+	//float __attribute__((aligned(16))) w[4];
+	//_mm_store_ps(pcbc0, vPCBC0);
+	//_mm_store_ps(pcbc1, vPCBC1);
+	//_mm_store_ps(w, vW);
+
+	//printf("jzb: pcbc0: %f %f %f %f\n", pcbc0[0], pcbc0[1], pcbc0[2], pcbc0[3]);
+	//printf("jzb: pcbc1: %f %f %f %f\n", pcbc1[0], pcbc1[1], pcbc1[2], pcbc1[3]);
+	//printf("jzb: w: %f %f %f %f\n", w[0], w[1], w[2], w[3]);
+	//printf("jzb: original w: %f %f %f\n",
+			//tri->mPrim.mVert[0].position().w,
+			//tri->mPrim.mVert[1].position().w,
+			//tri->mPrim.mVert[2].position().w);
+
+	__m128 vRes;
+	__m128 vAPEA, vAPEB;
+	for (size_t i = 1; i < size; ++i)
+	{
+		vRes   = _mm_set_ps1(tri->mVert2->getReg(i).x);
+		vAPEA = _mm_set_ps1(tri->mAttrPlaneEquationA[i].x);
+		vAPEB = _mm_set_ps1(tri->mAttrPlaneEquationB[i].x);
+		CalculatePlaneEquation(vAPEA, vPCBC0, vAPEB, vPCBC1, vRes);
+		_mm_store_ps((float *)&fsio.mInRegs[4 * i + 0], vRes);
+
+		vRes   = _mm_set_ps1(tri->mVert2->getReg(i).y);
+		vAPEA = _mm_set_ps1(tri->mAttrPlaneEquationA[i].y);
+		vAPEB = _mm_set_ps1(tri->mAttrPlaneEquationB[i].y);
+		CalculatePlaneEquation(vAPEA, vPCBC0, vAPEB, vPCBC1, vRes);
+		_mm_store_ps((float *)&fsio.mInRegs[4 * i + 1], vRes);
+
+		vRes   = _mm_set_ps1(tri->mVert2->getReg(i).z);
+		vAPEA = _mm_set_ps1(tri->mAttrPlaneEquationA[i].z);
+		vAPEB = _mm_set_ps1(tri->mAttrPlaneEquationB[i].z);
+		CalculatePlaneEquation(vAPEA, vPCBC0, vAPEB, vPCBC1, vRes);
+		_mm_store_ps((float *)&fsio.mInRegs[4 * i + 2], vRes);
+
+		vRes   = _mm_set_ps1(tri->mVert2->getReg(i).w);
+		vAPEA = _mm_set_ps1(tri->mAttrPlaneEquationA[i].w);
+		vAPEB = _mm_set_ps1(tri->mAttrPlaneEquationB[i].w);
+		CalculatePlaneEquation(vAPEA, vPCBC0, vAPEB, vPCBC1, vRes);
+		_mm_store_ps((float *)&fsio.mInRegs[4 * i + 3], vRes);
+	}
 }
 
 void PerspectiveCorrectInterpolater::onInterpolating(
@@ -189,6 +289,7 @@ void PerspectiveCorrectInterpolater::onInterpolating(
 	}
 }
 
+// TODO: SIMD boost
 Triangle::Triangle(Primitive &prim):
 	mPrim(prim)
 {
@@ -209,6 +310,8 @@ Triangle::Triangle(Primitive &prim):
 		v1 = &prim.mVert[1];
 		v2 = &prim.mVert[0];
 	}
+
+	mVert2 = v2;
 
 	/* Fixed point rasterization algorithm
 	 */
@@ -272,76 +375,60 @@ Triangle::Triangle(Primitive &prim):
 	ymin = clamp(ymin, 0, g_GC->mRT.height - 1);
 	ymax = clamp(ymax, 0, g_GC->mRT.height - 1);
 
-	// The attr/w can be interpolated linearly.
-	const float ZReciprocal0 = 1.0f / v0->position().w;
-	const float ZReciprocal1 = 1.0f / v1->position().w;
-	const float ZReciprocal2 = 1.0f / v2->position().w;
+	const float WReciprocal0 = 1.0f / v0->position().w;
+	const float WReciprocal1 = 1.0f / v1->position().w;
+	const float WReciprocal2 = 1.0f / v2->position().w;
+
+	const float area_reciprocal = fabs(prim.mAreaReciprocal);
+
+	const float y1y2f = (v1->position().y - v2->position().y) * area_reciprocal;
+	const float y2y0f = (v2->position().y - v0->position().y) * area_reciprocal;
+	const float y0y1f = (v0->position().y - v1->position().y) * area_reciprocal;
+
+	const float x2x1f = (v2->position().x - v1->position().x) * area_reciprocal;
+	const float x0x2f = (v0->position().x - v2->position().x) * area_reciprocal;
+	const float x1x0f = (v1->position().x - v0->position().x) * area_reciprocal;
+
+	const float lambdax0 = y1y2f * WReciprocal0;
+	const float lambdax1 = y2y0f * WReciprocal1;
+	const float lambdax2 = y0y1f * WReciprocal2;
+
+	const float lambday0 = x2x1f * WReciprocal0;
+	const float lambday1 = x0x2f * WReciprocal1;
+	const float lambday2 = x1x0f * WReciprocal2;
+
+	// Substracted by 0.5f because of the conversion b/w
+	// pixel index and window coodinates, this avoid per-pixel
+	// substraction.
+	const float xoffset = v0->position().x - 0.5f;
+	const float yoffset = v0->position().y - 0.5f;
+
+	mPCBCOnW0GradientX = lambdax0;
+	mPCBCOnW0GradientY = lambday0;
+	mPCBCOnW0AtOrigin  = WReciprocal0 - mPCBCOnW0GradientX * xoffset - mPCBCOnW0GradientY * yoffset;
+
+	mPCBCOnW1GradientX = lambdax1;
+	mPCBCOnW1GradientY = lambday1;
+	mPCBCOnW1AtOrigin  = -mPCBCOnW1GradientX * xoffset - mPCBCOnW1GradientY * yoffset;
+
+	mWRecipGradientX   = lambdax0 + lambdax1 + lambdax2;
+	mWRecipGradientY   = lambday0 + lambday1 + lambday2;
+	mWRecipAtOrigin    = WReciprocal0 - mWRecipGradientX * xoffset - mWRecipGradientY * yoffset;
+
+	mZGradientX = y1y2f * v0->position().z + y2y0f * v1->position().z + y0y1f * v2->position().z;
+	mZGradientY = x2x1f * v0->position().z + x0x2f * v1->position().z + x1x0f * v2->position().z;
+	mZAtOrigin  = v0->position().z - mZGradientX * xoffset - mZGradientY * yoffset;
 
 	const size_t size = v0->getRegsNum();
+	mAttrPlaneEquationA.resize(size);
+	mAttrPlaneEquationB.resize(size);
 
-	mVert[0].mAttrReciprocal.resize(size);
-	mVert[1].mAttrReciprocal.resize(size);
-	mVert[2].mAttrReciprocal.resize(size);
-
-	mGradientX.resize(size);
-	mGradientY.resize(size);
-
-	mVert[0].mAttrReciprocal.position().x = v0->position().x;
-	mVert[0].mAttrReciprocal.position().y = v0->position().y;
-	mVert[0].mAttrReciprocal.position().z = v0->position().z;
-	mVert[0].mAttrReciprocal.position().w = ZReciprocal0;
-
-	mVert[1].mAttrReciprocal.position().x = v1->position().x;
-	mVert[1].mAttrReciprocal.position().y = v1->position().y;
-	mVert[1].mAttrReciprocal.position().z = v1->position().z;
-	mVert[1].mAttrReciprocal.position().w = ZReciprocal1;
-
-	mVert[2].mAttrReciprocal.position().x = v2->position().x;
-	mVert[2].mAttrReciprocal.position().y = v2->position().y;
-	mVert[2].mAttrReciprocal.position().z = v2->position().z;
-	mVert[2].mAttrReciprocal.position().w = ZReciprocal2;
-
-	for (size_t i = 1; i < v0->getRegsNum(); ++i)
+	for (size_t i = 1; i < size; ++i)
 	{
-		mVert[0].mAttrReciprocal.getReg(i) = v0->getReg(i) * ZReciprocal0;
-		mVert[1].mAttrReciprocal.getReg(i) = v1->getReg(i) * ZReciprocal1;
-		mVert[2].mAttrReciprocal.getReg(i) = v2->getReg(i) * ZReciprocal2;
+		mAttrPlaneEquationA.getReg(i) = v0->getReg(i) - v2->getReg(i);
+		mAttrPlaneEquationB.getReg(i) = v1->getReg(i) - v2->getReg(i);
 	}
-
-	const float y1y2f = (v1->position().y - v2->position().y) * prim.mAreaReciprocal;
-	const float y2y0f = (v2->position().y - v0->position().y) * prim.mAreaReciprocal;
-	const float y0y1f = (v0->position().y - v1->position().y) * prim.mAreaReciprocal;
-
-	const float x2x1f = (v2->position().x - v1->position().x) * prim.mAreaReciprocal;
-	const float x0x2f = (v0->position().x - v2->position().x) * prim.mAreaReciprocal;
-	const float x1x0f = (v1->position().x - v0->position().x) * prim.mAreaReciprocal;
-
-#define GRADIENCE_EQUATION(i, c)	\
-	mGradientX[i].c = y1y2f * mVert[0].mAttrReciprocal[i].c +	\
-					  y2y0f * mVert[1].mAttrReciprocal[i].c +	\
-					  y0y1f * mVert[2].mAttrReciprocal[i].c;		\
-	mGradientY[i].c = x2x1f * mVert[0].mAttrReciprocal[i].c +	\
-					  x0x2f * mVert[1].mAttrReciprocal[i].c +	\
-					  x1x0f * mVert[2].mAttrReciprocal[i].c;
-
-	mGradientX[0].x = 1.0f;
-	mGradientX[0].y = 0.0f;
-
-	mGradientY[0].x = 0.0f;
-	mGradientY[0].y = 1.0f;
-
-	GRADIENCE_EQUATION(0, z);
-	GRADIENCE_EQUATION(0, w);
-
-	for(size_t i = 1; i < size; i++)
-	{
-		GRADIENCE_EQUATION(i, x);
-		GRADIENCE_EQUATION(i, y);
-		GRADIENCE_EQUATION(i, z);
-		GRADIENCE_EQUATION(i, w);
-	}
-#undef GRADIENCE_EQUATION
-
+#if 0
 	const int texCoordLoc = g_GC->mPM.getCurrentProgram()->getFS()->GetTextureCoordLocation();
 
 	{
@@ -362,6 +449,7 @@ Triangle::Triangle(Primitive &prim):
 		e = dudy * z0   - dzdy * u0;
 		f = dvdy * z0   - dzdy * v0;
 	}
+#endif
 }
 
 TBDR::TBDR():
@@ -405,6 +493,7 @@ void TBDR::onRasterizing(DrawContext *dc)
 	}
 }
 
+// TODO: SIMD boost
 void TBDR::ProcessMacroTile(int x, int y)
 {
 	PixelPrimMap &pp_map = mPixelPrimMap[ThreadPool::getThreadID()];
@@ -427,9 +516,7 @@ void TBDR::ProcessMacroTile(int x, int y)
 
 	for (Triangle *tri: full_disp_list)
 	{
-		float z = tri->mVert[0].mAttrReciprocal.position().z +
-				  tri->mGradientX[0].z * (x + 0.5f - tri->mVert[0].mAttrReciprocal.position().x) +
-				  tri->mGradientY[0].z * (y + 0.5f - tri->mVert[0].mAttrReciprocal.position().y);
+		float z = tri->mZAtOrigin + tri->mZGradientX * x + tri->mZGradientY * y;
 
 		for (int i = 0; i < MACRO_TILE_SIZE; ++i)
 		{
@@ -443,67 +530,14 @@ void TBDR::ProcessMacroTile(int x, int y)
 					pp_map[i][j] = tri;
 				}
 
-				zx += tri->mGradientX[0].z;
+				zx += tri->mZGradientX;
 			}
-			z += tri->mGradientY[0].z;
+			z += tri->mZGradientY;
 		}
 	}
 
 	for (Triangle *tri: disp_list)
 	{
-#if 0
-		const float x0 = tri->mVert[0].mAttrReciprocal.position().x;
-		const float y0 = tri->mVert[0].mAttrReciprocal.position().y;
-
-		const float x1 = tri->mVert[1].mAttrReciprocal.position().x;
-		const float y1 = tri->mVert[1].mAttrReciprocal.position().y;
-
-		const float x2 = tri->mVert[2].mAttrReciprocal.position().x;
-		const float y2 = tri->mVert[2].mAttrReciprocal.position().y;
-
-		const float x1x0 = x1 - x0;
-		const float x2x1 = x2 - x1;
-		const float x0x2 = x0 - x2;
-
-		const float y0y1 = y0 - y1;
-		const float y1y2 = y1 - y2;
-		const float y2y0 = y2 - y0;
-
-		float C0 = x1 * y2 - x2 * y1;
-		float C1 = x2 * y0 - x0 * y2;
-		float C2 = x0 * y1 - x1 * y0;
-		float z = tri->mVert[0].mAttrReciprocal.position().z +
-				  tri->mGradientX[0].z * (x + 0.5f - tri->mVert[0].mAttrReciprocal.position().x) +
-				  tri->mGradientY[0].z * (y + 0.5f - tri->mVert[0].mAttrReciprocal.position().y);
-
-		for (int yp = y, i = 0; i < MACRO_TILE_SIZE; yp++, ++i)
-		{
-			for (int xp = x, j = 0; j < MACRO_TILE_SIZE; xp++, ++j)
-			{
-				float sum0  = y0y1 * (xp + 0.5f) + x1x0 * (yp + 0.5f) + C2;
-
-				float sum1  = y1y2 * (xp + 0.5f) + x2x1 * (yp + 0.5f) + C0;
-
-				float sum2  = y2y0 * (xp + 0.5f) + x0x2 * (yp + 0.5f) + C1;
-								if (sum0 >= 0.0f && sum1 >= 0.0f && sum2 >= 0.0f)
-								{
-									const int xoff = j;
-									const int yoff = i;
-
-									const float zp = z + j * tri->mGradientX[0].z + i * tri->mGradientY[0].z;
-									if (zp < z_buf[yoff][xoff])
-									{
-										z_buf [yoff][xoff] = zp;
-										pp_map[yoff][xoff] = tri;
-									}
-								}
-								else
-								{
-								}
-			}
-		}
-#endif
-#if 1
 		for (int yp = y, i = 0; i < MICRO_TILES_IN_MACRO_TILE; yp += MICRO_TILE_SIZE, ++i)
 		{
 			for (int xp = x, j = 0; j < MICRO_TILES_IN_MACRO_TILE; xp += MICRO_TILE_SIZE, ++j)
@@ -560,9 +594,7 @@ void TBDR::ProcessMacroTile(int x, int y)
 				}
 				else
 				{
-					float z = tri->mVert[0].mAttrReciprocal.position().z +
-							  tri->mGradientX[0].z * (xp + 0.5f - tri->mVert[0].mAttrReciprocal.position().x) +
-							  tri->mGradientY[0].z * (yp + 0.5f - tri->mVert[0].mAttrReciprocal.position().y);
+					float z = tri->mZAtOrigin + tri->mZGradientX * xp + tri->mZGradientY * yp;
 
 					// Micro tile is totally inside the triangle
 					if (positive_half0 && positive_half1 && positive_half2)
@@ -582,9 +614,9 @@ void TBDR::ProcessMacroTile(int x, int y)
 									pp_map[yoff][xoff] = tri;
 								}
 
-								zx += tri->mGradientX[0].z;
+								zx += tri->mZGradientX;
 							}
-							z += tri->mGradientY[0].z;
+							z += tri->mZGradientY;
 						}
 					}
 					// This micro tile totally contain the triangle(can do OPT ?),
@@ -604,7 +636,7 @@ void TBDR::ProcessMacroTile(int x, int y)
 									const int xoff = (j << MICRO_TILE_SIZE_SHIFT) + l;
 									const int yoff = (i << MICRO_TILE_SIZE_SHIFT) + k;
 
-									const float zp = z + l * tri->mGradientX[0].z + k * tri->mGradientY[0].z;
+									const float zp = z + l * tri->mZGradientX + k * tri->mZGradientY;
 									if (zp < z_buf[yoff][xoff])
 									{
 										z_buf [yoff][xoff] = zp;
@@ -624,9 +656,11 @@ void TBDR::ProcessMacroTile(int x, int y)
 				}
 			}
 		}
-#endif
 	}
 
+	// TODO: early z/stencil
+	// TODO: hierarcical z/stencil
+#if 0
 	for (int i = 0; i < MACRO_TILE_SIZE; ++i)
 	{
 		for (int j = 0; j < MACRO_TILE_SIZE; ++j)
@@ -639,6 +673,16 @@ void TBDR::ProcessMacroTile(int x, int y)
 			}
 		}
 	}
+#endif
+#if 1
+	for (int i = 0; i < MACRO_TILE_SIZE; i += 2)
+	{
+		for (int j = 0; j < MACRO_TILE_SIZE; j += 2)
+		{
+			RenderQuadPixels(pp_map, x, y, i, j);
+		}
+	}
+#endif
 }
 
 void TBDR::RenderOnePixel(Triangle *tri, int x, int y, float z)
@@ -650,6 +694,67 @@ void TBDR::RenderOnePixel(Triangle *tri, int x, int y, float z)
 	fsio.mIndex  = (g_GC->mRT.height - y - 1) * g_GC->mRT.width + x;
 	fsio.m_priv0 = tri;
 	fsio.in.resize(tri->mPrim.mVert[0].getRegsNum());
+
+	getNextStage()->emit(&fsio);
+}
+
+void TBDR::RenderQuadPixels(PixelPrimMap pp_map, int x, int y, int i, int j)
+{
+	int quad_mask = 0xf;
+
+	Triangle *tri[4] =
+	{
+		pp_map[i    ][j    ],
+		pp_map[i    ][j + 1],
+		pp_map[i + 1][j    ],
+		pp_map[i + 1][j + 1]
+	};
+
+	for (int s = 0; s < 4; s++)
+	{
+		if (tri[s] == nullptr)
+			quad_mask &= ~(1 << s);
+	}
+
+	if (!quad_mask)
+		return;
+
+	unsigned idx;
+	while(_BitScanForward(&idx, quad_mask))
+	{
+		int coverage_mask = 0;
+		for (int s = 0; s < 4; s++)
+		{
+			if (tri[s] == tri[idx])
+				coverage_mask = 1 << idx;
+		}
+
+		quad_mask &= ~coverage_mask;
+
+		RenderQuadPixelsInOneTriangle(tri[idx], coverage_mask, x, y, i, j);
+	}
+}
+
+void TBDR::RenderQuadPixelsInOneTriangle(Triangle *tri, int coverage_mask, int x, int y, int i, int j)
+{
+	/* NOTE:
+	 * Put fsio at stack to optimize memory allocation.
+	 * However, since Fsiosimd is a large structure containing the shader input/output registers,
+	 * need take care if the max register number is increased.
+	 */
+	ALIGN(16) Fsiosimd fsio;
+
+	// TODO: need get FS from primitive state
+	FragmentShader *pFS = g_GC->mPM.getCurrentProgram()->getFS();
+	size_t fsin_num     = tri->mPrim.mVert[0].getRegsNum();
+	size_t fsout_num    = pFS->getOutRegsNum();
+
+	fsio.mInRegsNum  = fsin_num;
+	fsio.mOutRegsNum = fsout_num;
+	fsio.x = x + j;
+	fsio.y = y + i;
+	fsio.mCoverageMask = coverage_mask;
+	fsio.m_priv0 = tri;
 
 	getNextStage()->emit(&fsio);
 }

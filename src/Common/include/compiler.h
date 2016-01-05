@@ -34,6 +34,7 @@ unsigned char _BitScanReverse(unsigned int *Index, unsigned Mask)
 # define UNLIKELY(x)    __builtin_expect(!!(x), 0)
 # define THREAD_LOCAL   __thread
 
+
 #elif defined(__GNUC__) || defined(__GNUG__)
 #	if defined(__x86_64__) || defined(__i386__)
 #		include <x86intrin.h>
@@ -44,6 +45,7 @@ unsigned char _BitScanReverse(unsigned int *Index, unsigned Mask)
 # define LIKELY(x)      __builtin_expect(!!(x), 1)
 # define UNLIKELY(x)    __builtin_expect(!!(x), 0)
 # define THREAD_LOCAL   __thread
+# define ALIGN(a)       __attribute__((aligned(a)))
 
 inline
 unsigned char _BitScanForward(unsigned int *Index, unsigned Mask)

@@ -2,12 +2,13 @@
 
 #include "glsp_defs.h"
 #include "NameSpace.h"
+#include "DataFlow.h"
 #include "BufferObject.h"
 
 
 NS_OPEN_GLSP_OGL()
 
-#define MAX_VERTEX_ATTRIBS 16
+#define MAX_VERTEX_ATTRIBS MAX_SHADER_REGISTERS
 
 struct VertexAttribState
 {

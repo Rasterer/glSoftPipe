@@ -12,6 +12,7 @@
 #include "PipeStage.h"
 #include "DataFlow.h"
 #include "Texture.h"
+#include "compiler.h"
 
 
 NS_OPEN_GLSP_OGL()
@@ -122,6 +123,8 @@ public:
 	void SetTextureCoordLocation() { mTexCoordLoc = mInRegs.size(); }
 	int  GetTextureCoordLocation() const { return mTexCoordLoc; }
 
+	unsigned getOutRegsNum() const { return mOutRegs.size(); }
+
 	static void* getPrivateData() { return m_priv; }
 
 protected:
@@ -135,8 +138,6 @@ protected:
 
 	void declareSampler();
 	void setHasSampler()    { bHasSampler = true; }
-
-	unsigned getOutRegsNum() const { return mOutRegs.size(); }
 
 	glm::vec4 texture2D(sampler2D sampler, const glm::vec2 &coord)
 	{
@@ -272,6 +273,8 @@ public:
 
 	void attachTextures(Texture *tex) { mTextures = tex; }
 
+	void ExecuteSIMD(void *data);
+	void ExecuteSISD(void *data);
 	glm::vec4 texture2D(sampler2D sampler, const glm::vec2 &coord)
 	{
 		glm::vec4 res;
@@ -280,6 +283,10 @@ public:
 
 		return res;
 	}
+
+	void texture2D(sampler2D sampler, const __m128 &s, const __m128 &t, __m128 out[]);
+
+	virtual void OnExecuteSIMD(__m128 in[], __m128 out[]) { return; }
 
 private:
 	virtual void execute(fsInput& in, fsOutput& out);

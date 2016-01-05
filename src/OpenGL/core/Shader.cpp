@@ -237,6 +237,13 @@ FragmentShader::FragmentShader():
 
 void FragmentShader::emit(void *data)
 {
+	//ExecuteSISD(data);
+	ExecuteSIMD(data);
+	getNextStage()->emit(data);
+}
+
+void FragmentShader::ExecuteSISD(void *data)
+{
 	Fsio &fsio = *static_cast<Fsio *>(data);
 	const Triangle *tri = static_cast<Triangle *>(fsio.m_priv0);
 
@@ -246,8 +253,18 @@ void FragmentShader::emit(void *data)
 	attachTextures(tri->mPrim.mDC->mTextures);
 
 	execute(fsio.in, fsio.out);
+}
 
-	getNextStage()->emit(data);
+void FragmentShader::ExecuteSIMD(void *data)
+{
+	Fsiosimd &fsio = *static_cast<Fsiosimd *>(data);
+	const Triangle *tri = static_cast<Triangle *>(fsio.m_priv0);
+
+	m_priv = &fsio;
+
+	attachTextures(tri->mPrim.mDC->mTextures);
+
+	OnExecuteSIMD(fsio.mInRegs, fsio.mOutRegs);
 }
 
 void FragmentShader::compile()
@@ -260,6 +277,11 @@ void FragmentShader::execute(fsInput& in, fsOutput& out)
 	GLSP_UNREFERENCED_PARAM(in);
 
 	out.fragcolor() = vec4(0.0f, 255.0f, 0.0f, 255.0f);
+}
+
+void FragmentShader::texture2D(sampler2D sampler, const __m128 &s, const __m128 &t, __m128 out[])
+{
+	mTextures[sampler].Texture2DSIMD(s, t, out);
 }
 
 void FragmentShader::finalize()

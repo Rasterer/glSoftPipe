@@ -54,6 +54,7 @@ public:
 
 private:
 	inline bool onDepthTesting(const Fsio &fsio);
+	bool onDepthTestingSIMD(Fsiosimd &fsio);
 };
 
 class Blender: public PipeStage
@@ -90,6 +91,7 @@ public:
 
 private:
 	inline void onFBWriting(const Fsio &fsio);
+	void onFBWritingSIMD(const Fsiosimd &fsio);
 };
 
 NS_CLOSE_GLSP_OGL()

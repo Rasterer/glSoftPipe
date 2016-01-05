@@ -7,6 +7,7 @@
 #include "khronos/GL/glcorearb.h"
 #include "glsp_defs.h"
 #include "NameSpace.h"
+#include "compiler.h"
 
 
 NS_OPEN_GLSP_OGL()
@@ -112,11 +113,16 @@ public:
 
 	float getMagMinThresh() const { return mMagMinThresh; }
 	uint32_t getAvailableMipmaps() const { return mAvailableMipmaps; }
+	void Texture2DSIMD(const __m128 &u, const __m128 &v, __m128 out[]);
 
 public:
 	void (*m_pfnTexture2D)(const Shader *pShader, const Texture *pTex, const glm::vec2 &coord, glm::vec4 &res);
 	void (*m_pfnTexture2DMag)(const Texture *pTex, unsigned int level, const glm::vec2 &coord, glm::vec4 &res);
 	void (*m_pfnTexture2DMin)(const Texture *pTex, float lambda, const glm::vec2 &coord, glm::vec4 &res);
+
+	//void (*m_pfnTexture2DSIMD)(const Texture *pTex, const glm::vec4 &s, const glm::vec4 &t, glm::vec4 *res);
+	//void (*m_pfnTexture2DMagSIMD)(const Texture *pTex, unsigned int level, const glm::vec4 &s, const glm::vec4 &t, glm::vec4 *res);
+	//void (*m_pfnTexture2DMinSIMD)(const Texture *pTex, float lambda, const glm::vec4 &s, const glm::vec4 &t, glm::vec4 *res);
 
 	typedef int (*PWrapFunc)(int coord, int size);
 
@@ -128,7 +134,7 @@ private:
 	// FIXME: now just check base mipmap level
 	// need check more stuff.
 	bool IsComplete();
-	bool PickupWrapFunc(GLenum mode, PWrapFunc &pFunc);
+	bool PickupWrapFunc(SamplerObject &so);
 
 private:
 	TextureMipmap  *mpMipmap;

@@ -6,9 +6,12 @@
 
 #include "glsp_defs.h"
 #include "MemoryPool.h"
+#include "compiler.h"
 
 
 NS_OPEN_GLSP_OGL()
+
+#define MAX_SHADER_REGISTERS 16
 
 struct DrawContext;
 
@@ -239,6 +242,25 @@ public:
 
 	int 	x, y;
 	float 	z;
+	int 	mIndex; // used to lookup the color/depth/stencil buffers
+
+	void *m_priv0;
+};
+
+class ALIGN(16) Fsiosimd
+{
+public:
+	Fsiosimd() = default;
+	~Fsiosimd() = default;
+
+	__m128  mInRegs [MAX_SHADER_REGISTERS];
+	__m128  mOutRegs[MAX_SHADER_REGISTERS];
+
+	int mInRegsNum;
+	int mOutRegsNum;
+
+	int 	x, y;
+	int     mCoverageMask;
 	int 	mIndex; // used to lookup the color/depth/stencil buffers
 
 	void *m_priv0;

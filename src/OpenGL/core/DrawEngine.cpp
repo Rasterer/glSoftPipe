@@ -246,8 +246,10 @@ void DrawEngine::linkPipeStages(GLContext *gc)
 			!(enables & GLSP_SCISSOR_TEST) &&
 			!(enables & GLSP_STENCIL_TEST))
 		{
-			mRasterizer ->setNextStage(mDepthTest);
-			mDepthTest  ->setNextStage(mInterpolater);
+			// TODO: need formal zero depth load/store OPT.
+			//mRasterizer ->setNextStage(mDepthTest);
+			//mDepthTest  ->setNextStage(mInterpolater);
+			mRasterizer ->setNextStage(mInterpolater);
 			last = mInterpolater->setNextStage(pFS);
 		}
 		else
@@ -355,10 +357,10 @@ void DrawEngine::beginFrame(GLContext *gc)
 		*((unsigned char *)rt.pColorBuffer + i + 3) = 255;
 	}
 
-	for(int i = 0; i < rt.width * rt.height; i++)
-	{
-		*(rt.pDepthBuffer + i) = 1.0f;
-	}
+	//for(int i = 0; i < rt.width * rt.height; i++)
+	//{
+		//*(rt.pDepthBuffer + i) = 1.0f;
+	//}
 
 	gc->mbInFrame = true;
 }
