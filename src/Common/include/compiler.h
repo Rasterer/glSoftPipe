@@ -47,17 +47,23 @@ unsigned char _BitScanReverse(unsigned int *Index, unsigned Mask)
 # define THREAD_LOCAL   __thread
 # define ALIGN(a)       __attribute__((aligned(a)))
 
+# if defined(GLSP_EXPORT)
+#	define LINKAGE_IMPORTEXPORT
+# else
+#	define LINKAGE_IMPORTEXPORT
+# endif
+
 inline
-unsigned char _BitScanForward(unsigned int *Index, unsigned Mask)
+unsigned char _BitScanForward(unsigned long *Index, unsigned long Mask)
 {
-	*Index = __builtin_ctz(Mask);
+	*Index = __builtin_ctzl(Mask);
 	return (Mask != 0);
 }
 
 inline
-unsigned char _BitScanReverse(unsigned int *Index, unsigned Mask)
+unsigned char _BitScanReverse(unsigned long *Index, unsigned long Mask)
 {
-	*Index = __builtin_clz(Mask);
+	*Index = __builtin_clzl(Mask);
 	return (Mask != 0);
 }
 
@@ -67,5 +73,12 @@ unsigned char _BitScanReverse(unsigned int *Index, unsigned Mask)
 # define LIKELY(x)      (x)
 # define UNLIKELY(x)    (x)
 # define THREAD_LOCAL   __declspec(thread)
+# define ALIGN(a)       __declspec(align(a))
+
+# if defined(GLSP_EXPORT)
+#	define LINKAGE_IMPORTEXPORT    __declspec(dllexport)
+# else
+#	define LINKAGE_IMPORTEXPORT    __declspec(dllimport)
+# endif
 
 #endif

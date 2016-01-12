@@ -4,7 +4,7 @@
 #include "DrawEngine.h"
 
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 ShaderRegisterFile& ShaderRegisterFile::operator+=(const ShaderRegisterFile &rhs)
 {
@@ -96,4 +96,4 @@ Primitive& Primitive::operator=(Primitive &&rhs)
 }
 
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

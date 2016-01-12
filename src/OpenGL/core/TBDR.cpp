@@ -1,3 +1,6 @@
+// Avoid MSVC to see min max as macros rather than std functions
+#define NOMINMAX 1
+
 #include "TBDR.h"
 
 #include <algorithm>
@@ -11,7 +14,7 @@
 #include "compiler.h"
 
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 static std::vector<Triangle *> s_DispList         [MAX_TILES_IN_HEIGHT][MAX_TILES_IN_WIDTH];
 static std::vector<Triangle *> s_FullCoverDispList[MAX_TILES_IN_HEIGHT][MAX_TILES_IN_WIDTH];
@@ -152,8 +155,8 @@ void PerspectiveCorrectInterpolater::onInterpolatingSISD(void *data)
 	const Triangle *tri = static_cast<Triangle *>(fsio.m_priv0);
 	size_t size = tri->mPrim.mVert[0].getRegsNum();
 
-	const float &stepx = fsio.x;
-	const float &stepy = fsio.y;
+	const float &stepx = (float)fsio.x;
+	const float &stepy = (float)fsio.y;
 	float w     = tri->mWRecipGradientX * stepx + tri->mWRecipGradientY * stepy + tri->mWRecipAtOrigin;
 	w = 1.0f / w;
 
@@ -719,8 +722,8 @@ void TBDR::RenderQuadPixels(PixelPrimMap pp_map, int x, int y, int i, int j)
 	if (!quad_mask)
 		return;
 
-	unsigned idx;
-	while(_BitScanForward(&idx, quad_mask))
+	unsigned long idx;
+	while(_BitScanForward(&idx, (unsigned long)quad_mask))
 	{
 		int coverage_mask = 0;
 		for (int s = 0; s < 4; s++)
@@ -778,4 +781,4 @@ void TBDR::finalize()
 	}
 }
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

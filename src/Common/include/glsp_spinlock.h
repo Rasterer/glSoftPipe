@@ -20,10 +20,19 @@ namespace glsp {
 class SpinLock
 {
 public:
+
+// To WA the VS2013 ATOMIC_FLAG_INIT bug.
+#if 0
 	SpinLock():
 		mLock(ATOMIC_FLAG_INIT)
 	{
 	}
+#else
+	SpinLock()
+	{
+		mLock.clear();
+	}
+#endif
 	~SpinLock() = default;
 
 	void lock()

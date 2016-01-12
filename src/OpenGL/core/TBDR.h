@@ -2,7 +2,6 @@
 
 #include "Rasterizer.h"
 #include "PipeStage.h"
-#include "glsp_defs.h"
 #include "utils.h"
 
 
@@ -27,7 +26,7 @@
 #define RAST_SUBPIXELS      FIXED_POINT4
 
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 class Batch;
 class Triangle;
@@ -152,4 +151,4 @@ public:
 								 fsInput &out);
 };
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

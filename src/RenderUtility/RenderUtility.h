@@ -1,7 +1,5 @@
-#ifndef MESH_H
-#define	MESH_H
+#pragma once
 
-#include <map>
 #include <string>
 #include <vector>
 #include <assimp/Importer.hpp>      // C++ importer interface
@@ -10,13 +8,14 @@
 #include <glm/glm.hpp>
 #include <Magick++.h>
 
+
+namespace glsp {
 #include "khronos/GL/glcorearb.h"
 
-
-class Texture
+class Materials
 {
 public:
-    Texture(GLenum TextureTarget, const std::string& FileName);
+	Materials(GLenum TextureTarget, const std::string& FileName);
 
     bool Load();
 
@@ -46,17 +45,14 @@ struct Vertex
     }
 };
 
-
 class Mesh
 {
 public:
     Mesh();
-
     ~Mesh();
 
     bool LoadMesh(const std::string& Filename);
-
-    void Render();
+    virtual void Render();
 
 private:
     bool InitFromScene(const aiScene* pScene, const std::string& Filename);
@@ -81,9 +77,7 @@ private:
     };
 
     std::vector<MeshEntry> m_Entries;
-    std::vector<Texture*> m_Textures;
+	std::vector<Materials*> m_Textures;
 };
 
-
-#endif	/* MESH_H */
-
+} // namespace glsp

@@ -1,24 +1,26 @@
-#include <assert.h>
+#include "RenderUtility.h"
+
+#include <cassert>
 #include <cstdio>
 
-#include "mesh.h"
 
+namespace glsp {
 
-Texture::Texture(GLenum TextureTarget, const std::string& FileName)
+Materials::Materials(GLenum TextureTarget, const std::string& FileName)
 {
     m_textureTarget = TextureTarget;
     m_fileName      = FileName;
     m_pImage        = NULL;
 }
 
-bool Texture::Load()
+bool Materials::Load()
 {
     try {
-        m_pImage = new Magick::Image(m_fileName);
+		m_pImage = new Magick::Image(m_fileName);
         m_pImage->write(&m_blob, "RGBA");
     }
     catch (Magick::Error& Error) {
-        printf("Error loading texture '%s'\n", m_fileName.c_str());
+        printf("Error loading texture '%s'\n", Error.what());
         return false;
     }
 
@@ -31,7 +33,7 @@ bool Texture::Load()
     return true;
 }
 
-void Texture::Bind(GLenum TextureUnit)
+void Materials::Bind(GLenum TextureUnit)
 {
     glActiveTexture(TextureUnit);
     glBindTexture(m_textureTarget, m_textureObj);
@@ -192,7 +194,7 @@ bool Mesh::InitMaterials(const aiScene* pScene, const std::string& Filename)
 
             if (pMaterial->GetTexture(aiTextureType_DIFFUSE, 0, &Path, NULL, NULL, NULL, NULL, NULL) == AI_SUCCESS) {
                 std::string FullPath = Dir + "/" + Path.data;
-                m_Textures[i] = new Texture(GL_TEXTURE_2D, FullPath.c_str());
+				m_Textures[i] = new Materials(GL_TEXTURE_2D, FullPath);
 
                 if (!m_Textures[i]->Load()) {
                     printf("Error loading texture '%s'\n", FullPath.c_str());
@@ -208,7 +210,7 @@ bool Mesh::InitMaterials(const aiScene* pScene, const std::string& Filename)
 
         // Load a white texture in case the model does not include its own texture
         if (!m_Textures[i]) {
-            m_Textures[i] = new Texture(GL_TEXTURE_2D, "./white.png");
+            m_Textures[i] = new Materials(GL_TEXTURE_2D, "./white.png");
 
             Ret = m_Textures[i]->Load();
         }
@@ -244,3 +246,5 @@ void Mesh::Render()
     glDisableVertexAttribArray(1);
     //glDisableVertexAttribArray(2);
 }
+
+} // namespace glsp

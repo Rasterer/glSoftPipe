@@ -3,11 +3,10 @@
 #include "DrawEngine.h"
 #include "Clipper.h"
 #include "glsp_debug.h"
+
+
+namespace glsp {
 #include "khronos/GL/glcorearb.h"
-
-
-using glsp::ogl::GLContext;
-using glsp::ogl::GLViewport;
 
 GLAPI void APIENTRY glViewport (GLint x, GLint y, GLsizei width, GLsizei height)
 {
@@ -47,8 +46,6 @@ GLAPI void APIENTRY glEnable (GLenum cap)
 	}
 }
 
-NS_OPEN_GLSP_OGL()
-
 GLContext *g_GC = nullptr;
 
 static void setCurrentContext(void *gc)
@@ -61,9 +58,9 @@ GLContext* getCurrentContext()
 	return g_GC;
 }
 
-void* CreateContext(void *EglCtx, int major, int minor)
+GLContext* CreateContext(int major, int minor)
 {
-	GLContext *gc = new GLContext(EglCtx, major, minor);
+	GLContext *gc = new GLContext(major, minor);
 	return gc;
 }
 
@@ -83,10 +80,9 @@ void MakeCurrent(void *gc)
 	setCurrentContext(gc);
 }
 
-GLContext::GLContext(void *EglCtx, int major, int minor):
+GLContext::GLContext(int major, int minor):
 	mEmitFlag(0),
 	mbInFrame(false),
-	mpEGLContext(EglCtx),
 	mVersionMajor(major),
 	mVersionMinor(minor)
 {
@@ -132,8 +128,8 @@ void GLContext::applyViewport(int x, int y, int width, int height)
 	vp.xCenter = vp.x + vp.xScale;
 	vp.yCenter = vp.y + vp.yScale;
 
-	DrawEngine::getDrawEngine().GetClipper().ComputeGuardband(width, height);
+	DrawEngine::getDrawEngine().GetClipper().ComputeGuardband((float)width, (float)height);
 }
 
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

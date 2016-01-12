@@ -10,7 +10,7 @@
 
 namespace glsp {
 
-static std::atomic_int sID(0);
+static std::atomic_int sID = ATOMIC_VAR_INIT(0);
 static THREAD_LOCAL int s_TlsId = 0;
 
 ThreadPool::ThreadPool():

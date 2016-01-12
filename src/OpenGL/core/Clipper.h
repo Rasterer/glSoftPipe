@@ -2,11 +2,10 @@
 
 #include <glm/glm.hpp>
 
-#include "glsp_defs.h"
 #include "PipeStage.h"
 #include "TBDR.h"
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 class Batch;
 class vertex_data;
@@ -62,7 +61,6 @@ private:
 			  float t);
 
 private:
-	static glm::vec4 sPlanes[MAX_PLANES];
 	static const int kGBClipMask =  (1 << PLANE_NEAR)      |
 									(1 << PLANE_FAR)       |
 									(1 << PLANE_GB_LEFT)   |
@@ -71,4 +69,4 @@ private:
 									(1 << PLANE_GB_TOP);
 };
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

@@ -4,12 +4,11 @@
 #include <vector>
 #include <glm/glm.hpp>
 
-#include "glsp_defs.h"
 #include "MemoryPool.h"
 #include "compiler.h"
 
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 #define MAX_SHADER_REGISTERS 16
 
@@ -266,4 +265,4 @@ public:
 	void *m_priv0;
 };
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

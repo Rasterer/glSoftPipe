@@ -4,7 +4,7 @@
 #include "GLContext.h"
 
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 using glm::vec4;
 
@@ -76,4 +76,4 @@ void ScreenMapper::finalize()
 {
 }
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

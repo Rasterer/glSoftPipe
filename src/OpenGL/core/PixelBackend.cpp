@@ -5,7 +5,7 @@
 #include "GLContext.h"
 
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 OwnershipTester::OwnershipTester():
 	PipeStage("Ownership Test", DrawEngine::getDrawEngine())
@@ -145,10 +145,9 @@ void FBWriter::onFBWriting(const Fsio &fsio)
 	const int &index = fsio.mIndex;
 	uint8_t *colorBuffer = (uint8_t *)g_GC->mRT.pColorBuffer;
 
-	// FIXME: How could we know this is a BGRA format buffer?
-	colorBuffer[4 * index+2] = (uint8_t)(fsio.out.fragcolor().x * 256);
+	colorBuffer[4 * index+0] = (uint8_t)(fsio.out.fragcolor().x * 256);
 	colorBuffer[4 * index+1] = (uint8_t)(fsio.out.fragcolor().y * 256);
-	colorBuffer[4 * index+0] = (uint8_t)(fsio.out.fragcolor().z * 256);
+	colorBuffer[4 * index+2] = (uint8_t)(fsio.out.fragcolor().z * 256);
 	colorBuffer[4 * index+3] = (uint8_t)(fsio.out.fragcolor().w * 256);
 }
 
@@ -161,7 +160,7 @@ void FBWriter::onFBWritingSIMD(const Fsiosimd &fsio)
 	__m128i mask = _mm_set_epi8(0x80, 0x80, 0x80, 0x80,
 								0x80, 0x80, 0x80, 0x80,
 								0x80, 0x80, 0x80, 0x80,
-								12,   0,    4,    8);
+								0x0C, 0x08, 0x04, 0x00);
 	// left-bottom pixel
 	if (fsio.mCoverageMask & 1)
 	{
@@ -199,4 +198,4 @@ void FBWriter::onFBWritingSIMD(const Fsiosimd &fsio)
 	}
 }
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

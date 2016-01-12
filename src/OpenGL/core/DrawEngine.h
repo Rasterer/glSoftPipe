@@ -1,15 +1,11 @@
 #pragma once
 
+#include "DrawEngineExport.h"
 #include "DataFlow.h"
 #include "Texture.h"
-#include "glsp_defs.h"
 
 
 namespace glsp {
-	struct IEGLBridge;
-}
-
-NS_OPEN_GLSP_OGL()
 
 class GLContext;
 class VertexFetcher;
@@ -33,9 +29,6 @@ class GeometryStage;
 class RasterizationStage;
 class FragmentShader;
 
-namespace glsp {
-	struct IEGLBridge;
-}
 
 struct DrawContext
 {
@@ -69,11 +62,11 @@ struct DrawContext
 class DrawEngine
 {
 public:
-	void init(void *dpy, IEGLBridge *bridge);
+	void init(NWMCallBacks *call_backs);
 	bool validateState(DrawContext *dc);
 	void prepareToDraw(DrawContext *dc);
 	void emit(DrawContext *dc);
-	bool SwapBuffers();
+	bool SwapBuffers(NWMBufferToDisplay *buf);
 	void finalize();
 
 	// accessors
@@ -131,9 +124,9 @@ private:
 	DrawContext			   *mDrawContextList;
 	PipeStage			   *mFirstStage;
 
-	// EGL related data member
-	void             *mpEGLDisplay;
-	IEGLBridge *mpBridge;
+	GLContext              *mGLContext;
+
+	NWMCallBacks            mNativeWindowCallBacks;
 };
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

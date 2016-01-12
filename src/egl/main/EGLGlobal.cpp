@@ -2,7 +2,10 @@
 
 #include <algorithm>
 #include "EGLDisplayBase.h"
+
+#if defined(__linux__)
 #include "EGLDisplayX11.h"
+#endif
 
 NS_OPEN_GLSP_EGL()
 
@@ -41,10 +44,11 @@ EGLDisplayBase* EGLGlobal::getDisplay(void *nativeDpy)
 
 	switch(platformType)
 	{
+#if defined(__linux__)
 		case EGL_PLATFORM_X11_KHR:
 			pDisp = new EGLDisplayX11(nativeDpy, platformType);
 			break;
-
+#endif
 		default:
 			break;
 	}

@@ -4,26 +4,23 @@
 
 #include <glm/glm.hpp>
 
-#include "khronos/GL/glcorearb.h"
-#include "glsp_defs.h"
 #include "NameSpace.h"
 #include "compiler.h"
 
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
+#include "khronos/GL/glcorearb.h"
 
 #define MAX_TEXTURE_UNITS 4
 #define MAX_TEXTURE_MIPMAP_LEVELS 6
 
-
-class  GLContext;
-class  DrawContext;
+struct DrawContext;
 struct TextureState;
 struct TextureMipmap;
+class  GLContext;
 class  Texture;
 class  TextureMachine;
 class  Shader;
-
 
 struct SamplerObject: public NameItem
 {
@@ -188,4 +185,4 @@ private:
 	TextureBindingPoint		mBoundTexture[MAX_TEXTURE_UNITS][TEXTURE_TARGET_MAX];
 };
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

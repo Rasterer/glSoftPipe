@@ -2,7 +2,6 @@
 
 #include <cstdlib>
 
-#include "IEGLBridge.h"
 #include "GLContext.h"
 #include "VertexFetcher.h"
 #include "Rasterizer.h"
@@ -14,12 +13,10 @@
 #include "TBDR.h"
 #include "PixelBackend.h"
 #include "ThreadPool.h"
+
+
+namespace glsp {
 #include "khronos/GL/glcorearb.h"
-
-using glsp::ogl::DrawEngine;
-using glsp::ogl::DrawContext;
-using glsp::IEGLBridge;
-
 
 GLAPI void APIENTRY glDrawArrays (GLenum mode, GLint first, GLsizei count)
 {
@@ -77,16 +74,6 @@ GLAPI void APIENTRY glDrawElements (GLenum mode, GLsizei count, GLenum type, con
 	gc->mDC = NULL;
 }
 
-NS_OPEN_GLSP_OGL()
-
-namespace {
-
-bool swapBuffers()
-{
-	return DrawEngine::getDrawEngine().SwapBuffers();
-}
-
-} //namespace
 
 class GeometryStage: public PipeStageChain
 {
@@ -134,10 +121,9 @@ private:
 };
 
 DrawEngine::DrawEngine():
-	mDrawContextList(NULL),
-	mFirstStage(NULL),
-	mpEGLDisplay(NULL),
-	mpBridge(NULL)
+	mDrawContextList(nullptr),
+	mFirstStage(nullptr),
+	mGLContext(nullptr)
 {
 }
 
@@ -162,22 +148,27 @@ DrawEngine::~DrawEngine()
 
 	delete mRast;
 	delete mGeometry;
+
+	DestroyContext(mGLContext);
 }
 
 // TODO(done): connect all the pipeline stages
 // Shaders are inserted in validateState()
-void DrawEngine::init(void *dpy, IEGLBridge *bridge)
+void DrawEngine::init(NWMCallBacks *call_backs)
 {
-	mpEGLDisplay = dpy;
+	assert(call_backs);
+	mNativeWindowCallBacks = *call_backs;
 
-	assert(bridge->getBuffers);
+	mGLContext = CreateContext(4, 0);
+	MakeCurrent(mGLContext);
 
-	bridge->createGC    = CreateContext;
-	bridge->destroyGC   = DestroyContext;
-	bridge->makeCurrent = MakeCurrent;
-	bridge->swapBuffers = swapBuffers;
+	NWMWindowInfo win_info;
+	mNativeWindowCallBacks.GetWindowInfo(&win_info);
 
-	mpBridge = bridge;
+	mGLContext->mRT.width  = win_info.width;
+	mGLContext->mRT.height = win_info.height;
+	mGLContext->mRT.format = win_info.format;
+	mGLContext->applyViewport(0, 0, win_info.width, win_info.height);
 
 	initPipeline();
 }
@@ -324,27 +315,39 @@ bool DrawEngine::validateState(DrawContext *dc)
 void DrawEngine::beginFrame(GLContext *gc)
 {
 	RenderTarget &rt = gc->mRT;
-	GLViewport   &vp = gc->mState.mViewport;
 
-	// TODO: use info from GLContext(fbo or egl surface)
-	if(!mpBridge->getBuffers(gc->mpEGLContext,
-						     &rt.pColorBuffer,
-						     &rt.width,
-						     &rt.height))
-	{
-		GLSP_DPF(GLSP_DPF_LEVEL_ERROR, "%s: cannot get buffers from x server\n", __func__);
-		std::exit(EXIT_FAILURE);
-	}
+	NWMWindowInfo win_info;
+	mNativeWindowCallBacks.GetWindowInfo(&win_info);
 
-	// window resize, reset the viewport
-	if((rt.width  != vp.width) ||
-	   (rt.height != vp.height))
+	// TODO: check buffer format compatibility
+	bool size_change = ((win_info.width != rt.width) || (win_info.height != rt.height));
+
+	if (size_change)
 	{
+		if (rt.pColorBuffer)
+		{
+			free(rt.pColorBuffer);
+			rt.pColorBuffer = nullptr;
+		}
+
+		if (rt.pDepthBuffer)
+		{
+			free(rt.pDepthBuffer);
+			rt.pDepthBuffer = nullptr;
+		}
+
+		rt.width  = win_info.width;
+		rt.height = win_info.height;
+		rt.format = win_info.format;
 		gc->applyViewport(0, 0, rt.width, rt.height);
 	}
 
-	if(!rt.pDepthBuffer)
+	if (!rt.pColorBuffer)
+		rt.pColorBuffer = malloc(rt.width * rt.height * 4);
+
+	if (!rt.pDepthBuffer)
 		rt.pDepthBuffer = (float *)malloc(rt.width * rt.height * sizeof(float));
+
 	// TODO: impl stencil buffer
 	rt.pStencilBuffer = NULL;
 
@@ -382,7 +385,7 @@ void DrawEngine::emit(DrawContext *dc)
 	getFirstStage()->emit(dc);
 }
 
-bool DrawEngine::SwapBuffers()
+bool DrawEngine::SwapBuffers(NWMBufferToDisplay *buf)
 {
 	DrawContext *dc = mDrawContextList;
 
@@ -396,27 +399,32 @@ bool DrawEngine::SwapBuffers()
 	}
 	mDrawContextList = NULL;
 
-	__GET_CONTEXT();
+	buf->addr   = mGLContext->mRT.pColorBuffer;
+	buf->width  = mGLContext->mRT.width;
+	buf->height = mGLContext->mRT.height;
+	buf->format = mGLContext->mRT.format;
 
-	gc->mbInFrame = false;
-	gc->mRT.pColorBuffer   = NULL;
-	gc->mRT.pStencilBuffer = NULL;
+	mGLContext->mbInFrame = false;
 
 	return true;
 }
 
-NS_CLOSE_GLSP_OGL()
 
-
-namespace glsp {
-
-bool iglCreateScreen(void *dpy, IEGLBridge *bridge)
+bool glspCreateRender(NWMCallBacks *call_backs)
 {
 	DrawEngine &de = DrawEngine::getDrawEngine();
 
-	de.init(dpy, bridge);
+	de.init(call_backs);
 
 	return true;
 }
 
-} //namespace glsp
+bool glspSwapBuffers(NWMBufferToDisplay *buf)
+{
+	DrawEngine &de = DrawEngine::getDrawEngine();
+
+	return de.SwapBuffers(buf);
+}
+
+
+} // namespace glsp

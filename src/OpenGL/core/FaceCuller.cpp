@@ -1,11 +1,10 @@
 #include "FaceCuller.h"
 #include "DataFlow.h"
 #include "DrawEngine.h"
-#include "utils.h"
 
 using glm::vec4;
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 FaceCuller::FaceCuller():
 	PipeStage("Face Culling", DrawEngine::getDrawEngine()),
@@ -55,4 +54,4 @@ void FaceCuller::finalize()
 {
 }
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

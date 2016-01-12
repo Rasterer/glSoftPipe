@@ -3,7 +3,7 @@
 #include "DrawEngine.h"
 
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 Rasterizer::Rasterizer():
 	PipeStage("Rasterizing", DrawEngine::getDrawEngine())
@@ -39,4 +39,4 @@ void Interpolater::finalize()
 {
 }
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

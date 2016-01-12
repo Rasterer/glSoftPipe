@@ -1,3 +1,8 @@
+// On Windows, EGLAPI will be translated to dllimport.
+// But here we need implement the APIs, so redefine it to a null macro.
+#undef EGLAPI
+#define EGLAPI
+
 #include "khronos/EGL/egl.h"
 #include "EGLGlobal.h"
 #include "EGLDisplayBase.h"

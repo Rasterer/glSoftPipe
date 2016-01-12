@@ -9,10 +9,10 @@
 #include "compiler.h"
 
 
-using glsp::ogl::GLContext;
-using glsp::ogl::TextureMachine;
 using glm::vec2;
 using glm::vec4;
+
+namespace glsp {
 
 GLAPI void APIENTRY glGenTextures (GLsizei n, GLuint *textures)
 {
@@ -62,8 +62,6 @@ GLAPI void APIENTRY glTexParameterfv (GLenum target, GLenum pname, const GLfloat
 
 	gc->mTM.TexParameterfv(gc, target, pname, params);
 }
-
-NS_OPEN_GLSP_OGL()
 
 namespace {
 
@@ -471,7 +469,7 @@ void Sample2DNearestMipmapNearest(const Texture *pTex, float lambda, const vec2 
 	if(lambda <= 0.5f)
 		lvl = 0;
 	else
-		lvl = std::ceil(lambda + 0.5f) - 1;
+		lvl = (unsigned)std::ceil(lambda + 0.5f) - 1;
 
 	if(lvl > pTex->getAvailableMipmaps())
 		lvl = pTex->getAvailableMipmaps();
@@ -486,7 +484,7 @@ void Sample2DLinearMipmapNearest(const Texture *pTex, float lambda, const vec2 &
 	if(lambda <= 0.5f)
 		lvl = 0;
 	else
-		lvl = std::ceil(lambda + 0.5f) - 1;
+		lvl = (unsigned)std::ceil(lambda + 0.5f) - 1;
 
 	if(lvl > pTex->getAvailableMipmaps())
 		lvl = pTex->getAvailableMipmaps();
@@ -498,7 +496,7 @@ void Sample2DNearestMipmapLinear(const Texture *pTex, float lambda, const vec2 &
 {
 	uint32_t lvl1, lvl2;
 
-	lvl1 = std::floor(lambda);
+	lvl1 = (uint32_t)std::floor(lambda);
 
 	if(lvl1 >= pTex->getAvailableMipmaps())
 	{
@@ -527,7 +525,7 @@ void Sample2DLinearMipmapLinear(const Texture *pTex, float lambda, const vec2 &c
 {
 	uint32_t lvl1, lvl2;
 
-	lvl1 = std::floor(lambda);
+	lvl1 = (uint32_t)std::floor(lambda);
 
 	if(lvl1 >= pTex->getAvailableMipmaps())
 	{
@@ -1007,8 +1005,8 @@ void Texture::Texture2DSIMD(const __m128 &s, const __m128 &t, __m128 res[])
 {
 	const TextureMipmap *pMipmap = getMipmap(0, 0);
 
-	__m128 vTexSpaceS = MAWrapper(s, _mm_set1_ps(pMipmap->mWidth), _mm_set1_ps(-0.5f));
-	__m128 vTexSpaceT = MAWrapper(t, _mm_set1_ps(pMipmap->mHeight), _mm_set1_ps(-0.5f));
+	__m128 vTexSpaceS = MAWrapper(s, _mm_set1_ps((float)pMipmap->mWidth), _mm_set1_ps(-0.5f));
+	__m128 vTexSpaceT = MAWrapper(t, _mm_set1_ps((float)pMipmap->mHeight), _mm_set1_ps(-0.5f));
 	__m128i vS0 = _mm_cvtps_epi32(_mm_floor_ps(vTexSpaceS));
 	__m128i vT0 = _mm_cvtps_epi32(_mm_floor_ps(vTexSpaceT));
 	__m128i vS1 = _mm_add_epi32(vS0, _mm_set1_epi32(1));
@@ -1020,7 +1018,7 @@ void Texture::Texture2DSIMD(const __m128 &s, const __m128 &t, __m128 res[])
 	vT1 = _mm_min_epi32(_mm_max_epi32(vT1, _mm_setzero_si128()), _mm_set1_epi32(pMipmap->mHeight - 1));
 
 	__m128 *pAddr = static_cast<__m128 *>(pMipmap->mMem.addr);
-	int __attribute__((aligned(16))) addr[4];
+	ALIGN(16) int addr[4];
 
 	_mm_store_si128((__m128i *)addr, MAWrapper(vT0, _mm_set1_epi32(pMipmap->mWidth), vS0));
 	__m128 &vLB0 = pAddr[addr[0]];
@@ -1046,8 +1044,8 @@ void Texture::Texture2DSIMD(const __m128 &s, const __m128 &t, __m128 res[])
 	__m128 &vRT2 = pAddr[addr[2]];
 	__m128 &vRT3 = pAddr[addr[3]];
 
-	float __attribute__((aligned(16))) scale_s[4];
-	float __attribute__((aligned(16))) scale_t[4];
+	ALIGN(16) float scale_s[4];
+	ALIGN(16) float scale_t[4];
 	_mm_store_ps(scale_s, _mm_sub_ps(vTexSpaceS, _mm_floor_ps(vTexSpaceS)));
 	_mm_store_ps(scale_t, _mm_sub_ps(vTexSpaceT, _mm_floor_ps(vTexSpaceT)));
 
@@ -1364,4 +1362,4 @@ void TextureMachine::ActiveTexture(GLContext *gc, unsigned texture)
 	mActiveTextureUnit = texture - GL_TEXTURE0;
 }
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

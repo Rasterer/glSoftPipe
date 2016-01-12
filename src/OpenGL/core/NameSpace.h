@@ -1,17 +1,19 @@
 #pragma once
 
+#include <cassert>
 #include <list>
 #include <unordered_map>
 
-#include "glsp_defs.h"
 
-
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 class NameItem
 {
 public:
-	NameItem(): mName(0) { }
+	NameItem():
+		mName(0),
+		mRefCount(1)
+	{ }
 	virtual ~NameItem() { }
 
 	// accessors
@@ -20,8 +22,24 @@ public:
 	// mutators
 	void setName(unsigned name) { mName = name; }
 
+	void IncRef()
+	{
+		assert(mRefCount >= 1);
+		mRefCount++;
+	}
+
+	void DecRef()
+	{
+		assert(mRefCount >= 1);
+		if (!(--mRefCount))
+		{
+			delete this;
+		}
+	}
+
 private:
 	unsigned int mName;
+	unsigned int mRefCount;
 };
 
 struct NameBlock
@@ -53,4 +71,4 @@ private:
 	NameBlockList_t	mNameBlockLists;
 };
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

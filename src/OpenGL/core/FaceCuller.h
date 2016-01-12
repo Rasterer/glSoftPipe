@@ -1,11 +1,9 @@
 #pragma once
 
-#include "glsp_defs.h"
-
 #include "PipeStage.h"
 
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 class Batch;
 
@@ -39,4 +37,4 @@ private:
 	face_t mCullFace;
 };
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

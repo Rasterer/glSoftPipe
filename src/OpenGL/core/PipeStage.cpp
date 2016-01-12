@@ -1,7 +1,7 @@
 #include "PipeStage.h"
 #include "DrawEngine.h"
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 using std::string;
 
@@ -18,4 +18,4 @@ PipeStageChain::PipeStageChain(const std::string &name, const DrawEngine& de):
 {
 }
 
-NS_CLOSE_GLSP_OGL();
+} // namespace glsp;

@@ -38,9 +38,8 @@ struct MemoryPoolMT::ThreadMetaData
 	int               mAllocCounter[kBlockNum];
 };
 
-
-constexpr int    MemoryPoolMT::kBlockSize[MemoryPoolMT::kBlockNum];
-constexpr size_t MemoryPoolMT::kUnitSizes[MemoryPoolMT::kBlockNum];
+static const int    kBlockSize[MemoryPoolMT::kBlockNum] = {8 * 1024, 16 * 1024, 32 * 1024, 64 * 1024, 128 * 1024};
+static const size_t kUnitSizes[MemoryPoolMT::kBlockNum] = {16, 32, 64, 128, 256};
 
 // Use self-defined "THREAD_LOCAL" instead of "thread_local" due to performance concern in gcc.
 static THREAD_LOCAL MemoryPoolMT::ThreadMetaData s_ThreadMetaData;

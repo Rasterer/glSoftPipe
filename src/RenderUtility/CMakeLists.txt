@@ -1,0 +1,57 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
+
+SET(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
+
+AUX_SOURCE_DIRECTORY(./ RENDER_UTILITY_SRC)
+
+IF(UNIX)
+	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+ENDIF(UNIX)
+
+
+FIND_PACKAGE(ImageMagick COMPONENTS Magick++)
+IF(ImageMagick_Magick++_FOUND)
+	MESSAGE(STATUS      "ImageMagick package - found!")
+ELSE(ImageMagick_Magick++_FOUND)
+	MESSAGE(FATAL_ERROR "ImageMagick package - not found!")
+ENDIF(ImageMagick_Magick++_FOUND)
+
+FIND_PACKAGE(assimp)
+IF(assimp_FOUND)
+	MESSAGE(STATUS      "Looking for assimp - found")
+ELSE(assimp_FOUND)
+	MESSAGE(FATAL_ERROR "Looking for assimp - not found")
+ENDIF(assimp_FOUND)
+
+FIND_PACKAGE(glm)
+IF(glm_FOUND)
+	MESSAGE(STATUS      "Looking for glm - found")
+ELSE(glm_FOUND)
+	MESSAGE(FATAL_ERROR "Looking for glm - not found")
+ENDIF(glm_FOUND)
+
+
+ADD_LIBRARY(render_utility STATIC ${RENDER_UTILITY_SRC})
+
+INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/Common/include)
+
+INCLUDE_DIRECTORIES(${ImageMagick_INCLUDE_DIRS}
+					${ASSIMP_INCLUDE_DIRS}
+					${GLM_INCLUDE_DIRS})
+
+TARGET_LINK_LIBRARIES(render_utility
+					  PUBLIC glsp_ogl
+					  PRIVATE ${ImageMagick_LIBRARIES}
+					  PRIVATE ${ASSIMP_LIBRARIES})
+
+#IF(WIN32)
+#TARGET_LINK_LIBRARIES(render_utility ${ASSIMP_LIBRARIES})
+#ELSEIF(UNIX)
+#TARGET_LINK_LIBRARIES(render_utility ${ASSIMP_LIBRARIES})
+#ENDIF(WIN32)
+
+TARGET_COMPILE_DEFINITIONS(render_utility
+						PUBLIC GL_GLEXT_PROTOTYPES
+						PUBLIC GLM_FORCE_RADIANS
+						PUBLIC MAGICKCORE_HDRI_ENABLE=0
+						PUBLIC MAGICKCORE_QUANTUM_DEPTH=8)

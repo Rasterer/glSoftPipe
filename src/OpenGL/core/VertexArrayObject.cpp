@@ -1,9 +1,11 @@
 #include "VertexArrayObject.h"
 
-#include "khronos/GL/glcorearb.h"
 #include "BufferObject.h"
 #include "GLContext.h"
 
+
+namespace glsp {
+#include "khronos/GL/glcorearb.h"
 
 GLAPI void APIENTRY glGenVertexArrays (GLsizei n, GLuint *arrays)
 {
@@ -53,7 +55,6 @@ GLAPI void APIENTRY glVertexAttribPointer (GLuint index, GLint size, GLenum type
 	gc->mVAOM.VertexAttribPointer(gc, index, size, type, normalized, stride, pointer);
 }
 
-NS_OPEN_GLSP_OGL()
 
 VertexAttribState::VertexAttribState():
 	mAttribSize(0),
@@ -92,7 +93,7 @@ void VAOMachine::DeleteVertexArrays(GLContext *gc, int n, const unsigned *arrays
 		if(pVAO)
 		{
 			mNameSpace.removeObject(pVAO);
-			delete pVAO;
+			pVAO->DecRef();
 		}
 	}
 
@@ -188,4 +189,4 @@ void VAOMachine::VertexAttribPointer(
 	vas.mBO = gc->mBOM.getBoundBuffer(GL_ARRAY_BUFFER);
 }
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

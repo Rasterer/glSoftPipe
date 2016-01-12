@@ -1,11 +1,10 @@
 #pragma once
 
-#include "glsp_defs.h"
 #include "PipeStage.h"
 #include "DrawEngine.h"
 
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 class Fsio;
 struct RenderTarget;
@@ -94,4 +93,4 @@ private:
 	void onFBWritingSIMD(const Fsiosimd &fsio);
 };
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

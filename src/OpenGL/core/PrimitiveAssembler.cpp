@@ -5,7 +5,7 @@
 #include "MemoryPool.h"
 
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 PrimitiveAssembler::PrimitiveAssembler():
 	PipeStage("Primitive Assembly", DrawEngine::getDrawEngine())
@@ -60,4 +60,4 @@ void PrimitiveAssembler::finalize()
 {
 }
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

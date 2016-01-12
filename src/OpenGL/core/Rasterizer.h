@@ -1,14 +1,12 @@
 #pragma once
 
-#include "glsp_defs.h"
 #include "Shader.h"
 
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 class Interpolater;
-class DrawContext;
-
+struct DrawContext;
 
 class Rasterizer: public PipeStage
 {
@@ -60,4 +58,4 @@ public:
 };
 
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

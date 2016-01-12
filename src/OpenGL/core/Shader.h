@@ -7,7 +7,6 @@
 
 #include <glm/glm.hpp>
 
-#include "glsp_defs.h"
 #include "NameSpace.h"
 #include "PipeStage.h"
 #include "DataFlow.h"
@@ -15,12 +14,12 @@
 #include "compiler.h"
 
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 class GLContext;
-class Uniform;
 class Shader;
-class VertexInfo;
+struct Uniform;
+struct VertexInfo;
 
 typedef std::vector<Uniform> uniform_v;
 typedef std::map<std::string, int> UniformMap;
@@ -67,14 +66,25 @@ typedef unsigned int sampler2D;
 class ShaderFactory
 {
 public:
-	ShaderFactory() { }
-	virtual ~ShaderFactory() {};
+	ShaderFactory():
+		mVS(nullptr),
+		mFS(nullptr)
+	{}
+	virtual ~ShaderFactory()
+	{
+		delete mVS;
+		delete mFS;
+	}
 
 	virtual Shader *createVertexShader() = 0;
 	virtual void DeleteVertexShader(Shader *pVS) = 0;
 
 	virtual Shader *createFragmentShader() = 0;
 	virtual void DeleteFragmentShader(Shader *pFS) = 0;
+
+protected:
+	Shader *mVS;
+	Shader *mFS;
 };
 
 // TODO: use shader compiler
@@ -125,8 +135,6 @@ public:
 
 	unsigned getOutRegsNum() const { return mOutRegs.size(); }
 
-	static void* getPrivateData() { return m_priv; }
-
 protected:
 	template <class T>
 	void declareUniform(const std::string &name, T *constant);
@@ -147,11 +155,6 @@ protected:
 
 		return res;
 	}
-
-protected:
-	// TLS variable, prepare for multi-threads
-	// FIXME: find a better way
-	static thread_local void *m_priv;
 
 private:
 	ShaderType mType;
@@ -301,12 +304,13 @@ class Program: public NameItem
 {
 public:
 	Program();
-	virtual ~Program() { }
+	virtual ~Program();
 
-	VertexShader *getVS() const { return mVertexShader; }
-	FragmentShader *getFS() const { return mFragmentShader; }
+	VertexShader *getVS() const { return mVSLinked; }
+	FragmentShader *getFS() const { return mFSLinked; }
 
 	void AttachShader(Shader *pShader);
+	void DetachShader(Shader *pShader);
 	void LinkProgram();
 	int  GetUniformLocation(const std::string &name);
 
@@ -314,11 +318,11 @@ public:
 	void UniformValue(int location, int count, const T *value);
 
 private:
-	bool validate();
-
-private:
-	VertexShader *mVertexShader;
+	VertexShader   *mVertexShader;
 	FragmentShader *mFragmentShader;
+
+	VertexShader   *mVSLinked;
+	FragmentShader *mFSLinked;
 
 	UniformMap mUniformMap;
 	uniform_v mUniformBlock;
@@ -350,6 +354,7 @@ public:
 	void ShaderSource(GLContext *gc, unsigned shader, int count, const char *const*string, const int *length);
 	void CompileShader(GLContext *gc, unsigned shader);
 	void AttachShader(GLContext *gc, unsigned program, unsigned shader);
+	void DetachShader(GLContext *gc, unsigned program, unsigned shader);
 	void LinkProgram(GLContext *gc, unsigned program);
 	void UseProgram(GLContext *gc, unsigned program);
 
@@ -401,4 +406,4 @@ void ProgramMachine::UniformUif(GLContext *gc, int location, int count, const T 
 	pProg->UniformValue(location, count, value);
 }
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

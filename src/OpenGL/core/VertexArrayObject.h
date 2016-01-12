@@ -1,12 +1,11 @@
 #pragma once
 
-#include "glsp_defs.h"
 #include "NameSpace.h"
 #include "DataFlow.h"
 #include "BufferObject.h"
 
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 #define MAX_VERTEX_ATTRIBS MAX_SHADER_REGISTERS
 
@@ -52,4 +51,4 @@ private:
 	VertexArrayObject	mDefaultVAO;
 };
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

@@ -10,10 +10,11 @@
 #include "DrawEngine.h"
 #include "VertexArrayObject.h"
 #include "ThreadPool.h"
+
+
+namespace glsp {
 #include "khronos/GL/glcorearb.h"
 
-
-NS_OPEN_GLSP_OGL()
 
 using glm::vec4;
 
@@ -137,4 +138,4 @@ void VertexCachedFetcher::finalize()
 {
 }
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

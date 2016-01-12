@@ -5,10 +5,12 @@
 #include "BufferObject.h"
 #include "GLContext.h"
 #include "glsp_debug.h"
-#include "khronos/GL/glcorearb.h"
 
 
 using namespace std;
+
+namespace glsp {
+#include "khronos/GL/glcorearb.h"
 
 GLAPI void APIENTRY glGenBuffers (GLsizei n, GLuint *buffers)
 {
@@ -33,8 +35,6 @@ GLAPI void APIENTRY glBufferData (GLenum target, GLsizeiptr size, const void *da
 	__GET_CONTEXT();
 	gc->mBOM.BufferData(gc, target, size, data, usage);
 }
-
-NS_OPEN_GLSP_OGL()
 
 BufferObject::BufferObject():
 	mSize(0),
@@ -82,7 +82,7 @@ bool BufferObjectMachine::DeleteBuffers(GLContext *gc, int n, const unsigned *bu
 				pBP->mBO = NULL;
 
 			mNameSpace.removeObject(pBO);
-			delete pBO;
+			pBO->DecRef();
 		}
 	}
 
@@ -199,4 +199,4 @@ int BufferObjectMachine::TargetToIndex(GLenum target)
 	return -1;
 }
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

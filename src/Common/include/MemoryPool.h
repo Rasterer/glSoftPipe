@@ -31,9 +31,6 @@ public:
 
 	static const int kBlockNum = 5;
 
-	static constexpr int    kBlockSize[kBlockNum] = {8 * 1024, 16 * 1024, 32 * 1024, 64 * 1024, 128 * 1024};
-	static constexpr size_t kUnitSizes[kBlockNum] = {16, 32, 64, 128, 256};
-
 	static MemoryPoolMT& get()
 	{
 		static MemoryPoolMT pool;

@@ -2,7 +2,7 @@
 #include "DataFlow.h"
 #include "DrawEngine.h"
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 
 using glm::vec4;
@@ -41,4 +41,4 @@ void PerspectiveDivider::finalize()
 {
 }
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

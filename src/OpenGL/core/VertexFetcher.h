@@ -1,13 +1,12 @@
 #pragma once
 
-#include "glsp_defs.h"
 #include "Shader.h"
 #include "PipeStage.h"
 
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
-class DrawContext;
+struct DrawContext;
 class GLContext;
 
 class VertexFetcher: public PipeStage
@@ -33,4 +32,4 @@ protected:
 	virtual void FetchVertex(DrawContext *dc);
 };
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

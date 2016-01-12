@@ -8,24 +8,24 @@
 #include "compiler.h"
 
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 using glm::vec4;
 
 
 
-glm::vec4 Clipper::sPlanes[Clipper::MAX_PLANES] = {
-	[Clipper::PLANE_NEAR     ] = glm::vec4( 0.0f,  0.0f,  1.0f, 1.0f),
-	[Clipper::PLANE_FAR      ] = glm::vec4( 0.0f,  0.0f, -1.0f, 1.0f),
-	[Clipper::PLANE_LEFT     ] = glm::vec4( 1.0f,  0.0f,  0.0f, 1.0f),
-	[Clipper::PLANE_RIGHT    ] = glm::vec4(-1.0f,  0.0f,  0.0f, 1.0f),
-	[Clipper::PLANE_BOTTOM   ] = glm::vec4( 0.0f,  1.0f,  0.0f, 1.0f),
-	[Clipper::PLANE_TOP      ] = glm::vec4( 0.0f, -1.0f,  0.0f, 1.0f),
-	[Clipper::PLANE_ZEROW    ] = glm::vec4( 0.0f,  0.0f,  0.0f, 1.0f),
-	[Clipper::PLANE_GB_LEFT  ] = glm::vec4( 1.0f,  0.0f,  0.0f, 0.0f),
-	[Clipper::PLANE_GB_RIGHT ] = glm::vec4(-1.0f,  0.0f,  0.0f, 0.0f),
-	[Clipper::PLANE_GB_BOTTOM] = glm::vec4( 0.0f,  1.0f,  0.0f, 0.0f),
-	[Clipper::PLANE_GB_TOP   ] = glm::vec4( 0.0f, -1.0f,  0.0f, 0.0f)
+static glm::vec4 sPlanes[Clipper::MAX_PLANES] = {
+	glm::vec4( 0.0f,  0.0f,  1.0f, 1.0f), // PLANE_NEAR
+	glm::vec4( 0.0f,  0.0f, -1.0f, 1.0f), // PLANE_FAR
+	glm::vec4( 1.0f,  0.0f,  0.0f, 1.0f), // PLANE_LEFT
+	glm::vec4(-1.0f,  0.0f,  0.0f, 1.0f), // PLANE_RIGHT
+	glm::vec4( 0.0f,  1.0f,  0.0f, 1.0f), // PLANE_BOTTOM
+	glm::vec4( 0.0f, -1.0f,  0.0f, 1.0f), // PLANE_TOP
+	glm::vec4( 0.0f,  0.0f,  0.0f, 1.0f), // PLANE_ZEROW
+	glm::vec4( 1.0f,  0.0f,  0.0f, 0.0f), // PLANE_GB_LEFT
+	glm::vec4(-1.0f,  0.0f,  0.0f, 0.0f), // PLANE_GB_RIGHT
+	glm::vec4( 0.0f,  1.0f,  0.0f, 0.0f), // PLANE_GB_BOTTOM
+	glm::vec4( 0.0f, -1.0f,  0.0f, 0.0f)  // PLANE_GB_TOP
 };
 
 Clipper::Clipper():
@@ -115,8 +115,8 @@ void Clipper::ClipAgainstGuardband(Primitive &prim, int outcodes_union, Primlist
 
 	vertNum[src] = 3;
 
-	unsigned int i;
-	while (_BitScanForward(&i, outcodes_union))
+	unsigned long i;
+	while (_BitScanForward(&i, (unsigned long)outcodes_union))
 	{
 		outcodes_union &= ~(1 << i);
 
@@ -167,7 +167,7 @@ void Clipper::ClipAgainstGuardband(Primitive &prim, int outcodes_union, Primlist
 		// Triangulation
 		for (int i = 1; i < vertNum[src] - 1; i++)
 		{
-			Primitive *new_prim = new(MemoryPoolMT::get()) Primitive();
+			Primitive *new_prim = new(MemoryPoolMT::get()) Primitive;
 
 			new_prim->mType    = Primitive::TRIANGLE;
 			new_prim->mVertNum = 3;
@@ -279,4 +279,4 @@ void Clipper::finalize()
 {
 }
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

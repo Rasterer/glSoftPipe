@@ -4,7 +4,7 @@
 #include <string>
 #include <utility>
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 NameSpace::NameSpace()
 {
@@ -169,7 +169,7 @@ bool NameSpace::removeObject(NameItem *pNameItem)
 		return false;
 
 	NameHashTable_t::const_iterator iter = mNameHashTable.find(name);
-	
+
 	if(iter != mNameHashTable.end())
 	{
 		mNameHashTable.erase(iter);
@@ -181,4 +181,4 @@ bool NameSpace::removeObject(NameItem *pNameItem)
 	}
 }
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

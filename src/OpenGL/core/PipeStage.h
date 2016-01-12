@@ -2,14 +2,13 @@
 
 #include <string>
 
-#include "glsp_defs.h"
 #include "glsp_debug.h"
 
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
+struct DrawContext;
 class DrawEngine;
-class DrawContext;
 
 class PipeStage
 {
@@ -58,4 +57,4 @@ protected:
 };
 
 
-NS_CLOSE_GLSP_OGL();
+} // namespace glsp;

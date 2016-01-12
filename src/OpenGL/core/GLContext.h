@@ -4,18 +4,17 @@
 #include "VertexArrayObject.h"
 #include "Texture.h"
 #include "Shader.h"
-#include "glsp_defs.h"
 
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
 
 extern GLContext *g_GC;
 
 #define __GET_CONTEXT()		\
-		::glsp::ogl::GLContext *gc = ::glsp::ogl::getCurrentContext();
+		::glsp::GLContext *gc = ::glsp::getCurrentContext();
 
 #define __SET_CONTEXT(gc)	\
-		::glsp::ogl::setCurrentContext(gc);
+		::glsp::setCurrentContext(gc);
 
 #define EMIT_FLAG_VIEWPORT (1 << 0)
 
@@ -38,6 +37,7 @@ struct RenderTarget
 {
 	int width;
 	int height;
+	int format;
 	void  *pColorBuffer;
 	float *pDepthBuffer;
 	void  *pStencilBuffer;
@@ -69,7 +69,7 @@ struct GLStateMachine
 class GLContext
 {
 public:
-	GLContext(void *EglCtx, int major, int minor);
+	GLContext(int major, int minor);
 	~GLContext();
 
 	void applyViewport(int x, int y, int width, int height);
@@ -102,9 +102,9 @@ private:
 	void initGC();
 };
 
-GLContext *getCurrentContext();
-void* CreateContext(void *EglCtx, int major, int minor);
+GLContext* getCurrentContext();
+GLContext* CreateContext(int major, int minor);
 void DestroyContext(void *gc);
 void MakeCurrent(void *gc);
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

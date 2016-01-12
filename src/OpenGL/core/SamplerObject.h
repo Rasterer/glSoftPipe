@@ -1,11 +1,10 @@
 #pragma once
 
-#include "khronos/GL/glcorearb.h"
-#include "glsp_defs.h"
 #include "NameSpace.h"
 
 
-NS_OPEN_GLSP_OGL()
+namespace glsp {
+#include "khronos/GL/glcorearb.h"
 
 struct SamplerObject: public NameItem
 {
@@ -25,4 +24,4 @@ struct SamplerObject: public NameItem
 	GLenum eMinFilter;
 };
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp

@@ -6,14 +6,15 @@
 #include "Rasterizer.h"
 #include "Texture.h"
 #include "TBDR.h"
-#include "khronos/GL/glcorearb.h"
-
 
 using std::string;
 using std::type_info;
 using glm::vec4;
 using glm::vec2;
 using glm::mat4;
+
+namespace glsp {
+#include "khronos/GL/glcorearb.h"
 
 GLAPI GLuint APIENTRY glCreateShader (GLenum type)
 {
@@ -57,6 +58,12 @@ GLAPI void APIENTRY glAttachShader (GLuint program, GLuint shader)
 	gc->mPM.AttachShader(gc, program, shader);
 }
 
+GLAPI void APIENTRY glDetachShader (GLuint program, GLuint shader)
+{
+	__GET_CONTEXT();
+	gc->mPM.DetachShader(gc, program, shader);
+}
+
 GLAPI void APIENTRY glLinkProgram (GLuint program)
 {
 	__GET_CONTEXT();
@@ -93,11 +100,6 @@ GLAPI GLint APIENTRY glGetAttribLocation (GLuint program, const GLchar *name)
 	return gc->mPM.GetAttribLocation(gc, program, name);
 }
 
-
-NS_OPEN_GLSP_OGL()
-
-
-thread_local void *Shader::m_priv = NULL;
 
 // vertex shader cache
 Shader::Shader():
@@ -247,8 +249,6 @@ void FragmentShader::ExecuteSISD(void *data)
 	Fsio &fsio = *static_cast<Fsio *>(data);
 	const Triangle *tri = static_cast<Triangle *>(fsio.m_priv0);
 
-	m_priv = &fsio;
-
 	fsio.out.resize(getOutRegsNum());
 	attachTextures(tri->mPrim.mDC->mTextures);
 
@@ -259,8 +259,6 @@ void FragmentShader::ExecuteSIMD(void *data)
 {
 	Fsiosimd &fsio = *static_cast<Fsiosimd *>(data);
 	const Triangle *tri = static_cast<Triangle *>(fsio.m_priv0);
-
-	m_priv = &fsio;
 
 	attachTextures(tri->mPrim.mDC->mTextures);
 
@@ -295,9 +293,17 @@ public:
 };
 
 Program::Program():
-	mVertexShader(NULL),
-	mFragmentShader(NULL)
+	mVertexShader(nullptr),
+	mFragmentShader(nullptr),
+	mVSLinked(nullptr),
+	mFSLinked(nullptr)
 {
+}
+
+Program::~Program()
+{
+	if (mVSLinked) mVSLinked->DecRef();
+	if (mFSLinked) mFSLinked->DecRef();
 }
 
 void Program::AttachShader(Shader *pShader)
@@ -310,12 +316,14 @@ void Program::AttachShader(Shader *pShader)
 		assert(false);
 }
 
-bool Program::validate()
+void Program::DetachShader(Shader *pShader)
 {
-	if(mVertexShader && mFragmentShader)
-		return true;
+	if(pShader->getType() == Shader::VERTEX && mVertexShader == static_cast<VertexShader *>(pShader))
+		mVertexShader = nullptr;
+	else if(pShader->getType() == Shader::FRAGMENT && mFragmentShader == static_cast<FragmentShader *>(pShader))
+		mFragmentShader = nullptr;
 	else
-		return false;
+		assert(false);
 }
 
 void Program::LinkProgram()
@@ -323,8 +331,14 @@ void Program::LinkProgram()
 	uniform_v & VSUniform = mVertexShader->getUniformBlock();
 	uniform_v & FSUniform = mFragmentShader->getUniformBlock();
 
-	if(validate() != true)
+	if(!mVertexShader || !mFragmentShader)
 		return;
+
+	mVSLinked = mVertexShader;
+	mVSLinked->IncRef();
+
+	mFSLinked = mFragmentShader;
+	mFSLinked->IncRef();
 
 	// TODO: add uniform conflict check
 	uniform_v::iterator it = VSUniform.begin();
@@ -378,9 +392,16 @@ unsigned ProgramMachine::CreateShader(GLContext *gc, unsigned type)
 
 void ProgramMachine::DeleteShader(GLContext *gc, unsigned shader)
 {
-	// TODO: impl
 	GLSP_UNREFERENCED_PARAM(gc);
 
+	Shader *pShader = static_cast<Shader *>(mShaderNameSpace.retrieveObject(shader));
+
+	if (pShader)
+	{
+		mShaderNameSpace.removeObject(pShader);
+		pShader->DecRef();
+	}
+	mProgramNameSpace.deleteNames(1, &shader);
 }
 
 unsigned ProgramMachine::CreateProgram(GLContext *gc)
@@ -401,10 +422,19 @@ unsigned ProgramMachine::CreateProgram(GLContext *gc)
 	}
 }
 
-// TODO: impl
 void ProgramMachine::DeleteProgram(GLContext *gc, unsigned program)
 {
 	GLSP_UNREFERENCED_PARAM(gc);
+
+	Program *prog = static_cast<Program *>(mShaderNameSpace.retrieveObject(program));
+
+	if (prog)
+	{
+		mShaderNameSpace.removeObject(prog);
+
+		prog->DecRef();
+	}
+	mProgramNameSpace.deleteNames(1, &program);
 }
 
 void ProgramMachine::ShaderSource(
@@ -436,7 +466,7 @@ void ProgramMachine::ShaderSource(
 	pShader->setName(shader);
 	pShader->setSource(pString);
 	mShaderNameSpace.insertObject(pShader);
-	delete pSPH;
+	pSPH->DecRef();
 }
 
 void ProgramMachine::CompileShader(GLContext *gc, unsigned shader)
@@ -457,6 +487,19 @@ void ProgramMachine::AttachShader(GLContext *gc, unsigned program, unsigned shad
 		return;
 	
 	pProg->AttachShader(pShader);
+}
+
+void ProgramMachine::DetachShader(GLContext *gc, unsigned program, unsigned shader)
+{
+	GLSP_UNREFERENCED_PARAM(gc);
+
+	Program *pProg = static_cast<Program *>(mProgramNameSpace.retrieveObject(program));
+	Shader *pShader = static_cast<Shader *>(mShaderNameSpace.retrieveObject(shader));
+
+	if(!pProg || !pShader)
+		return;
+
+	pProg->DetachShader(pShader);
 }
 
 void ProgramMachine::LinkProgram(GLContext *gc, unsigned program)
@@ -506,4 +549,4 @@ int ProgramMachine::GetAttribLocation(GLContext *gc, unsigned program, const cha
 	return pProg->getVS()->GetInRegLocation(name);
 }
 
-NS_CLOSE_GLSP_OGL()
+} // namespace glsp
