@@ -11,7 +11,7 @@ namespace glsp {
 extern GLContext *g_GC;
 
 #define __GET_CONTEXT()		\
-		::glsp::GLContext *gc = ::glsp::getCurrentContext();
+		GLContext *gc = g_GC;
 
 #define __SET_CONTEXT(gc)	\
 		::glsp::setCurrentContext(gc);
@@ -43,6 +43,12 @@ struct RenderTarget
 	void  *pStencilBuffer;
 };
 
+struct ClearState
+{
+	float  red, green, blue, alpha;
+	double depth;
+	int    stencil;
+};
 
 /* NOTE:
  * No alpha test now in core profile.
@@ -62,6 +68,7 @@ struct GLStateMachine
 {
 	int        mEnables;
 	GLViewport mViewport;
+	ClearState mClearState;
 };
 
 // GLContext needs to be accessed by most components.
@@ -69,7 +76,7 @@ struct GLStateMachine
 class GLContext
 {
 public:
-	GLContext(int major, int minor);
+	GLContext(int major, int minor, DrawEngine &de);
 	~GLContext();
 
 	void applyViewport(int x, int y, int width, int height);
@@ -88,7 +95,7 @@ public:
 
 	RenderTarget        mRT;
 
-	DrawEngine		   *mDE;
+	DrawEngine		   &mDE;
 	DrawContext		   *mDC;
 
 	bool				mbInFrame;
@@ -103,8 +110,6 @@ private:
 };
 
 GLContext* getCurrentContext();
-GLContext* CreateContext(int major, int minor);
-void DestroyContext(void *gc);
 void MakeCurrent(void *gc);
 
 } // namespace glsp

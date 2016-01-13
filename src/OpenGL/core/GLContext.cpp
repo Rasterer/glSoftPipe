@@ -48,40 +48,19 @@ GLAPI void APIENTRY glEnable (GLenum cap)
 
 GLContext *g_GC = nullptr;
 
-static void setCurrentContext(void *gc)
-{
-	g_GC = static_cast<GLContext *>(gc);
-}
-
 GLContext* getCurrentContext()
 {
 	return g_GC;
 }
 
-GLContext* CreateContext(int major, int minor)
-{
-	GLContext *gc = new GLContext(major, minor);
-	return gc;
-}
-
-void DestroyContext(void *_gc)
-{
-	__GET_CONTEXT();
-	GLContext *_del = static_cast<GLContext *>(_gc);
-
-	if(gc == _del)
-		__SET_CONTEXT(nullptr);
-
-	delete _del;
-}
-
 void MakeCurrent(void *gc)
 {
-	setCurrentContext(gc);
+	g_GC = static_cast<GLContext *>(gc);
 }
 
-GLContext::GLContext(int major, int minor):
+GLContext::GLContext(int major, int minor, DrawEngine &de):
 	mEmitFlag(0),
+	mDE(de),
 	mbInFrame(false),
 	mVersionMajor(major),
 	mVersionMinor(minor)
@@ -91,20 +70,29 @@ GLContext::GLContext(int major, int minor):
 
 GLContext::~GLContext()
 {
+	if (mRT.pColorBuffer)
+		free(mRT.pColorBuffer);
+
 	if (mRT.pDepthBuffer)
-	{
 		free(mRT.pDepthBuffer);
-	}
 
 	if (mRT.pStencilBuffer)
-	{
 		free(mRT.pStencilBuffer);
-	}
+
+	if (g_GC == this)
+		g_GC = nullptr;
 }
 
 void GLContext::initGC()
 {
 	applyViewport(0, 0, 0, 0);
+
+	mState.mClearState.red     = 0.0f;
+	mState.mClearState.green   = 0.0f;
+	mState.mClearState.blue    = 0.0f;
+	mState.mClearState.alpha   = 0.0f;
+	mState.mClearState.depth   = 1.0;
+	mState.mClearState.stencil = 0;
 
 	mState.mEnables    = 0;
 

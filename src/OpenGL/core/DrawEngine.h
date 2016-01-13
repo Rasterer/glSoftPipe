@@ -64,7 +64,7 @@ class DrawEngine
 public:
 	void init(NWMCallBacks *call_backs);
 	bool validateState(DrawContext *dc);
-	void prepareToDraw(DrawContext *dc);
+	void prepareToDraw();
 	void emit(DrawContext *dc);
 	bool SwapBuffers(NWMBufferToDisplay *buf);
 	void finalize();
@@ -86,6 +86,10 @@ public:
 
 	RasterizationStage* getRastStage() const { return mRast; }
 	Clipper& GetClipper() const { return *mClipper; }
+
+	GLContext* GetGLContext() const { return mGLContext; }
+
+	void PerformClear(unsigned int mask);
 
 protected:
 	DrawEngine();

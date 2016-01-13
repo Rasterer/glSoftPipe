@@ -225,6 +225,7 @@ void LoadModel::onRender()
 	glUniformMatrix4fv(mWVPLocation, 1, false, (float *)&wvp);
 	mScalar += 1.0f;
 
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	mMesh->Render();
 }
 

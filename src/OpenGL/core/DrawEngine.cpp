@@ -13,6 +13,7 @@
 #include "TBDR.h"
 #include "PixelBackend.h"
 #include "ThreadPool.h"
+#include "compiler.h"
 
 
 namespace glsp {
@@ -20,7 +21,7 @@ namespace glsp {
 
 GLAPI void APIENTRY glDrawArrays (GLenum mode, GLint first, GLsizei count)
 {
-	__GET_CONTEXT();
+	GLContext *gc = g_GC;
 
 	DrawEngine *de = &DrawEngine::getDrawEngine();
 
@@ -40,7 +41,7 @@ GLAPI void APIENTRY glDrawArrays (GLenum mode, GLint first, GLsizei count)
 
 	dc->m_pNext = de->getDrawContextList();
 	de->setDrawContextList(dc);
-	de->prepareToDraw(dc);
+	de->prepareToDraw();
 	de->emit(dc);
 
 	gc->mDC = NULL;
@@ -48,7 +49,7 @@ GLAPI void APIENTRY glDrawArrays (GLenum mode, GLint first, GLsizei count)
 
 GLAPI void APIENTRY glDrawElements (GLenum mode, GLsizei count, GLenum type, const void *indices)
 {
-	__GET_CONTEXT();
+	GLContext *gc = g_GC;
 
 	DrawEngine *de = &DrawEngine::getDrawEngine();
 
@@ -68,12 +69,43 @@ GLAPI void APIENTRY glDrawElements (GLenum mode, GLsizei count, GLenum type, con
 
 	dc->m_pNext = de->getDrawContextList();
 	de->setDrawContextList(dc);
-	de->prepareToDraw(dc);
+	de->prepareToDraw();
 	de->emit(dc);
 
 	gc->mDC = NULL;
 }
 
+GLAPI void APIENTRY glClear (GLbitfield mask)
+{
+	DrawEngine &de = DrawEngine::getDrawEngine();
+
+	de.prepareToDraw();
+	de.PerformClear(mask);
+}
+
+GLAPI void APIENTRY glClearColor (GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha)
+{
+	GLContext *gc = g_GC;
+
+	gc->mState.mClearState.red   = red;
+	gc->mState.mClearState.green = green;
+	gc->mState.mClearState.blue = blue;
+	gc->mState.mClearState.alpha = alpha;
+}
+
+GLAPI void APIENTRY glClearStencil (GLint s)
+{
+	GLContext *gc = g_GC;
+
+	gc->mState.mClearState.stencil = s;
+}
+
+GLAPI void APIENTRY glClearDepth (GLdouble depth)
+{
+	GLContext *gc = g_GC;
+
+	gc->mState.mClearState.depth = depth;
+}
 
 class GeometryStage: public PipeStageChain
 {
@@ -149,7 +181,7 @@ DrawEngine::~DrawEngine()
 	delete mRast;
 	delete mGeometry;
 
-	DestroyContext(mGLContext);
+	delete mGLContext;
 }
 
 // TODO(done): connect all the pipeline stages
@@ -159,7 +191,7 @@ void DrawEngine::init(NWMCallBacks *call_backs)
 	assert(call_backs);
 	mNativeWindowCallBacks = *call_backs;
 
-	mGLContext = CreateContext(4, 0);
+	mGLContext = new GLContext(4, 0, *this);
 	MakeCurrent(mGLContext);
 
 	NWMWindowInfo win_info;
@@ -351,37 +383,56 @@ void DrawEngine::beginFrame(GLContext *gc)
 	// TODO: impl stencil buffer
 	rt.pStencilBuffer = NULL;
 
-	// TODO: move to glClear()
-	for(int i = 0; i < rt.width * rt.height * 4; i += 4)
-	{
-		*((unsigned char *)rt.pColorBuffer + i) = 0;
-		*((unsigned char *)rt.pColorBuffer + i + 1) = 0;
-		*((unsigned char *)rt.pColorBuffer + i + 2) = 0;
-		*((unsigned char *)rt.pColorBuffer + i + 3) = 255;
-	}
-
-	//for(int i = 0; i < rt.width * rt.height; i++)
-	//{
-		//*(rt.pDepthBuffer + i) = 1.0f;
-	//}
-
 	gc->mbInFrame = true;
 }
 
-void DrawEngine::prepareToDraw(DrawContext *dc)
+void DrawEngine::prepareToDraw()
 {
-	GLContext *gc = dc->gc;
-
-	if(!gc->mbInFrame)
+	if(!mGLContext->mbInFrame)
 	{
-		beginFrame(gc);
+		beginFrame(mGLContext);
+	}
+}
+
+void DrawEngine::PerformClear(unsigned int mask)
+{
+	RenderTarget &rt = mGLContext->mRT;
+
+	if (mask & GL_COLOR_BUFFER_BIT)
+	{
+		uint8_t r = static_cast<uint8_t>(mGLContext->mState.mClearState.red   * 256.0f);
+		uint8_t g = static_cast<uint8_t>(mGLContext->mState.mClearState.green * 256.0f);
+		uint8_t b = static_cast<uint8_t>(mGLContext->mState.mClearState.blue  * 256.0f);
+		uint8_t a = static_cast<uint8_t>(mGLContext->mState.mClearState.alpha * 256.0f);
+
+		uint32_t color = (r << 0) | (g << 8) | (b << 16) | (a << 24);
+		__m128i vColor = _mm_set1_epi32(color);
+
+		int count = rt.width * rt.height;
+		__m128i *addr = (__m128i *)rt.pColorBuffer;
+		for(int i = 0; i < count; i += 4, ++addr)
+		{
+			_mm_stream_si128(addr, vColor);
+		}
 	}
 
-	linkPipeStages(gc);
+	if (mask & GL_DEPTH_BUFFER_BIT)
+	{
+		// Defer clear until the rasterizer stage begin,
+		// and that will only clear the per-tile depth buffer
+		// rather than the big one from render target, improving cache locality.
+		static_cast<TBDR *>(mRasterizer)->SetDepthClearFlag();
+	}
+
+	if (mask & GL_STENCIL_BUFFER_BIT)
+	{
+		// TODO: clear stencil buffer
+	}
 }
 
 void DrawEngine::emit(DrawContext *dc)
 {
+	linkPipeStages(mGLContext);
 	getFirstStage()->emit(dc);
 }
 

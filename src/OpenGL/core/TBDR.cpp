@@ -456,7 +456,8 @@ Triangle::Triangle(Primitive &prim):
 }
 
 TBDR::TBDR():
-	Rasterizer()
+	Rasterizer(),
+	mDepthClearFlag(false)
 {
 	const int thread_number = ThreadPool::get().getThreadsNumber();
 
@@ -508,13 +509,20 @@ void TBDR::ProcessMacroTile(int x, int y)
 	x = (x << MACRO_TILE_SIZE_SHIFT);
 	y = (y << MACRO_TILE_SIZE_SHIFT);
 
-	for (int i = 0; i < MACRO_TILE_SIZE; ++i)
+	if (mDepthClearFlag)
 	{
-		for (int j = 0; j < MACRO_TILE_SIZE; ++j)
+		__m128 vDepth = _mm_set_ps1(static_cast<float>(g_GC->mState.mClearState.depth));
+		float *addr = &z_buf[0][0];
+		for (int i = 0; i < MACRO_TILE_SIZE * MACRO_TILE_SIZE; i += 4, addr += 4)
 		{
-			z_buf[i][j] = 1.0f;
+			_mm_store_ps(addr, vDepth);
 		}
 	}
+	else
+	{
+		// TODO: load depth buffer from render target.
+	}
+
 	std::memset(&pp_map[0][0], 0, sizeof(PixelPrimMap));
 
 	for (Triangle *tri: full_disp_list)
@@ -779,6 +787,9 @@ void TBDR::finalize()
 			full_disp_list.clear();
 		}
 	}
+
+	if (mDepthClearFlag)
+		mDepthClearFlag = false;
 }
 
 } // namespace glsp

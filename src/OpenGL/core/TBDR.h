@@ -112,6 +112,8 @@ public:
 
 	virtual void finalize();
 
+	void SetDepthClearFlag() { mDepthClearFlag = true; }
+
 private:
 	typedef Triangle  *PixelPrimMap[MACRO_TILE_SIZE][MACRO_TILE_SIZE];
 	typedef float           ZBuffer[MACRO_TILE_SIZE][MACRO_TILE_SIZE];
@@ -124,6 +126,8 @@ private:
 
 	PixelPrimMap  *mPixelPrimMap;
 	ZBuffer       *mZBuffer;
+
+	bool           mDepthClearFlag;
 };
 
 class PerspectiveCorrectInterpolater: public Interpolater
