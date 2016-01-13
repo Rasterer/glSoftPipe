@@ -135,7 +135,7 @@ private:
 	float mScalar;
 	GLuint mProg;
 	GLint mWVPLocation;
-	mat4  mScale, mTVP;
+	mat4  mTVP;
 	Mesh *mMesh;
 };
 
@@ -177,13 +177,11 @@ void LoadModel::onInit()
 	mWVPLocation = glGetUniformLocation(mProg, "mWVP");
 	GLint samplerLocation = glGetUniformLocation(mProg, "mSampler");
 
-	float xbias = 10.0f;
-	mScale = ::glm::scale(mat4(1.0f), vec3(0.3f, 0.3f, 0.3f));
-	mat4 trans = ::glm::translate(mat4(1.0f), vec3(0.0f, 0.0f, xbias));
-	mat4 view = ::glm::lookAt(vec3(15.0f, 10.0f, -10.0f),
-		vec3(0.0f, 0.0f, 10.0f),
-		vec3(0.0f, 1.0f, 0.0f));
-	mat4 project = ::glm::perspective((float)M_PI * 60.0f / 180.0f, 16.0f / 9.0f, 1.0f, 50.0f);
+	mat4 trans = ::glm::translate(mat4(1.0f), vec3(0.0f, -20.0f, -100.0f));
+	mat4 view = ::glm::lookAt(vec3(0.0f, 0.0f, 0.0f),
+							vec3(0.0f, 0.0f, -1.0f),
+							vec3(0.0f, 1.0f, 0.0f));
+	mat4 project = ::glm::perspective((float)M_PI * 60.0f / 180.0f, 16.0f / 9.0f, 10.0f, 200.0f);
 	mTVP = project * view * trans;
 
 	glUniform1i(samplerLocation, 0);
@@ -195,7 +193,7 @@ void LoadModel::onInit()
 void LoadModel::onRender()
 {
 	mat4 rotate = ::glm::rotate(mat4(1.0f), (float)M_PI * mScalar / 180, vec3(0.0f, 1.0f, 0.0f));
-	mat4 wvp = mTVP * rotate * mScale;
+	mat4 wvp = mTVP * rotate;
 	glUniformMatrix4fv(mWVPLocation, 1, false, (float *)&wvp);
 	mScalar += 1.0f;
 

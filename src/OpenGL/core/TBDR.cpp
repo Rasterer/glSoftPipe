@@ -521,11 +521,11 @@ void TBDR::ProcessMacroTile(int x, int y)
 	{
 		float z = tri->mZAtOrigin + tri->mZGradientX * x + tri->mZGradientY * y;
 
-		for (int i = 0; i < MACRO_TILE_SIZE; ++i)
+		for (int i = 0; i < MACRO_TILE_SIZE && (y + i) < g_GC->mRT.height; ++i)
 		{
 			float zx = z;
 
-			for (int j = 0; j < MACRO_TILE_SIZE; ++j)
+			for (int j = 0; j < MACRO_TILE_SIZE && (x + j) < g_GC->mRT.width; ++j)
 			{
 				if (zx < z_buf[i][j])
 				{
@@ -541,9 +541,9 @@ void TBDR::ProcessMacroTile(int x, int y)
 
 	for (Triangle *tri: disp_list)
 	{
-		for (int yp = y, i = 0; i < MICRO_TILES_IN_MACRO_TILE; yp += MICRO_TILE_SIZE, ++i)
+		for (int yp = y, i = 0; i < MICRO_TILES_IN_MACRO_TILE && yp < g_GC->mRT.height; yp += MICRO_TILE_SIZE, ++i)
 		{
-			for (int xp = x, j = 0; j < MICRO_TILES_IN_MACRO_TILE; xp += MICRO_TILE_SIZE, ++j)
+			for (int xp = x, j = 0; j < MICRO_TILES_IN_MACRO_TILE && xp < g_GC->mRT.width; xp += MICRO_TILE_SIZE, ++j)
 			{
 				const int & xleft   = xp;
 				const int & ybottom = yp;
@@ -602,11 +602,11 @@ void TBDR::ProcessMacroTile(int x, int y)
 					// Micro tile is totally inside the triangle
 					if (positive_half0 && positive_half1 && positive_half2)
 					{
-						for (int k = 0; k < MICRO_TILE_SIZE; ++k)
+						for (int k = 0; k < MICRO_TILE_SIZE && (yp + k) < g_GC->mRT.height; ++k)
 						{
 							float zx = z;
 
-							for (int l = 0; l < MICRO_TILE_SIZE; ++l)
+							for (int l = 0; l < MICRO_TILE_SIZE && (xp + l) < g_GC->mRT.width; ++l)
 							{
 								const int xoff = (j << MICRO_TILE_SIZE_SHIFT) + l;
 								const int yoff = (i << MICRO_TILE_SIZE_SHIFT) + k;
@@ -626,13 +626,13 @@ void TBDR::ProcessMacroTile(int x, int y)
 					// or it's clipped against the triangle edges, so need further rasterization
 					else
 					{
-						for (int k = 0; k < MICRO_TILE_SIZE; ++k)
+						for (int k = 0; k < MICRO_TILE_SIZE && (yp + k) < g_GC->mRT.height; ++k)
 						{
 							int sum0 = left_bottom_v0;
 							int sum1 = left_bottom_v1;
 							int sum2 = left_bottom_v2;
 
-							for (int l = 0; l < MICRO_TILE_SIZE; ++l)
+							for (int l = 0; l < MICRO_TILE_SIZE && (xp + l) < g_GC->mRT.width; ++l)
 							{
 								if (sum0 > 0 && sum1 > 0 && sum2 > 0)
 								{
@@ -678,9 +678,9 @@ void TBDR::ProcessMacroTile(int x, int y)
 	}
 #endif
 #if 1
-	for (int i = 0; i < MACRO_TILE_SIZE; i += 2)
+	for (int i = 0; i < MACRO_TILE_SIZE && (y + i) < (g_GC->mRT.height - 1); i += 2)
 	{
-		for (int j = 0; j < MACRO_TILE_SIZE; j += 2)
+		for (int j = 0; j < MACRO_TILE_SIZE && (x + j) < (g_GC->mRT.width - 1); j += 2)
 		{
 			RenderQuadPixels(pp_map, x, y, i, j);
 		}
