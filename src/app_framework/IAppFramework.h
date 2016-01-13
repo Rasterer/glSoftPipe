@@ -18,7 +18,7 @@ public:
 	virtual ~GlspApp() = default;
 
 	void run();
-	void Render();
+
 
 protected:
 	void setWindowInfo(int w, int h, const char *name)
@@ -33,9 +33,11 @@ private:
 	{
 		onInit();
 	}
+	void Render();
 
 	virtual void onInit() { }
 	virtual void onRender() { }
+	virtual void onKeyPressed(unsigned long) { }
 
 	int mWidth;
 	int mHeight;
@@ -60,6 +62,9 @@ public:
 	//virtual void EventDispatch() = 0;
 
 protected:
+	void Render() { mApp->Render(); }
+	void onKeyPressed(unsigned long key) { mApp->onKeyPressed(key); }
+
 	INativeWindowManager *mNWM;
 	GlspApp              *mApp;
 	void                 *mAppHandle;

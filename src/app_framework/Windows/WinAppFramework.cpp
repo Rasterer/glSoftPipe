@@ -1,24 +1,7 @@
-#include <windows.h>
-
-#include "IAppFramework.h"
-
+#include "WinAppFramework.h"
+#include <cstdio>
 namespace glsp {
 
-class WinAppFramework: public IAppFramework
-{
-public:
-    WinAppFramework() = default;
-    virtual ~WinAppFramework() = default;
-
-    //virtual void* GetAppHandle(GlspApp *app);
-    virtual void EnterLoop();
-    //virtual void EventDispatch();
-
-private:
-    virtual bool AFWCreateWindow(int w, int h, const char *name);
-
-    HINSTANCE mAppInstance;
-};
 
 bool WinAppFramework::AFWCreateWindow(int w, int h, const char *name)
 {
@@ -43,9 +26,30 @@ void WinAppFramework::EnterLoop()
         }
         else
         {
-            mApp->Render();
+            Render();
         }
     }
+}
+
+LRESULT WinAppFramework::WinWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+/*    case WM_PAINT:
+        hdc = ::BeginPaint(hWnd, &ps);
+        ::EndPaint(hWnd, &ps);
+        break;*/
+    case WM_KEYDOWN:
+    {
+        onKeyPressed(wParam);
+        break;
+    }
+
+    default:
+        return ::DefWindowProc(hWnd, message, wParam, lParam);
+    }
+
+    return 0;
 }
 
 IAppFramework* OpenAppFramework()

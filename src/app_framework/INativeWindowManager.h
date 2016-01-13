@@ -4,6 +4,7 @@
 
 
 namespace glsp {
+class IAppFramework;
 
 class INativeWindowManager
 {
@@ -19,6 +20,12 @@ public:
 
 	virtual bool NWMCreateWindow(int width, int height, const char *name) = 0;
 	virtual void NWMDestroyWindow() = 0;
+
+	void SetAppFramework(IAppFramework *app_framework) { mAppFramework = app_framework; }
+	IAppFramework* GetAppFramework() const { return mAppFramework; }
+
+protected:
+	IAppFramework *mAppFramework;
 
 private:
 	virtual void GetWindowInfo(NWMWindowInfo *win_info) = 0;

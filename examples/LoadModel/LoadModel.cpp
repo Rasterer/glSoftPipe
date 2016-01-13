@@ -9,6 +9,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 #include "IAppFramework.h"
 #include "Shader.h"
@@ -130,12 +131,26 @@ public:
 private:
 	virtual void onInit();
 	virtual void onRender();
+	virtual void onKeyPressed(unsigned long key);
+
+	void UpdateCameraMatrix();
 
 	ShaderFactory *mShaderFactory;
 	float mScalar;
 	GLuint mProg;
 	GLint mWVPLocation;
-	mat4  mTVP;
+
+	mat4  mTrans;
+	mat4  mView;
+	mat4  mProject;
+	mat4  mTransViewProject;
+
+	// Camera related
+	vec3  mCameraPosition;
+	vec3  mCameraTarget;
+	vec3  mCameraUp;
+	vec3  mCameraRight;
+
 	Mesh *mMesh;
 };
 
@@ -177,12 +192,15 @@ void LoadModel::onInit()
 	mWVPLocation = glGetUniformLocation(mProg, "mWVP");
 	GLint samplerLocation = glGetUniformLocation(mProg, "mSampler");
 
-	mat4 trans = ::glm::translate(mat4(1.0f), vec3(0.0f, -20.0f, -100.0f));
-	mat4 view = ::glm::lookAt(vec3(0.0f, 0.0f, 0.0f),
-							vec3(0.0f, 0.0f, -1.0f),
-							vec3(0.0f, 1.0f, 0.0f));
-	mat4 project = ::glm::perspective((float)M_PI * 60.0f / 180.0f, 16.0f / 9.0f, 10.0f, 200.0f);
-	mTVP = project * view * trans;
+	mCameraPosition = vec3(0.0f, 0.0f, 0.0f);
+	mCameraTarget   = vec3(0.0f, 0.0f, -1.0f);
+	mCameraUp       = vec3(0.0f, 1.0f, 0.0f);
+	mCameraRight    = vec3(1.0f, 0.0f, 0.0f);
+	UpdateCameraMatrix();
+
+	mTrans   = ::glm::translate(mat4(1.0f), vec3(0.0f, -20.0f, -100.0f));
+	mProject = ::glm::perspective((float)M_PI * 60.0f / 180.0f, 16.0f / 9.0f, 10.0f, 200.0f);
+	mTransViewProject = mProject * mView * mTrans;
 
 	glUniform1i(samplerLocation, 0);
 
@@ -190,43 +208,109 @@ void LoadModel::onInit()
 	mMesh->LoadMesh("../../../examples/LoadModel/materials/phoenix_ugv.md2");
 }
 
+void LoadModel::UpdateCameraMatrix()
+{
+	mView   = ::glm::lookAt(mCameraPosition,
+							mCameraTarget + mCameraPosition,
+							mCameraUp);
+}
+
 void LoadModel::onRender()
 {
 	mat4 rotate = ::glm::rotate(mat4(1.0f), (float)M_PI * mScalar / 180, vec3(0.0f, 1.0f, 0.0f));
-	mat4 wvp = mTVP * rotate;
+	mat4 view   = ::glm::lookAt(mCameraPosition,
+							mCameraTarget + mCameraPosition,
+							mCameraUp);
+	mat4 wvp = mTransViewProject * rotate;
 	glUniformMatrix4fv(mWVPLocation, 1, false, (float *)&wvp);
 	mScalar += 1.0f;
 
 	mMesh->Render();
+}
 
-#if 0
+void LoadModel::onKeyPressed(unsigned long key)
+{
+	bool bUpdateCamera = false;
 
-	std::chrono::high_resolution_clock::time_point  beginTime = std::chrono::high_resolution_clock::now();
-	std::chrono::high_resolution_clock::time_point  endTime;
-	while(true)
+	switch (key)
 	{
-		rotate = glm::rotate(mat4(1.0f), (float)M_PI * scalar / 180, vec3(0.0f, 1.0f, 0.0f));
-
-		wvp   = tvp * rotate * scal;
-		glUniformMatrix4fv(WVPLocation, 1, false, (float *)&wvp);
-		scalar += 1.0f;
-
-		pMesh->Render();
-		ok = eglSwapBuffers(display, surface);
-
-		nFrames++;
-
-		if(nFrames == 150)
+		case 'W':
 		{
-			endTime = std::chrono::high_resolution_clock::now();
-
-			printf("FPS: %f\n", 150.0 / (std::chrono::duration_cast<std::chrono::duration<double>>(endTime - beginTime)).count());
-
-			nFrames = 0;
-			beginTime = endTime;
+			mCameraPosition += (mCameraUp * 1.0f);
+			bUpdateCamera = true;
+			break;
 		}
+		case 'X':
+		{
+			mCameraPosition += (mCameraUp * (-1.0f));
+			bUpdateCamera = true;
+			break;
+		}
+		case 'A':
+		{
+			mCameraPosition += (mCameraRight * (-1.0f));
+			bUpdateCamera = true;
+			break;
+		}
+		case 'D':
+		{
+			mCameraPosition += (mCameraRight * 1.0f);
+			bUpdateCamera = true;
+			break;
+		}
+		case 'S':
+		{
+			mCameraPosition += (mCameraTarget * 1.0f);
+			bUpdateCamera = true;
+			break;
+		}
+		case 'Z':
+		{
+			mCameraPosition += (mCameraTarget * (-1.0f));
+			bUpdateCamera = true;
+			break;
+		}
+		case 'U':
+		{
+			// quaternion rotation around right axis
+			mCameraTarget = rotate(angleAxis(0.05f, mCameraRight), mCameraTarget);
+			mCameraUp = cross(mCameraRight, mCameraTarget);
+			bUpdateCamera = true;
+			break;
+		}
+		case 'M':
+		{
+			// quaternion rotation around right axis
+			mCameraTarget = rotate(angleAxis(-0.05f, mCameraRight), mCameraTarget);
+			mCameraUp = cross(mCameraRight, mCameraTarget);
+			bUpdateCamera = true;
+			break;
+		}
+		case 'H':
+		{
+			// quaternion rotation around up axis
+			mCameraTarget = rotate(angleAxis(0.05f, mCameraUp), mCameraTarget);
+			mCameraRight = cross(mCameraTarget, mCameraUp);
+			bUpdateCamera = true;
+			break;
+		}
+		case 'K':
+		{
+			// quaternion rotation around up axis
+			mCameraTarget = rotate(angleAxis(-0.05f, mCameraUp), mCameraTarget);
+			mCameraRight = cross(mCameraTarget, mCameraUp);
+			bUpdateCamera = true;
+			break;
+		}
+		default:
+			break;
 	}
-#endif
+
+	if (bUpdateCamera)
+	{
+		UpdateCameraMatrix();
+		mTransViewProject = mProject * mView * mTrans;
+	}
 }
 
 } // namespace glsp

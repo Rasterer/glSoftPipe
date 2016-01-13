@@ -56,11 +56,12 @@ bool IAppFramework::AttachApp(GlspApp *app)
 {
 	assert(app);
 
-	mApp       = app;
+	mApp = app;
+	mNWM = INativeWindowManager::get();
 	//mAppHandle = GetAppHandle(app);
-	mNWM       = INativeWindowManager::get();
-	bool ret = mNWM->InitDrawEngine();
+	mNWM->SetAppFramework(this);
 
+	bool ret = mNWM->InitDrawEngine();
 	if (!ret)
 		return false;
 

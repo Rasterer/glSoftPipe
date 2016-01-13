@@ -6,6 +6,7 @@
 #include <D3Dcompiler.h>
 
 #include "INativeWindowManager.h"
+#include "WinAppFramework.h"
 #include "glsp_defs.h"
 #include "glsp_debug.h"
 
@@ -84,17 +85,19 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 
     switch( message )
     {
-    case WM_PAINT:
-        hdc = ::BeginPaint( hWnd, &ps );
-        ::EndPaint( hWnd, &ps );
-        break;
-
+/*    case WM_PAINT:
+        hdc = ::BeginPaint(hWnd, &ps);
+        ::EndPaint(hWnd, &ps);
+        break;*/
     case WM_DESTROY:
-        ::PostQuitMessage( 0 );
+        ::PostQuitMessage(0);
         break;
 
     default:
-        return ::DefWindowProc( hWnd, message, wParam, lParam );
+        WinAppFramework *app_framwork =
+            static_cast<WinAppFramework *>(INativeWindowManager::get()->GetAppFramework());
+
+        return app_framwork->WinWndProc(hWnd, message, wParam, lParam);
     }
 
     return 0;
@@ -158,7 +161,7 @@ bool D3DNativeWindowManager::NWMCreateWindow(int w, int h, const char *name)
     if (!mWND)
         return false;
 
-    ::ShowWindow(mWND, SW_SHOW);
+    ::ShowWindow(mWND, SW_SHOWDEFAULT);
 
     return InitD3DDevice();
 }
