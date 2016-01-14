@@ -241,7 +241,6 @@ void FragmentShader::emit(void *data)
 {
 	//ExecuteSISD(data);
 	ExecuteSIMD(data);
-	getNextStage()->emit(data);
 }
 
 void FragmentShader::ExecuteSISD(void *data)

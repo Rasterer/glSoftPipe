@@ -15,7 +15,7 @@ class PerspectiveDivider;
 class ScreenMapper;
 class FaceCuller;
 class Binning;
-class Rasterizer;
+class TBDR;
 class PipeStage;
 class Interpolater;
 class OwnershipTester;
@@ -62,6 +62,8 @@ struct DrawContext
 class DrawEngine
 {
 public:
+	friend class TBDR;
+
 	void init(NWMCallBacks *call_backs);
 	bool validateState(DrawContext *dc);
 	void prepareToDraw();
@@ -91,6 +93,8 @@ public:
 
 	void PerformClear(unsigned int mask);
 
+	void Flush(bool swap_buffer);
+
 protected:
 	DrawEngine();
 	~DrawEngine();
@@ -99,7 +103,8 @@ protected:
 private:
 	void beginFrame(GLContext *dc);
 	void initPipeline();
-	void linkPipeStages(GLContext *gc);
+	void linkGeomertryPipeStages();
+	void linkRasterizerPipeStages();
 
 	// Use pointer member because there may be serveral impls of this components.
 	// And we may need to switch between those dynamically.
@@ -111,7 +116,7 @@ private:
 	FaceCuller 				*mCuller;
 	Binning  				*mBinning;
 
-	Rasterizer      		*mRasterizer;
+	TBDR                    *mTBDR;
 	Interpolater            *mInterpolater;
 	OwnershipTester         *mOwnershipTest;
 	ScissorTester           *mScissorTest;

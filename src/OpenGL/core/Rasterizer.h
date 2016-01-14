@@ -17,18 +17,8 @@ public:
 	virtual void emit(void *data);
 	virtual void finalize();
 
-	void SetInterpolater(Interpolater *interp)
-	{
-		mpInterpolate = interp;
-	}
-
-	Interpolater* GetInterpolater() const { return mpInterpolate; }
-
-protected:
-	virtual void onRasterizing(DrawContext *dc) = 0;
-
-	// Used to calculate gradiences.
-	Interpolater *mpInterpolate;
+private:
+	virtual void onRasterizing() = 0;
 };
 
 

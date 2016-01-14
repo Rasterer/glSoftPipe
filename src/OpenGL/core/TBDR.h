@@ -28,6 +28,7 @@
 
 namespace glsp {
 
+class DrawEngine;
 class Batch;
 class Triangle;
 using std::vector;
@@ -107,27 +108,35 @@ public:
 class TBDR: public Rasterizer
 {
 public:
-	TBDR();
+	TBDR(DrawEngine &de);
 	~TBDR();
 
 	virtual void finalize();
 
+	void FlushDisplayLists(bool swap_buffer);
 	void SetDepthClearFlag() { mDepthClearFlag = true; }
 
 private:
 	typedef Triangle  *PixelPrimMap[MACRO_TILE_SIZE][MACRO_TILE_SIZE];
 	typedef float           ZBuffer[MACRO_TILE_SIZE][MACRO_TILE_SIZE];
 
-	virtual void onRasterizing(DrawContext *dc);
+	virtual void onRasterizing();
 	void ProcessMacroTile(int x, int y);
 	void RenderOnePixel(Triangle *tri, int x, int y, float z);
 	void RenderQuadPixels(PixelPrimMap pp_map, int x, int y, /* float z, */ int i, int j);
 	inline void RenderQuadPixelsInOneTriangle(Triangle *tri, int coverage_mask, int x, int y, int i, int j);
 
+	DrawEngine    &mDE;
 	PixelPrimMap  *mPixelPrimMap;
 	ZBuffer       *mZBuffer;
 
 	bool           mDepthClearFlag;
+
+	// Used to optimize the depth buffer store.
+	// In the case where flush is triggered by swap buffer,
+	// we can eliminate the depth buffer store.
+	// This is the very zero depth store implemented in HW.
+	bool           mFlushTriggerBySwapBuffer;
 };
 
 class PerspectiveCorrectInterpolater: public Interpolater

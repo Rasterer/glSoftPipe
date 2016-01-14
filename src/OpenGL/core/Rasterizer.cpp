@@ -11,10 +11,9 @@ Rasterizer::Rasterizer():
 }
 
 
-void Rasterizer::emit(void *data)
+void Rasterizer::emit(void *)
 {
-	DrawContext *dc = static_cast<DrawContext *>(data);
-	onRasterizing(dc);
+	onRasterizing();
 
 	finalize();
 }

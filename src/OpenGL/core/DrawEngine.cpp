@@ -168,7 +168,7 @@ DrawEngine::~DrawEngine()
 	delete mMapper;
 	delete mCuller;
 	delete mBinning;
-	delete mRasterizer;
+	delete mTBDR;
 	delete mInterpolater;
 	delete mOwnershipTest;
 	delete mScissorTest;
@@ -214,7 +214,7 @@ void DrawEngine::initPipeline()
 	mMapper        = new ScreenMapper();
 	mCuller        = new FaceCuller();
 	mBinning       = new Binning();
-	mRasterizer    = new TBDR();
+	mTBDR          = new TBDR(*this);
 
 	mInterpolater  = new PerspectiveCorrectInterpolater();
 	mOwnershipTest = new OwnershipTester();
@@ -238,14 +238,13 @@ void DrawEngine::initPipeline()
 	mGeometry->setLastChild(mBinning);
 	mGeometry->setNextStage(mRast);
 
-	mRast->setFirstChild(mRasterizer);
+	mRast->setFirstChild(mTBDR);
 }
 
-void DrawEngine::linkPipeStages(GLContext *gc)
+void DrawEngine::linkGeomertryPipeStages()
 {
-	int enables = gc->mState.mEnables;
-	VertexShader *pVS = gc->mPM.getCurrentProgram()->getVS();
-	FragmentShader *pFS = gc->mPM.getCurrentProgram()->getFS();
+	int enables = mGLContext->mState.mEnables;
+	VertexShader *pVS = mGLContext->mPM.getCurrentProgram()->getVS();
 
 	mVertexFetcher->setNextStage(pVS);
 	pVS->setNextStage(mPrimAsbl);
@@ -259,6 +258,16 @@ void DrawEngine::linkPipeStages(GLContext *gc)
 	{
 		mMapper->setNextStage(mBinning);
 	}
+}
+
+void DrawEngine::linkRasterizerPipeStages()
+{
+	// NOTE:
+	// Rasterizer stages has complex logic and are tightly coupled.
+	// So don't link them together here, instead, let TBDR handle the details. 
+#if 0
+	int enables = mGLContext->mState.mEnables;
+	FragmentShader *pFS = mGLContext->mPM.getCurrentProgram()->getFS();
 
 	PipeStage *last = NULL;
 
@@ -269,15 +278,21 @@ void DrawEngine::linkPipeStages(GLContext *gc)
 			!(enables & GLSP_SCISSOR_TEST) &&
 			!(enables & GLSP_STENCIL_TEST))
 		{
-			// TODO: need formal zero depth load/store OPT.
-			//mRasterizer ->setNextStage(mDepthTest);
-			//mDepthTest  ->setNextStage(mInterpolater);
-			mRasterizer ->setNextStage(mInterpolater);
-			last = mInterpolater->setNextStage(pFS);
+			if (mFlushTriggerBySwapBuffer)
+			{
+				mTBDR->setNextStage(mInterpolater);
+				last = mInterpolater->setNextStage(pFS);
+			}
+			else
+			{
+				mTBDR->setNextStage(mDepthTest);
+				mDepthTest->setNextStage(mInterpolater);
+				last = mInterpolater->setNextStage(pFS);
+			}
 		}
 		else
 		{
-			mRasterizer  ->setNextStage(mInterpolater);
+			mTBDR->setNextStage(mInterpolater);
 			mInterpolater->setNextStage(pFS);
 
 			if(enables & GLSP_SCISSOR_TEST)
@@ -291,7 +306,7 @@ void DrawEngine::linkPipeStages(GLContext *gc)
 	}
 	else
 	{
-		mRasterizer ->setNextStage(mInterpolater);
+		mTBDR ->setNextStage(mInterpolater);
 		last = mInterpolater->setNextStage(pFS);
 	}
 
@@ -304,6 +319,7 @@ void DrawEngine::linkPipeStages(GLContext *gc)
 		last = last->setNextStage(mDither);
 
 	last = last->setNextStage(mFBWriter);
+#endif
 }
 
 // OPT: use dirty flag to optimize
@@ -410,9 +426,14 @@ void DrawEngine::PerformClear(unsigned int mask)
 
 		int count = rt.width * rt.height;
 		__m128i *addr = (__m128i *)rt.pColorBuffer;
-		for(int i = 0; i < count; i += 4, ++addr)
+
+		// Assume 64 bytes cache line size
+		for(int i = 0; i < count; i += 16, addr += 4)
 		{
-			_mm_stream_si128(addr, vColor);
+			_mm_stream_si128(addr    , vColor);
+			_mm_stream_si128(addr + 1, vColor);
+			_mm_stream_si128(addr + 2, vColor);
+			_mm_stream_si128(addr + 3, vColor);
 		}
 	}
 
@@ -421,7 +442,7 @@ void DrawEngine::PerformClear(unsigned int mask)
 		// Defer clear until the rasterizer stage begin,
 		// and that will only clear the per-tile depth buffer
 		// rather than the big one from render target, improving cache locality.
-		static_cast<TBDR *>(mRasterizer)->SetDepthClearFlag();
+		mTBDR->SetDepthClearFlag();
 	}
 
 	if (mask & GL_STENCIL_BUFFER_BIT)
@@ -432,23 +453,14 @@ void DrawEngine::PerformClear(unsigned int mask)
 
 void DrawEngine::emit(DrawContext *dc)
 {
-	linkPipeStages(mGLContext);
+	linkGeomertryPipeStages();
 	getFirstStage()->emit(dc);
 }
 
 bool DrawEngine::SwapBuffers(NWMBufferToDisplay *buf)
 {
-	DrawContext *dc = mDrawContextList;
-
-	getRastStage()->emit(dc);
-
-	while(dc)
-	{
-		DrawContext *tmp = dc;
-		dc = dc->m_pNext;
-		delete tmp;
-	}
-	mDrawContextList = NULL;
+	linkRasterizerPipeStages();
+	Flush(true);
 
 	buf->addr   = mGLContext->mRT.pColorBuffer;
 	buf->width  = mGLContext->mRT.width;
@@ -460,6 +472,19 @@ bool DrawEngine::SwapBuffers(NWMBufferToDisplay *buf)
 	return true;
 }
 
+void DrawEngine::Flush(bool swap_buffer)
+{
+	mTBDR->FlushDisplayLists(swap_buffer);
+
+	DrawContext *dc = mDrawContextList;
+	while(dc)
+	{
+		DrawContext *tmp = dc;
+		dc = dc->m_pNext;
+		delete tmp;
+	}
+	mDrawContextList = NULL;
+}
 
 bool glspCreateRender(NWMCallBacks *call_backs)
 {

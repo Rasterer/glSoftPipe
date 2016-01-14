@@ -10,6 +10,7 @@
 #include "MemoryPool.h"
 #include "GLContext.h"
 #include "DrawEngine.h"
+#include "PixelBackend.h"
 #include "glsp_spinlock.h"
 #include "compiler.h"
 
@@ -146,7 +147,6 @@ void PerspectiveCorrectInterpolater::emit(void *data)
 {
 	//onInterpolatingSISD(data);
 	onInterpolatingSIMD(data);
-	getNextStage()->emit(data);
 }
 
 void PerspectiveCorrectInterpolater::onInterpolatingSISD(void *data)
@@ -455,9 +455,11 @@ Triangle::Triangle(Primitive &prim):
 #endif
 }
 
-TBDR::TBDR():
+TBDR::TBDR(DrawEngine &de):
 	Rasterizer(),
-	mDepthClearFlag(false)
+	mDE(de),
+	mDepthClearFlag(false),
+	mFlushTriggerBySwapBuffer(true)
 {
 	const int thread_number = ThreadPool::get().getThreadsNumber();
 
@@ -473,7 +475,7 @@ TBDR::~TBDR()
 	free(mPixelPrimMap);
 }
 
-void TBDR::onRasterizing(DrawContext *dc)
+void TBDR::onRasterizing()
 {
 	::glsp::ThreadPool &thread_pool = ::glsp::ThreadPool::get();
 
@@ -513,9 +515,14 @@ void TBDR::ProcessMacroTile(int x, int y)
 	{
 		__m128 vDepth = _mm_set_ps1(static_cast<float>(g_GC->mState.mClearState.depth));
 		float *addr = &z_buf[0][0];
-		for (int i = 0; i < MACRO_TILE_SIZE * MACRO_TILE_SIZE; i += 4, addr += 4)
+
+		// Assume 64 bytes cache line size
+		for (int i = 0; i < MACRO_TILE_SIZE * MACRO_TILE_SIZE; i += 16, addr += 16)
 		{
-			_mm_store_ps(addr, vDepth);
+			_mm_store_ps(addr     , vDepth);
+			_mm_store_ps(addr + 4 , vDepth);
+			_mm_store_ps(addr + 8 , vDepth);
+			_mm_store_ps(addr + 12, vDepth);
 		}
 	}
 	else
@@ -685,6 +692,12 @@ void TBDR::ProcessMacroTile(int x, int y)
 		}
 	}
 #endif
+
+	if (!mFlushTriggerBySwapBuffer)
+	{
+		// depth buffer store.
+	}
+
 #if 1
 	for (int i = 0; i < MACRO_TILE_SIZE && (y + i) < (g_GC->mRT.height - 1); i += 2)
 	{
@@ -694,6 +707,7 @@ void TBDR::ProcessMacroTile(int x, int y)
 		}
 	}
 #endif
+
 }
 
 void TBDR::RenderOnePixel(Triangle *tri, int x, int y, float z)
@@ -706,7 +720,8 @@ void TBDR::RenderOnePixel(Triangle *tri, int x, int y, float z)
 	fsio.m_priv0 = tri;
 	fsio.in.resize(tri->mPrim.mVert[0].getRegsNum());
 
-	getNextStage()->emit(&fsio);
+	// TODO: Add condition check
+	mDE.mInterpolater->emit(&fsio);
 }
 
 void TBDR::RenderQuadPixels(PixelPrimMap pp_map, int x, int y, int i, int j)
@@ -767,7 +782,12 @@ void TBDR::RenderQuadPixelsInOneTriangle(Triangle *tri, int coverage_mask, int x
 	fsio.mCoverageMask = coverage_mask;
 	fsio.m_priv0 = tri;
 
-	getNextStage()->emit(&fsio);
+	// TODO: elaborate the pipe stages order
+	mDE.mInterpolater->emit(&fsio);
+
+	FragmentShader *fs = tri->mPrim.mDC->mFS;
+	fs->emit(&fsio);
+	mDE.mFBWriter->emit(&fsio);
 }
 
 void TBDR::finalize()
@@ -790,6 +810,15 @@ void TBDR::finalize()
 
 	if (mDepthClearFlag)
 		mDepthClearFlag = false;
+}
+
+void TBDR::FlushDisplayLists(bool swap_buffer)
+{
+	mFlushTriggerBySwapBuffer = swap_buffer;
+
+	onRasterizing();
+
+	finalize();
 }
 
 } // namespace glsp
