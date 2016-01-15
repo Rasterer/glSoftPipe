@@ -44,6 +44,11 @@ public:
 
 private:
 	void onBinning(Batch *bat);
+
+	void SetupTriangle(Triangle *tri);
+	void SetupTriangleSIMD(Triangle *tri0, Triangle *tri1, Triangle *tri2, Triangle *tri3);
+
+	void CoarseRasterizing(Triangle *tri);
 };
 
 
@@ -80,23 +85,24 @@ public:
 	float				mZGradientY;
 	float				mZAtOrigin;
 
-	// Attributes plane equation, used for fast attributes interpolation.
-	vsOutput			mAttrPlaneEquationA;
-	vsOutput			mAttrPlaneEquationB;
-
-	// NOTE: the order may be changed from the original order
-	// in Primitive to keep counter-clockwise
-	IntermVertex		mVert[3];
-
 	// Bounding box.
 	int					xmin;
 	int					xmax;
 	int					ymin;
 	int					ymax;
-	const Primitive	   &mPrim;
+
+	// NOTE: the order may be changed from the original order
+	// in Primitive to keep counter-clockwise
+	IntermVertex		mVert[3];
+
+	Primitive	       &mPrim;
 
 	// Store the vert2(in counter-clockwise) for later attribute plane equation.
 	const vsOutput     *mVert2;
+
+	// Attributes plane equation, used for fast attributes interpolation.
+	vsOutput			mAttrPlaneEquationA;
+	vsOutput			mAttrPlaneEquationB;
 
 #if 0
 	// used to compute texture mipmap lambda. Refer to:

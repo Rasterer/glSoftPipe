@@ -586,12 +586,6 @@ inline int mirror(int val)
 	return (val >= 0) ? val: (-1 - val);
 }
 
-template <class T>
-inline T clamp(T val, T l, T h)
-{
-	return (val < l) ? l: (val > h) ? h: val;
-}
-
 int WrapClampToEdge(int coord, int size)
 {
 	return clamp(coord, 0, size - 1);
@@ -981,30 +975,11 @@ bool Texture::PickupWrapFunc(SamplerObject &so)
 	return true;
 }
 
-static inline __m128i MAWrapper(const __m128i &v, const __m128i &stride, const __m128i &h)
-{
-#if defined(__AVX2__)
-	// FMA, relaxed floating-point precision
-	return _mm_fmadd_epi32(v, stride, h);
-#else
-	return _mm_add_epi32(_mm_mullo_epi32(v, stride), h);
-#endif
-}
-
-static inline __m128 MAWrapper(const __m128 &v, const __m128 &stride, const __m128 &h)
-{
-#if defined(__AVX2__)
-	// FMA, relaxed floating-point precision
-	return _mm_fmadd_ps(v, stride, h);
-#else
-	return _mm_add_ps(_mm_mul_ps(v, stride), h);
-#endif
-}
-
 void Texture::Texture2DSIMD(const __m128 &s, const __m128 &t, __m128 res[])
 {
 	const TextureMipmap *pMipmap = getMipmap(0, 0);
 
+	// OPT: use _mm_cvtps_epi32 with round mode specified
 	__m128 vTexSpaceS = MAWrapper(s, _mm_set1_ps((float)pMipmap->mWidth), _mm_set1_ps(-0.5f));
 	__m128 vTexSpaceT = MAWrapper(t, _mm_set1_ps((float)pMipmap->mHeight), _mm_set1_ps(-0.5f));
 	__m128i vS0 = _mm_cvtps_epi32(_mm_floor_ps(vTexSpaceS));
