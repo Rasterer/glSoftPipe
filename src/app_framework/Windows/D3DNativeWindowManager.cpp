@@ -284,7 +284,7 @@ bool D3DNativeWindowManager::InitD3DDevice()
 	mDeviceContext->PSSetShader(mPS, NULL, 0);
 
 	::D3D11_SAMPLER_DESC sampler;
-	sampler.Filter = D3D11_FILTER_MIN_MAG_POINT_MIP_LINEAR;
+	sampler.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
 	sampler.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
 	sampler.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
 	sampler.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
