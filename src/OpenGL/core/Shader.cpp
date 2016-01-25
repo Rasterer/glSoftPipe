@@ -100,6 +100,12 @@ GLAPI GLint APIENTRY glGetAttribLocation (GLuint program, const GLchar *name)
 	return gc->mPM.GetAttribLocation(gc, program, name);
 }
 
+ShaderFactory::~ShaderFactory()
+{
+	mVS->DecRef();
+	mFS->DecRef();
+}
+
 
 // vertex shader cache
 Shader::Shader():
@@ -398,7 +404,6 @@ void ProgramMachine::DeleteShader(GLContext *gc, unsigned shader)
 	if (pShader)
 	{
 		mShaderNameSpace.removeObject(pShader);
-		pShader->DecRef();
 	}
 	mProgramNameSpace.deleteNames(1, &shader);
 }

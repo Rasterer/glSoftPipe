@@ -70,11 +70,7 @@ public:
 		mVS(nullptr),
 		mFS(nullptr)
 	{}
-	virtual ~ShaderFactory()
-	{
-		delete mVS;
-		delete mFS;
-	}
+	virtual ~ShaderFactory();
 
 	virtual Shader *createVertexShader() = 0;
 	virtual void DeleteVertexShader(Shader *pVS) = 0;
