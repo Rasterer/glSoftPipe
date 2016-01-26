@@ -132,6 +132,7 @@ private:
 	virtual void onInit();
 	virtual void onRender();
 	virtual void onKeyPressed(unsigned long key);
+	virtual void onMouseLeftClickDown(int x, int y);
 
 	void UpdateCameraMatrix();
 
@@ -313,6 +314,12 @@ void LoadModel::onKeyPressed(unsigned long key)
 		mTransViewProject = mProject * mView * mTrans;
 	}
 }
+
+void LoadModel::onMouseLeftClickDown(int x, int y)
+{
+	//printf("Mouse left click: %d %d", x, y);
+}
+
 
 } // namespace glsp
 

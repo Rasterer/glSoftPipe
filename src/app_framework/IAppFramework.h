@@ -38,6 +38,7 @@ private:
 	virtual void onInit() { }
 	virtual void onRender() { }
 	virtual void onKeyPressed(unsigned long) { }
+	virtual void onMouseLeftClickDown(int, int) { }
 
 	int mWidth;
 	int mHeight;
@@ -64,6 +65,7 @@ public:
 protected:
 	void Render() { mApp->Render(); }
 	void onKeyPressed(unsigned long key) { mApp->onKeyPressed(key); }
+	void onMouseLeftClickDown(int x, int y) { mApp->onMouseLeftClickDown(x, y); }
 
 	INativeWindowManager *mNWM;
 	GlspApp              *mApp;

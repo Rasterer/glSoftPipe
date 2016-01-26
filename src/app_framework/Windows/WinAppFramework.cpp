@@ -1,5 +1,8 @@
 #include "WinAppFramework.h"
 #include <cstdio>
+
+#include <Windowsx.h>
+
 namespace glsp {
 
 
@@ -44,7 +47,10 @@ LRESULT WinAppFramework::WinWndProc(HWND hWnd, UINT message, WPARAM wParam, LPAR
         onKeyPressed(wParam);
         break;
     }
-
+    case WM_LBUTTONDOWN:
+    {
+        onMouseLeftClickDown(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+    }
     default:
         return ::DefWindowProc(hWnd, message, wParam, lParam);
     }

@@ -5,9 +5,9 @@
 #include "utils.h"
 
 
-// 64x64
-#define MACRO_TILE_SIZE           64
-#define MACRO_TILE_SIZE_SHIFT     6
+// 32x32
+#define MACRO_TILE_SIZE           32
+#define MACRO_TILE_SIZE_SHIFT     5
 
 // 8x8
 #define MICRO_TILE_SIZE           8
@@ -127,7 +127,7 @@ private:
 	typedef float           ZBuffer[MACRO_TILE_SIZE][MACRO_TILE_SIZE];
 
 	virtual void onRasterizing();
-	void ProcessMacroTile(int x, int y);
+	void FineRasterizing(int x, int y);
 	void RenderOnePixel(Triangle *tri, int x, int y, float z);
 	void RenderQuadPixels(PixelPrimMap pp_map, int x, int y, /* float z, */ int i, int j);
 	inline void RenderQuadPixelsInOneTriangle(Triangle *tri, int coverage_mask, int x, int y, int i, int j);

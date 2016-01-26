@@ -200,21 +200,21 @@ void Binning::SetupTriangleSIMD(Triangle *tri0, Triangle *tri1, Triangle *tri2, 
 	vMask  = _mm_cmpgt_epi32(vY1Y2, _mm_setzero_si128());
 	vMask1 = _mm_and_si128(_mm_cmpeq_epi32(vY1Y2, _mm_setzero_si128()), _mm_cmplt_epi32(vX2X1, _mm_setzero_si128()));
 	vMask  = _mm_or_si128(vMask, vMask1);
-	vMaskedOne = _mm_and_si128(vMask, _mm_set1_epi32(1));
+	vMaskedOne = _mm_andnot_si128(vMask, _mm_set1_epi32(1));
 	vC0  = _mm_sub_epi32(vC0, vMaskedOne);
 
 
 	vMask  = _mm_cmpgt_epi32(vY2Y0, _mm_setzero_si128());
 	vMask1 = _mm_and_si128(_mm_cmpeq_epi32(vY2Y0, _mm_setzero_si128()), _mm_cmplt_epi32(vX0X2, _mm_setzero_si128()));
 	vMask  = _mm_or_si128(vMask, vMask1);
-	vMaskedOne = _mm_and_si128(vMask, _mm_set1_epi32(1));
+	vMaskedOne = _mm_andnot_si128(vMask, _mm_set1_epi32(1));
 	vC1  = _mm_sub_epi32(vC1, vMaskedOne);
 
 
 	vMask  = _mm_cmpgt_epi32(vY0Y1, _mm_setzero_si128());
 	vMask1 = _mm_and_si128(_mm_cmpeq_epi32(vY0Y1, _mm_setzero_si128()), _mm_cmplt_epi32(vX1X0, _mm_setzero_si128()));
 	vMask  = _mm_or_si128(vMask, vMask1);
-	vMaskedOne = _mm_and_si128(vMask, _mm_set1_epi32(1));
+	vMaskedOne = _mm_andnot_si128(vMask, _mm_set1_epi32(1));
 	vC2  = _mm_sub_epi32(vC2, vMaskedOne);
 
 
@@ -651,7 +651,6 @@ void Binning::SetupTriangle(Triangle *tri)
 	}
 }
 
-
 void Binning::CoarseRasterizing(Triangle *tri)
 {
 	const int xmin = ROUND_DOWN(tri->xmin, MACRO_TILE_SIZE);
@@ -673,8 +672,8 @@ void Binning::CoarseRasterizing(Triangle *tri)
 	{
 		for (int x = xmin; x <= tri->xmax; x += MACRO_TILE_SIZE)
 		{
-			__m128i vTileCornerX = _mm_set_epi32(x, x + MACRO_TILE_SIZE - 1, x, x + MACRO_TILE_SIZE - 1);
-			__m128i vTileCornerY = _mm_set_epi32(y, y, y + MACRO_TILE_SIZE - 1, y + MACRO_TILE_SIZE - 1);
+			__m128i vTileCornerX = _mm_set_epi32(x + MACRO_TILE_SIZE - 1, x, x + MACRO_TILE_SIZE - 1, x);
+			__m128i vTileCornerY = _mm_set_epi32(y + MACRO_TILE_SIZE - 1, y + MACRO_TILE_SIZE - 1, y, y);
 
 			__m128i vArea0 = MAWrapper(vFactorB0, vTileCornerY, MAWrapper(vFactorA0, vTileCornerX, vFactorC0));
 			__m128i vTest0 = _mm_cmplt_epi32(vArea0, _mm_setzero_si128());
@@ -865,7 +864,7 @@ void PerspectiveCorrectInterpolater::onInterpolating(
 	}
 }
 
-// TODO: SIMD boost
+
 Triangle::Triangle(Primitive &prim):
 	mPrim(prim)
 {
@@ -906,7 +905,7 @@ void TBDR::onRasterizing()
 			{
 				auto task_handler = [this, x, y](void *data)
 				{
-					this->ProcessMacroTile(x, y);
+					this->FineRasterizing(x, y);
 				};
 				WorkItem *task = thread_pool.CreateWork(task_handler, nullptr);
 				thread_pool.AddWork(task);
@@ -915,8 +914,23 @@ void TBDR::onRasterizing()
 	}
 }
 
-// TODO: SIMD boost
-void TBDR::ProcessMacroTile(int x, int y)
+template <typename T>
+static inline void _simd_mask_store(T *ptr, __m128i &vMask, T value)
+{
+	if (_mm_extract_epi32(vMask, 0))
+		*(ptr + 0) = value;
+
+	if (_mm_extract_epi32(vMask, 1))
+		*(ptr + 1) = value;
+
+	if (_mm_extract_epi32(vMask, 2))
+		*(ptr + 2) = value;
+
+	if (_mm_extract_epi32(vMask, 3))
+		*(ptr + 3) = value;
+}
+
+void TBDR::FineRasterizing(int x, int y)
 {
 	PixelPrimMap &pp_map = mPixelPrimMap[ThreadPool::getThreadID()];
 	ZBuffer      &z_buf  = mZBuffer     [ThreadPool::getThreadID()];
@@ -948,6 +962,244 @@ void TBDR::ProcessMacroTile(int x, int y)
 
 	std::memset(&pp_map[0][0], 0, sizeof(PixelPrimMap));
 
+
+	int max_w = std::min(MACRO_TILE_SIZE, g_GC->mRT.width  - x);
+	int max_h = std::min(MACRO_TILE_SIZE, g_GC->mRT.height - y);
+
+	for (Triangle *tri: full_disp_list)
+	{
+		// 2x2 quad
+		__m128 vNewZ   = _mm_set_ps1(tri->mZAtOrigin);
+
+		vNewZ = MAWrapper(_mm_cvtepi32_ps(_mm_set_epi32(x + 1, x, x + 1, x)), _mm_set_ps1(tri->mZGradientX), vNewZ);
+		vNewZ = MAWrapper(_mm_cvtepi32_ps(_mm_set_epi32(y + 1, y + 1, y, y)), _mm_set_ps1(tri->mZGradientY), vNewZ);
+
+		float *zbuf_pos = &z_buf[0][0];
+		Triangle **pp_map_pos = &pp_map[0][0];
+		__m128 vStepx = _mm_set_ps1(tri->mZGradientX * 2);
+		__m128 vStepy = _mm_set_ps1(tri->mZGradientY * 2);
+
+		for (int i = 0; i < max_h; i += 2)
+		{
+			float *zbuf_posx = zbuf_pos;
+			Triangle **pp_map_posx = pp_map_pos;
+			__m128 vNewZx = vNewZ;
+
+			for (int j = 0; j < max_w; j += 2)
+			{
+				// 2x2 depth buffer tiling.
+				__m128 vCurrentZ = _mm_load_ps(zbuf_posx);
+				__m128i vMask = _mm_castps_si128(_mm_cmp_ps(vNewZx, vCurrentZ, _CMP_LT_OS));
+
+				_mm_maskstore_ps(zbuf_posx, vMask, vNewZx);
+				_simd_mask_store(pp_map_posx, vMask, tri);
+
+				zbuf_posx   += 4;
+				pp_map_posx += 4;
+				vNewZx = _mm_add_ps(vNewZx, vStepx);
+			}
+			zbuf_pos += 2 * MACRO_TILE_SIZE;
+			pp_map_pos += 2 * MACRO_TILE_SIZE;
+			vNewZ = _mm_add_ps(vNewZ, vStepy);
+		}
+	}
+
+	for (Triangle *tri: disp_list)
+	{
+		__m128 vNewZ = _mm_set_ps1(tri->mZAtOrigin);
+
+		vNewZ = MAWrapper(_mm_cvtepi32_ps(_mm_set_epi32(x + 1, x, x + 1, x)), _mm_set_ps1(tri->mZGradientX), vNewZ);
+		vNewZ = MAWrapper(_mm_cvtepi32_ps(_mm_set_epi32(y + 1, y + 1, y, y)), _mm_set_ps1(tri->mZGradientY), vNewZ);
+
+		__m128 vZStepQuadx = _mm_set_ps1(tri->mZGradientX * 2);
+		__m128 vZStepQuady = _mm_set_ps1(tri->mZGradientY * 2);
+
+		__m128 vZStepMTx = _mm_set_ps1(tri->mZGradientX * MICRO_TILE_SIZE);
+		__m128 vZStepMTy = _mm_set_ps1(tri->mZGradientY * MICRO_TILE_SIZE);
+
+		__m128i vMicroTileCornerX = _mm_set_epi32(x + MICRO_TILE_SIZE - 1, x, x + MICRO_TILE_SIZE - 1, x);
+		__m128i vMicroTileCornerY = _mm_set_epi32(y + MICRO_TILE_SIZE - 1, y + MICRO_TILE_SIZE - 1, y, y);
+
+		__m128i vFactorA0 = _mm_set1_epi32(tri->mVert[0].mFactorA);
+		__m128i vFactorB0 = _mm_set1_epi32(tri->mVert[0].mFactorB);
+		__m128i vFactorC0 = _mm_set1_epi32(tri->mVert[0].mFactorC);
+		__m128i vArea0 = MAWrapper(vFactorB0, vMicroTileCornerY, MAWrapper(vFactorA0, vMicroTileCornerX, vFactorC0));
+
+		__m128i vFactorA1 = _mm_set1_epi32(tri->mVert[1].mFactorA);
+		__m128i vFactorB1 = _mm_set1_epi32(tri->mVert[1].mFactorB);
+		__m128i vFactorC1 = _mm_set1_epi32(tri->mVert[1].mFactorC);
+		__m128i vArea1 = MAWrapper(vFactorB1, vMicroTileCornerY, MAWrapper(vFactorA1, vMicroTileCornerX, vFactorC1));
+
+		__m128i vFactorA2 = _mm_set1_epi32(tri->mVert[2].mFactorA);
+		__m128i vFactorB2 = _mm_set1_epi32(tri->mVert[2].mFactorB);
+		__m128i vFactorC2 = _mm_set1_epi32(tri->mVert[2].mFactorC);
+		__m128i vArea2 = MAWrapper(vFactorB2, vMicroTileCornerY, MAWrapper(vFactorA2, vMicroTileCornerX, vFactorC2));
+
+		__m128i vAreaStepQuadx0 = _mm_slli_epi32(vFactorA0, 1);
+		__m128i vAreaStepQuady0 = _mm_slli_epi32(vFactorB0, 1);
+
+		__m128i vAreaStepQuadx1 = _mm_slli_epi32(vFactorA1, 1);
+		__m128i vAreaStepQuady1 = _mm_slli_epi32(vFactorB1, 1);
+
+		__m128i vAreaStepQuadx2 = _mm_slli_epi32(vFactorA2, 1);
+		__m128i vAreaStepQuady2 = _mm_slli_epi32(vFactorB2, 1);
+
+		__m128i vAreaStepMTx0 = _mm_slli_epi32(vFactorA0, MICRO_TILE_SIZE_SHIFT);
+		__m128i vAreaStepMTy0 = _mm_slli_epi32(vFactorB0, MICRO_TILE_SIZE_SHIFT);
+
+		__m128i vAreaStepMTx1 = _mm_slli_epi32(vFactorA1, MICRO_TILE_SIZE_SHIFT);
+		__m128i vAreaStepMTy1 = _mm_slli_epi32(vFactorB1, MICRO_TILE_SIZE_SHIFT);
+
+		__m128i vAreaStepMTx2 = _mm_slli_epi32(vFactorA2, MICRO_TILE_SIZE_SHIFT);
+		__m128i vAreaStepMTy2 = _mm_slli_epi32(vFactorB2, MICRO_TILE_SIZE_SHIFT);
+
+		for (int i = 0; i < max_h; i += MICRO_TILE_SIZE)
+		{
+			__m128i vArea0x = vArea0;
+			__m128i vArea1x = vArea1;
+			__m128i vArea2x = vArea2;
+
+			__m128  vNewZx  = vNewZ;
+
+			for (int j = 0; j < max_w; j += MICRO_TILE_SIZE,
+				vArea0x = _mm_add_epi32(vArea0x, vAreaStepMTx0),
+				vArea1x = _mm_add_epi32(vArea1x, vAreaStepMTx1),
+				vArea2x = _mm_add_epi32(vArea2x, vAreaStepMTx2),
+				vNewZx = _mm_add_ps(vNewZx, vZStepMTx))
+			{
+				__m128i vTest0 = _mm_cmplt_epi32(vArea0x, _mm_setzero_si128());
+				// This micro tile is totally outside the triangle
+				if (_mm_test_all_ones(vTest0))
+					continue;
+
+				__m128i vTest1 = _mm_cmplt_epi32(vArea1x, _mm_setzero_si128());
+				if (_mm_test_all_ones(vTest1))
+					continue;
+
+				__m128i vTest2 = _mm_cmplt_epi32(vArea2x, _mm_setzero_si128());
+				if (_mm_test_all_ones(vTest2))
+					continue;
+
+				// This micro tile is totally inside the triangle
+				if (_mm_test_all_zeros(vTest0, _mm_set1_epi32(0xFFFFFFFF)) &&
+					_mm_test_all_zeros(vTest1, _mm_set1_epi32(0xFFFFFFFF)) &&
+					_mm_test_all_zeros(vTest2, _mm_set1_epi32(0xFFFFFFFF)))
+				{
+					float *zbuf_pos = &z_buf[0][0] + (i << MACRO_TILE_SIZE_SHIFT) + (j << 1);
+					Triangle **pp_map_pos = &pp_map[0][0] + (i << MACRO_TILE_SIZE_SHIFT) + (j << 1);
+
+					__m128 vNewZxx = vNewZx;
+
+					for (int k = 0; k < MICRO_TILE_SIZE; k += 2)
+					{
+						float *zbuf_posx = zbuf_pos;
+						Triangle **pp_map_posx = pp_map_pos;
+						__m128 vNewZxxx = vNewZxx;
+
+						for (int l = 0; l < MICRO_TILE_SIZE; l += 2)
+						{
+							__m128 vCurrentZ = _mm_load_ps(zbuf_posx);
+							__m128i vMask = _mm_castps_si128(_mm_cmp_ps(vNewZxxx, vCurrentZ, _CMP_LT_OS));
+
+							_mm_maskstore_ps(zbuf_posx, vMask, vNewZxxx);
+							_simd_mask_store(pp_map_posx, vMask, tri);
+
+							zbuf_posx   += 4;
+							pp_map_posx += 4;
+							vNewZxxx = _mm_add_ps(vNewZxxx, vZStepQuadx);
+						}
+
+						zbuf_pos   += (MACRO_TILE_SIZE << 1);
+						pp_map_pos += (MACRO_TILE_SIZE << 1);
+						vNewZxx = _mm_add_ps(vNewZxx, vZStepQuady);
+					}
+				}
+				else
+				{
+					const int xp = x + j;
+					const int yp = y + i;
+
+					__m128 vNewZxx = vNewZx;
+
+					__m128i vQuadX = _mm_set_epi32(xp + 1, xp, xp + 1, xp);
+					__m128i vQuadY = _mm_set_epi32(yp + 1, yp + 1, yp, yp);
+
+					__m128i vArea0xx = MAWrapper(vFactorB0, vQuadY, MAWrapper(vFactorA0, vQuadX, vFactorC0));
+					__m128i vArea1xx = MAWrapper(vFactorB1, vQuadY, MAWrapper(vFactorA1, vQuadX, vFactorC1));
+					__m128i vArea2xx = MAWrapper(vFactorB2, vQuadY, MAWrapper(vFactorA2, vQuadX, vFactorC2));
+
+					for (int k = 0; k < MICRO_TILE_SIZE; k += 2)
+					{
+						__m128  vNewZxxx  = vNewZxx;
+						__m128i vArea0xxx = vArea0xx;
+						__m128i vArea1xxx = vArea1xx;
+						__m128i vArea2xxx = vArea2xx;
+
+						for (int l = 0; l < MICRO_TILE_SIZE; l += 2,
+							vArea0xxx = _mm_add_epi32(vArea0xxx, vAreaStepQuadx0),
+							vArea1xxx = _mm_add_epi32(vArea1xxx, vAreaStepQuadx1),
+							vArea2xxx = _mm_add_epi32(vArea2xxx, vAreaStepQuadx2),
+							vNewZxxx = _mm_add_ps(vNewZxxx, vZStepQuadx))
+						{
+							__m128i vTest0x = _mm_cmplt_epi32(vArea0xxx, _mm_setzero_si128());
+							// This quad is totally outside the triangle
+							if (_mm_test_all_ones(vTest0x))
+								continue;
+
+							__m128i vTest1x = _mm_cmplt_epi32(vArea1xxx, _mm_setzero_si128());
+							if (_mm_test_all_ones(vTest1x))
+								continue;
+
+							__m128i vTest2x = _mm_cmplt_epi32(vArea2xxx, _mm_setzero_si128());
+							if (_mm_test_all_ones(vTest2x))
+								continue;
+
+							float *zbuf_pos = &z_buf[0][0] + ((i + k) << MACRO_TILE_SIZE_SHIFT) + ((j + l) << 1);
+							Triangle **pp_map_pos = &pp_map[0][0] + ((i + k) << MACRO_TILE_SIZE_SHIFT) + ((j + l) << 1);
+
+							__m128 vCurrentZ = _mm_load_ps(zbuf_pos);
+							__m128i vMask = _mm_castps_si128(_mm_cmp_ps(vNewZxxx, vCurrentZ, _CMP_LT_OS));
+							vMask = _mm_andnot_si128(vTest0x, vMask);
+							vMask = _mm_andnot_si128(vTest1x, vMask);
+							vMask = _mm_andnot_si128(vTest2x, vMask);
+
+							_mm_maskstore_ps(zbuf_pos, vMask, vNewZxxx);
+							_simd_mask_store(pp_map_pos, vMask, tri);
+						}
+
+						vArea0xx = _mm_add_epi32(vArea0xx, vAreaStepQuady0);
+						vArea1xx = _mm_add_epi32(vArea1xx, vAreaStepQuady1);
+						vArea2xx = _mm_add_epi32(vArea2xx, vAreaStepQuady2);
+						vNewZxx = _mm_add_ps(vNewZxx, vZStepQuady);
+					}
+				}
+			}
+
+			vArea0 = _mm_add_epi32(vArea0, vAreaStepMTy0);
+			vArea1 = _mm_add_epi32(vArea1, vAreaStepMTy1);
+			vArea2 = _mm_add_epi32(vArea2, vAreaStepMTy2);
+			vNewZ = _mm_add_ps(vNewZ, vZStepMTy);
+		}
+	}
+
+	if (!mFlushTriggerBySwapBuffer)
+	{
+		// depth buffer store.
+	}
+
+	// TODO: early z/stencil
+	// TODO: hierarcical z/stencil
+	for (int i = 0; i < max_h; i += 2)
+	{
+		for (int j = 0; j < max_w; j += 2)
+		{
+			RenderQuadPixels(pp_map, x, y, i, j);
+		}
+	}
+
+
+// Deprecated SISD path, left for debug purpose.
+#if 0
 	for (Triangle *tri: full_disp_list)
 	{
 		float z = tri->mZAtOrigin + tri->mZGradientX * x + tri->mZGradientY * y;
@@ -958,10 +1210,11 @@ void TBDR::ProcessMacroTile(int x, int y)
 
 			for (int j = 0; j < MACRO_TILE_SIZE && (x + j) < g_GC->mRT.width; ++j)
 			{
-				if (zx < z_buf[i][j])
+				int offset = (i / 2) * 2 * MACRO_TILE_SIZE + (j / 2) * 4 + (i % 2) * 2 + j % 2;
+				if (zx < *(&z_buf[0][0] + offset))
 				{
-					z_buf[i][j]  = zx;
-					pp_map[i][j] = tri;
+					*(&z_buf[0][0] + offset) = zx;
+					*(&pp_map[0][0] + offset) = tri;
 				}
 
 				zx += tri->mZGradientX;
@@ -1041,13 +1294,13 @@ void TBDR::ProcessMacroTile(int x, int y)
 							{
 								const int xoff = (j << MICRO_TILE_SIZE_SHIFT) + l;
 								const int yoff = (i << MICRO_TILE_SIZE_SHIFT) + k;
+								const int offset = (yoff / 2) * 2 * MACRO_TILE_SIZE + (xoff / 2) * 4 + (yoff % 2) * 2 + xoff % 2;
 
-								if (zx < z_buf[yoff][xoff])
+								if (zx < *(&z_buf[0][0] + offset))
 								{
-									z_buf [yoff][xoff] = zx;
-									pp_map[yoff][xoff] = tri;
+									*(&z_buf[0][0] + offset) = zx;
+									*(&pp_map[0][0] + offset) = tri;
 								}
-
 								zx += tri->mZGradientX;
 							}
 							z += tri->mZGradientY;
@@ -1071,10 +1324,12 @@ void TBDR::ProcessMacroTile(int x, int y)
 									const int yoff = (i << MICRO_TILE_SIZE_SHIFT) + k;
 
 									const float zp = z + l * tri->mZGradientX + k * tri->mZGradientY;
-									if (zp < z_buf[yoff][xoff])
+									const int offset = (yoff / 2) * 2 * MACRO_TILE_SIZE + (xoff / 2) * 4 + (yoff % 2) * 2 + xoff % 2;
+
+									if (zp < *(&z_buf[0][0] + offset))
 									{
-										z_buf [yoff][xoff] = zp;
-										pp_map[yoff][xoff] = tri;
+										*(&z_buf[0][0] + offset) = zp;
+										*(&pp_map[0][0] + offset) = tri;
 									}
 								}
 								sum0 += tri->mVert[0].mFactorA;
@@ -1092,9 +1347,6 @@ void TBDR::ProcessMacroTile(int x, int y)
 		}
 	}
 
-	// TODO: early z/stencil
-	// TODO: hierarcical z/stencil
-#if 0
 	for (int i = 0; i < MACRO_TILE_SIZE; ++i)
 	{
 		for (int j = 0; j < MACRO_TILE_SIZE; ++j)
@@ -1108,22 +1360,6 @@ void TBDR::ProcessMacroTile(int x, int y)
 		}
 	}
 #endif
-
-	if (!mFlushTriggerBySwapBuffer)
-	{
-		// depth buffer store.
-	}
-
-#if 1
-	for (int i = 0; i < MACRO_TILE_SIZE && (y + i) < (g_GC->mRT.height - 1); i += 2)
-	{
-		for (int j = 0; j < MACRO_TILE_SIZE && (x + j) < (g_GC->mRT.width - 1); j += 2)
-		{
-			RenderQuadPixels(pp_map, x, y, i, j);
-		}
-	}
-#endif
-
 }
 
 void TBDR::RenderOnePixel(Triangle *tri, int x, int y, float z)
@@ -1144,13 +1380,7 @@ void TBDR::RenderQuadPixels(PixelPrimMap pp_map, int x, int y, int i, int j)
 {
 	int quad_mask = 0xf;
 
-	Triangle *tri[4] =
-	{
-		pp_map[i    ][j    ],
-		pp_map[i    ][j + 1],
-		pp_map[i + 1][j    ],
-		pp_map[i + 1][j + 1]
-	};
+	Triangle **tri = &pp_map[0][0] + (i << MACRO_TILE_SIZE_SHIFT) + (j << 1);
 
 	for (int s = 0; s < 4; s++)
 	{
