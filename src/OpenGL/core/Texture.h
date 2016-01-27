@@ -113,6 +113,7 @@ public:
 	uint32_t getBytesPerTexel() const { return mBytesPerTexel; }
 
 	void Texture2DSIMD(const __m128 &u, const __m128 &v, __m128 out[]);
+	void Texture2DSIMD(const __m128 &u, const __m128 &v, uint32_t out[]);
 
 public:
 	void (*m_pfnTexture2D)(const Shader *pShader, const Texture *pTex, const glm::vec2 &coord, glm::vec4 &res);

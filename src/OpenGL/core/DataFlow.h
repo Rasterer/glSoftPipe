@@ -253,7 +253,11 @@ public:
 	~Fsiosimd() = default;
 
 	__m128  mInRegs [MAX_SHADER_REGISTERS];
-	__m128  mOutRegs[MAX_SHADER_REGISTERS];
+
+	union {
+		__m128   mOutRegs   [MAX_SHADER_REGISTERS];
+		uint32_t mOutRegsInt[4];
+	};
 
 	int mInRegsNum;
 	int mOutRegsNum;

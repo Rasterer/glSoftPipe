@@ -272,8 +272,10 @@ public:
 
 	void attachTextures(Texture *tex) { mTextures = tex; }
 
-	void ExecuteSIMD(void *data);
-	void ExecuteSISD(void *data);
+protected:
+	void texture2D(sampler2D sampler, const __m128 &s, const __m128 &t, __m128 out[]);
+	void texture2D(sampler2D sampler, const __m128 &s, const __m128 &t, uint32_t out[]);
+
 	glm::vec4 texture2D(sampler2D sampler, const glm::vec2 &coord)
 	{
 		glm::vec4 res;
@@ -283,12 +285,12 @@ public:
 		return res;
 	}
 
-	void texture2D(sampler2D sampler, const __m128 &s, const __m128 &t, __m128 out[]);
-
-	virtual void OnExecuteSIMD(__m128 in[], __m128 out[]) { return; }
-
 private:
 	virtual void execute(fsInput& in, fsOutput& out);
+	virtual void OnExecuteSIMD(Fsiosimd &fsio) { return; }
+
+	void ExecuteSIMD(void *data);
+	void ExecuteSISD(void *data);
 
 	void SetDiscardFlag() { bHasDiscard = true; }
 

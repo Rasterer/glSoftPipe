@@ -12,6 +12,7 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include "IAppFramework.h"
+#include "DataFlow.h"
 #include "Shader.h"
 #include "RenderUtility.h"
 
@@ -83,9 +84,11 @@ private:
 		FragColor = texture2D(mSampler, oTexCoor);
 	}
 
-	virtual void OnExecuteSIMD(__m128 in[], __m128 out[])
+	virtual void OnExecuteSIMD(Fsiosimd &fsio)
 	{
-		texture2D(mSampler, in[4], in[4 + 1], out);
+		texture2D(mSampler, fsio.mInRegs[4], fsio.mInRegs[4 + 1], fsio.mOutRegs);
+
+		_MM_TRANSPOSE4_PS(fsio.mOutRegs[0], fsio.mOutRegs[1], fsio.mOutRegs[2], fsio.mOutRegs[3]);
 	}
 
 private:

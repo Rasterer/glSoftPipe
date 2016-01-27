@@ -267,7 +267,7 @@ void FragmentShader::ExecuteSIMD(void *data)
 
 	attachTextures(tri->mPrim.mDC->mTextures);
 
-	OnExecuteSIMD(fsio.mInRegs, fsio.mOutRegs);
+	OnExecuteSIMD(fsio);
 }
 
 void FragmentShader::compile()
@@ -283,6 +283,11 @@ void FragmentShader::execute(fsInput& in, fsOutput& out)
 }
 
 void FragmentShader::texture2D(sampler2D sampler, const __m128 &s, const __m128 &t, __m128 out[])
+{
+	mTextures[sampler].Texture2DSIMD(s, t, out);
+}
+
+void FragmentShader::texture2D(sampler2D sampler, const __m128 &s, const __m128 &t, uint32_t out[])
 {
 	mTextures[sampler].Texture2DSIMD(s, t, out);
 }

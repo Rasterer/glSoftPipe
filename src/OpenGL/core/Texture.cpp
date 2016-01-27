@@ -128,94 +128,8 @@ void CopyTexelR5G6B5ToRGBAF(const uint8_t *pSrc, TextureMipmap *pMipmap)
 		*pDst++ = 1.0f;		// fill 1.0f in the alpha component
 	}
 }
-// TODO: add support for other formats
-#if 0
-bool PickupCopyFunc(int internalformat, unsigned format, unsigned type, uint32_t *bytesPerTexel, PFNCopyTexels *ppfnCopyTexels)
-{
-	switch(format)
-	{
-		case GL_RGBA:
-		{
-			switch(type)
-			{
-				case GL_UNSIGNED_BYTE:
-				{
-					switch(internalformat)
-					{
-						case GL_RGBA:
-						case GL_RGBA8:
-						{
-							*bytesPerTexel  = 4;
-							*ppfnCopyTexels = (PFNCopyTexels)CopyTexelIntactly;
-							return true;
-						}
-						default:
-						{
-							return false;
-						}
-					}
-				}
-				default:
-				{
-					return false;
-				}
-			}
-		}
-		case GL_RGB:
-		{
-			switch(type)
-			{
-				case GL_UNSIGNED_BYTE:
-				{
-					switch(internalformat)
-					{
-						case GL_RGB:
-						case GL_RGB8:
-						{
-							*bytesPerTexel  = 3;
-							*ppfnCopyTexels = (PFNCopyTexels)CopyTexelIntactly;
-						}
-						case GL_RGB565:
-						{
-							*bytesPerTexel  = 2;
-							*ppfnCopyTexels = (PFNCopyTexels)CopyTexelR8G8B8ToR5G6B5;
-						}
-						default:
-						{
-							return false;
-						}
-					}
-				}
-				case GL_UNSIGNED_SHORT_5_6_5:
-				{
-					switch(internalformat)
-					{
-						case GL_RGB:
-						case GL_RGB565:
-						{
-							*bytesPerTexel  = 2;
-							*ppfnCopyTexels = (PFNCopyTexels)CopyTexelIntactly;
-						}
-						default:
-						{
-							return false;
-						}
-					}
-				}
-				default:
-				{
-					return false;
-				}
-			}
-		}
-		default:
-		{
-			return false;
-		}
-	}
-}
-#endif
 
+// TODO: add support for other formats
 bool PickupCopyFunc(int internalformat, unsigned format, unsigned type, PFNCopyTexels *ppfnCopyTexels)
 {
 	GLSP_UNREFERENCED_PARAM(internalformat);
@@ -228,7 +142,7 @@ bool PickupCopyFunc(int internalformat, unsigned format, unsigned type, PFNCopyT
 			{
 				case GL_UNSIGNED_BYTE:
 				{
-					*ppfnCopyTexels = (PFNCopyTexels)CopyTexelR8G8B8A8ToRGBAF;
+					*ppfnCopyTexels = (PFNCopyTexels)CopyTexelIntactly;
 					return true;
 				}
 				default:
@@ -751,7 +665,7 @@ TextureMipmap* Texture::getMipmap(uint32_t layer, int32_t level) const
 unsigned int GetBPPFromFormat(int internalformat, unsigned format)
 {
 	if (internalformat == GL_RGBA)
-		return 4 * sizeof(float);
+		return 4;
 
 	if (internalformat == GL_DEPTH_COMPONENT)
 		return 4;
@@ -796,7 +710,6 @@ void Texture::TexImage2D(int level, int internalformat,
 		return;
 
 	PFNCopyTexels pfnCopyTexels;
-
 	if (pixels)
 	{
 		if(!PickupCopyFunc(internalformat, format, type, &pfnCopyTexels))
@@ -1006,7 +919,12 @@ bool Texture::PickupWrapFunc(SamplerObject &so)
 	return true;
 }
 
-void Texture::Texture2DSIMD(const __m128 &s, const __m128 &t, __m128 res[])
+void Texture::Texture2DSIMD(const __m128 &u, const __m128 &v, uint32_t out[])
+{
+	// TODO:
+}
+
+void Texture::Texture2DSIMD(const __m128 &s, const __m128 &t, __m128 out[])
 {
 	const TextureMipmap *pMipmap = getMipmap(0, 0);
 
@@ -1023,57 +941,77 @@ void Texture::Texture2DSIMD(const __m128 &s, const __m128 &t, __m128 res[])
 	vS1 = _mm_min_epi32(_mm_max_epi32(vS1, _mm_setzero_si128()), _mm_set1_epi32(pMipmap->mWidth - 1));
 	vT1 = _mm_min_epi32(_mm_max_epi32(vT1, _mm_setzero_si128()), _mm_set1_epi32(pMipmap->mHeight - 1));
 
-	__m128 *pAddr = static_cast<__m128 *>(pMipmap->mMem.addr);
+	__m128 vScale_s      = _mm_sub_ps(vTexSpaceS, _mm_floor_ps(vTexSpaceS));
+	__m128 vScale_t      = _mm_sub_ps(vTexSpaceT, _mm_floor_ps(vTexSpaceT));
+	__m128 vScale_s_Comp = _mm_sub_ps(_mm_set_ps1(1.0f), vScale_s);
+	__m128 vScale_t_Comp = _mm_sub_ps(_mm_set_ps1(1.0f), vScale_t);
+
 	ALIGN(16) int addr[4];
 
-	_mm_store_si128((__m128i *)addr, MAWrapper(vT0, _mm_set1_epi32(pMipmap->mWidth), vS0));
-	__m128 &vLB0 = pAddr[addr[0]];
-	__m128 &vLB1 = pAddr[addr[1]];
-	__m128 &vLB2 = pAddr[addr[2]];
-	__m128 &vLB3 = pAddr[addr[3]];
+	switch (mFormat)
+	{
+		case GL_RGBA:
+		{
+			uint32_t *pAddr = static_cast<uint32_t *>(pMipmap->mMem.addr);
 
-	_mm_store_si128((__m128i *)addr, MAWrapper(vT1, _mm_set1_epi32(pMipmap->mWidth), vS0));
-	__m128 &vLT0 = pAddr[addr[0]];
-	__m128 &vLT1 = pAddr[addr[1]];
-	__m128 &vLT2 = pAddr[addr[2]];
-	__m128 &vLT3 = pAddr[addr[3]];
+			_mm_store_si128((__m128i *)addr, MAWrapper(vT0, _mm_set1_epi32(pMipmap->mWidth), vS0));
+			__m128i vLB = _mm_set_epi32(pAddr[addr[3]], pAddr[addr[2]], pAddr[addr[1]], pAddr[addr[0]]);
 
-	_mm_store_si128((__m128i *)addr, MAWrapper(vT0, _mm_set1_epi32(pMipmap->mWidth), vS1));
-	__m128 &vRB0 = pAddr[addr[0]];
-	__m128 &vRB1 = pAddr[addr[1]];
-	__m128 &vRB2 = pAddr[addr[2]];
-	__m128 &vRB3 = pAddr[addr[3]];
+			_mm_store_si128((__m128i *)addr, MAWrapper(vT0, _mm_set1_epi32(pMipmap->mWidth), vS1));
+			__m128i vRB = _mm_set_epi32(pAddr[addr[3]], pAddr[addr[2]], pAddr[addr[1]], pAddr[addr[0]]);
 
-	_mm_store_si128((__m128i *)addr, MAWrapper(vT1, _mm_set1_epi32(pMipmap->mWidth), vS1));
-	__m128 &vRT0 = pAddr[addr[0]];
-	__m128 &vRT1 = pAddr[addr[1]];
-	__m128 &vRT2 = pAddr[addr[2]];
-	__m128 &vRT3 = pAddr[addr[3]];
+			_mm_store_si128((__m128i *)addr, MAWrapper(vT1, _mm_set1_epi32(pMipmap->mWidth), vS0));
+			__m128i vLT = _mm_set_epi32(pAddr[addr[3]], pAddr[addr[2]], pAddr[addr[1]], pAddr[addr[0]]);
 
-	ALIGN(16) float scale_s[4];
-	ALIGN(16) float scale_t[4];
-	_mm_store_ps(scale_s, _mm_sub_ps(vTexSpaceS, _mm_floor_ps(vTexSpaceS)));
-	_mm_store_ps(scale_t, _mm_sub_ps(vTexSpaceT, _mm_floor_ps(vTexSpaceT)));
+			_mm_store_si128((__m128i *)addr, MAWrapper(vT1, _mm_set1_epi32(pMipmap->mWidth), vS1));
+			__m128i vRT = _mm_set_epi32(pAddr[addr[3]], pAddr[addr[2]], pAddr[addr[1]], pAddr[addr[0]]);
 
-	res[0] = _mm_mul_ps(vRT0, _mm_set_ps1(scale_s[0] * scale_t[0]));
-	res[0] = MAWrapper(vRB0, _mm_set_ps1(scale_s[0] * (1.0f - scale_t[0])), res[0]);
-	res[0] = MAWrapper(vLT0, _mm_set_ps1((1.0f - scale_s[0]) * scale_t[0]), res[0]);
-	res[0] = MAWrapper(vLB0, _mm_set_ps1((1.0f - scale_s[0]) * (1.0f - scale_t[0])), res[0]);
+			__m128i vMask  = _mm_set1_epi32(0xFF);
+			__m128  vNorm = _mm_set_ps1(1.0f / 256.0f);
+			for (int i = 0; i < 4; ++i)
+			{
+				__m128 vLBf = _mm_cvtepi32_ps(_mm_and_si128(_mm_srli_epi32(vLB, i << 3), vMask));
+				__m128 vRBf = _mm_cvtepi32_ps(_mm_and_si128(_mm_srli_epi32(vRB, i << 3), vMask));
+				__m128 vLTf = _mm_cvtepi32_ps(_mm_and_si128(_mm_srli_epi32(vLT, i << 3), vMask));
+				__m128 vRTf = _mm_cvtepi32_ps(_mm_and_si128(_mm_srli_epi32(vRT, i << 3), vMask));
 
-	res[1] = _mm_mul_ps(vRT1, _mm_set_ps1(scale_s[1] * scale_t[1]));
-	res[1] = MAWrapper(vRB1, _mm_set_ps1(scale_s[1] * (1.0f - scale_t[1])), res[1]);
-	res[1] = MAWrapper(vLT1, _mm_set_ps1((1.0f - scale_s[1]) * scale_t[1]), res[1]);
-	res[1] = MAWrapper(vLB1, _mm_set_ps1((1.0f - scale_s[1]) * (1.0f - scale_t[1])), res[1]);
+				out[i] = _mm_mul_ps(vRTf, _mm_mul_ps(vScale_s,     vScale_t     ));
+				out[i] = MAWrapper(vRBf, _mm_mul_ps(vScale_s,      vScale_t_Comp), out[i]);
+				out[i] = MAWrapper(vLTf, _mm_mul_ps(vScale_s_Comp, vScale_t     ), out[i]);
+				out[i] = MAWrapper(vLBf, _mm_mul_ps(vScale_s_Comp, vScale_t_Comp), out[i]);
+				out[i] = _mm_mul_ps(out[i], vNorm);
+			}
 
-	res[2] = _mm_mul_ps(vRT2, _mm_set_ps1(scale_s[2] * scale_t[2]));
-	res[2] = MAWrapper(vRB2, _mm_set_ps1(scale_s[2] * (1.0f - scale_t[2])), res[2]);
-	res[2] = MAWrapper(vLT2, _mm_set_ps1((1.0f - scale_s[2]) * scale_t[2]), res[2]);
-	res[2] = MAWrapper(vLB2, _mm_set_ps1((1.0f - scale_s[2]) * (1.0f - scale_t[2])), res[2]);
+			break;
+		}
+		case GL_DEPTH_COMPONENT:
+		{
+			float *pAddr = static_cast<float *>(pMipmap->mMem.addr);
 
-	res[3] = _mm_mul_ps(vRT3, _mm_set_ps1(scale_s[3] * scale_t[3]));
-	res[3] = MAWrapper(vRB3, _mm_set_ps1(scale_s[3] * (1.0f - scale_t[3])), res[3]);
-	res[3] = MAWrapper(vLT3, _mm_set_ps1((1.0f - scale_s[3]) * scale_t[3]), res[3]);
-	res[3] = MAWrapper(vLB3, _mm_set_ps1((1.0f - scale_s[3]) * (1.0f - scale_t[3])), res[3]);
+			_mm_store_si128((__m128i *)addr, MAWrapper(vT0, _mm_set1_epi32(pMipmap->mWidth), vS0));
+			__m128 vLBf = _mm_set_ps(pAddr[addr[3]], pAddr[addr[2]], pAddr[addr[1]], pAddr[addr[0]]);
+
+			_mm_store_si128((__m128i *)addr, MAWrapper(vT0, _mm_set1_epi32(pMipmap->mWidth), vS1));
+			__m128 vRBf = _mm_set_ps(pAddr[addr[3]], pAddr[addr[2]], pAddr[addr[1]], pAddr[addr[0]]);
+
+			_mm_store_si128((__m128i *)addr, MAWrapper(vT1, _mm_set1_epi32(pMipmap->mWidth), vS0));
+			__m128 vLTf = _mm_set_ps(pAddr[addr[3]], pAddr[addr[2]], pAddr[addr[1]], pAddr[addr[0]]);
+
+			_mm_store_si128((__m128i *)addr, MAWrapper(vT1, _mm_set1_epi32(pMipmap->mWidth), vS1));
+			__m128 vRTf = _mm_set_ps(pAddr[addr[3]], pAddr[addr[2]], pAddr[addr[1]], pAddr[addr[0]]);
+
+			out[0] = _mm_mul_ps(vRTf, _mm_mul_ps(vScale_s,     vScale_t     ));
+			out[0] = MAWrapper(vRBf, _mm_mul_ps(vScale_s,      vScale_t_Comp), out[0]);
+			out[0] = MAWrapper(vLTf, _mm_mul_ps(vScale_s_Comp, vScale_t     ), out[0]);
+			out[0] = MAWrapper(vLBf, _mm_mul_ps(vScale_s_Comp, vScale_t_Comp), out[0]);
+
+			break;
+		}
+		default:
+		{
+			break;
+		}
+	}
 }
 
 bool Texture::ValidateState()
