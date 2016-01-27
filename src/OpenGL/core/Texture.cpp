@@ -67,12 +67,12 @@ namespace {
 
 typedef void (*PFNCopyTexels)(const void *pSrc, TextureMipmap *pMipmap);
 
-#if 0
+
 void CopyTexelIntactly(const uint8_t *pSrc, TextureMipmap *pMipmap)
 {
 	memcpy(pMipmap->mMem.addr,
 		   pSrc,
-		   pMipmap->mHeight * pMipmap->mWidth * pMipmap->mBytesPerTexel);
+		   pMipmap->mHeight * pMipmap->mWidth * pMipmap->mpTex->getBytesPerTexel());
 }
 
 void CopyTexelR8G8B8ToR5G6B5(const uint8_t *pSrc, TextureMipmap *pMipmap)
@@ -87,7 +87,7 @@ void CopyTexelR8G8B8ToR5G6B5(const uint8_t *pSrc, TextureMipmap *pMipmap)
 		*pDst |= ((*pSrc++) >> 3) << 11;
 	}
 }
-#endif
+
 
 void CopyTexelR8G8B8A8ToRGBAF(const uint8_t *pSrc, TextureMipmap *pMipmap)
 {
@@ -216,17 +216,15 @@ bool PickupCopyFunc(int internalformat, unsigned format, unsigned type, uint32_t
 }
 #endif
 
-bool PickupCopyFunc(int internalformat, unsigned format, unsigned type, uint32_t *bytesPerTexel, PFNCopyTexels *ppfnCopyTexels)
+bool PickupCopyFunc(int internalformat, unsigned format, unsigned type, PFNCopyTexels *ppfnCopyTexels)
 {
 	GLSP_UNREFERENCED_PARAM(internalformat);
 
-	*bytesPerTexel = 4 * sizeof(float);
-
-	switch(format)
+	switch (format)
 	{
 		case GL_RGBA:
 		{
-			switch(type)
+			switch (type)
 			{
 				case GL_UNSIGNED_BYTE:
 				{
@@ -241,7 +239,7 @@ bool PickupCopyFunc(int internalformat, unsigned format, unsigned type, uint32_t
 		}
 		case GL_RGB:
 		{
-			switch(type)
+			switch (type)
 			{
 				case GL_UNSIGNED_BYTE:
 				{
@@ -252,6 +250,20 @@ bool PickupCopyFunc(int internalformat, unsigned format, unsigned type, uint32_t
 				{
 					*ppfnCopyTexels = (PFNCopyTexels)CopyTexelR5G6B5ToRGBAF;
 					return true;
+				}
+				default:
+				{
+					return false;
+				}
+			}
+		}
+		case GL_DEPTH_COMPONENT:
+		{
+			switch (type)
+			{
+				case GL_FLOAT:
+				{
+					*ppfnCopyTexels = (PFNCopyTexels)CopyTexelIntactly;
 				}
 				default:
 				{
@@ -658,7 +670,6 @@ TextureMipmap::TextureMipmap():
 	mResident(false),
 	mWidth(0),
 	mHeight(0),
-	mBytesPerTexel(0),
 	mRefCount(1)
 {
 	mMem.size = 0;
@@ -737,6 +748,17 @@ TextureMipmap* Texture::getMipmap(uint32_t layer, int32_t level) const
 	}
 }
 
+unsigned int GetBPPFromFormat(int internalformat, unsigned format)
+{
+	if (internalformat == GL_RGBA)
+		return 4 * sizeof(float);
+
+	if (internalformat == GL_DEPTH_COMPONENT)
+		return 4;
+
+	return 0;
+}
+
 // TODO: consider the consistency between mipmaps
 void Texture::TexImage2D(int level, int internalformat,
 				int width, int height, int border,
@@ -768,50 +790,57 @@ void Texture::TexImage2D(int level, int internalformat,
 			return;
 	}
 
-	uint32_t bytesPerTexel = 0;
-	PFNCopyTexels pfnCopyTexels = NULL;
-
-	if(!PickupCopyFunc(internalformat, format, type, &bytesPerTexel, &pfnCopyTexels))
-	{
+	mFormat = internalformat;
+	mBytesPerTexel = GetBPPFromFormat(internalformat, format);
+	if (mBytesPerTexel == 0)
 		return;
+
+	PFNCopyTexels pfnCopyTexels;
+
+	if (pixels)
+	{
+		if(!PickupCopyFunc(internalformat, format, type, &pfnCopyTexels))
+		{
+			return;
+		}
+	}
+	else
+	{
+		pfnCopyTexels = nullptr;
 	}
 
-	uint32_t size = width * height * bytesPerTexel;
+	uint32_t size = width * height * mBytesPerTexel;
 	bool bNeedRealloc = true;
 
 	TextureMipmap *pMipmap = getMipmap(layer, level);
-	pMipmap->mFormat = internalformat;
-	pMipmap->mBytesPerTexel = bytesPerTexel;
-
 	if(pMipmap->mResident)
 	{
-		if(size != pMipmap->mMem.size)
+		if(size > pMipmap->mMem.size)
 		{
 			free(pMipmap->mMem.addr);
 		}
 		else
 		{
-			// Size match, luckily, we can reuse current backup memory.
+			// Luckily, the current backup memory can be reused.
 			bNeedRealloc = false;
 		}
 	}
-	else
-	{
-		pMipmap->mResident = true;
-	}
 
 	if(bNeedRealloc)
+	{
 		pMipmap->mMem.addr = malloc(size);
+		pMipmap->mAllocationSize = size;
+	}
 
-	// NULL pointer, just alloc memory and leave it uninitialized.
+	pMipmap->mSizeUsed = size;
+	pMipmap->mWidth    = width;
+	pMipmap->mHeight   = height;
+	pMipmap->mResident = true;
+
+	// If no initialization data, just alloc memory and leave it uninitialized.
 	// TODO: add PBO support.
-	if(!pixels)
-		return;
-
-	pMipmap->mWidth  = width;
-	pMipmap->mHeight = height;
-
-	pfnCopyTexels(pixels, pMipmap);
+	if(pfnCopyTexels)
+		pfnCopyTexels(pixels, pMipmap);
 }
 
 void Texture::TexParameteri(unsigned pname, int param)
@@ -876,20 +905,22 @@ void Texture::TexParameterfv(unsigned pname, const GLfloat *params)
 
 bool Texture::IsComplete()
 {
-	bool ret = true;
+	mIsComplete = false;
+
+	if (mBytesPerTexel == 0)
+		goto err;
 
 	for(uint32_t i = 0; i <= mAvailableMipmaps; ++i)
 	{
 		if(!mpMipmap[i].mResident)
 		{
-			ret = false;
-			break;
+			goto err;
 		}
 	}
 
 	mIsComplete = true;
-
-	return ret;
+err:
+	return mIsComplete;
 }
 
 bool Texture::PickupWrapFunc(SamplerObject &so)
@@ -1222,12 +1253,38 @@ void TextureMachine::BindTexture(GLContext *const gc, unsigned target, unsigned 
 	}
 }
 
+static bool TexImage2DValidateParams(unsigned target, int internalformat, unsigned format, unsigned type)
+{
+	if (internalformat == GL_DEPTH_COMPONENT || format == GL_DEPTH_COMPONENT)
+	{
+		if (target != GL_TEXTURE_2D)
+		{
+			return false;
+		}
+
+		if (format != internalformat)
+		{
+			return false;
+		}
+
+		if (type != GL_FLOAT)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
 void TextureMachine::TexImage2D(GLContext *gc, unsigned target, int level,
 				int internalformat, int width, int height,
 				int border, unsigned format, unsigned type,
 				const void *pixels)
 {
 	GLSP_UNREFERENCED_PARAM(gc);
+
+	if (TexImage2DValidateParams(target, internalformat, format, type) == false)
+		return;
 
 	TextureBindingPoint *pBP = getBindingPoint(mActiveTextureUnit, target);
 

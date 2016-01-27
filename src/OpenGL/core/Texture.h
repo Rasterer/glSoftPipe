@@ -74,8 +74,8 @@ struct TextureMipmap
 
 	int32_t mLevel;
 	uint32_t mWidth, mHeight;
-	uint32_t mBytesPerTexel;
-	unsigned mFormat;
+	uint32_t mAllocationSize;
+	uint32_t mSizeUsed;
 
 	int mRefCount;
 
@@ -110,6 +110,8 @@ public:
 
 	float getMagMinThresh() const { return mMagMinThresh; }
 	uint32_t getAvailableMipmaps() const { return mAvailableMipmaps; }
+	uint32_t getBytesPerTexel() const { return mBytesPerTexel; }
+
 	void Texture2DSIMD(const __m128 &u, const __m128 &v, __m128 out[]);
 
 public:
@@ -143,6 +145,9 @@ private:
 
 	TextureTarget	mTextureTarget;
 	uint32_t		mNumLayers;
+
+	int 			mFormat;
+	uint32_t        mBytesPerTexel;
 
 	bool	mIsComplete;
 };
