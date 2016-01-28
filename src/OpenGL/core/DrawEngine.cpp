@@ -79,6 +79,9 @@ GLAPI void APIENTRY glClear (GLbitfield mask)
 {
 	DrawEngine &de = DrawEngine::getDrawEngine();
 
+	if (!de.validateState(nullptr))
+		return;
+
 	de.prepareToDraw();
 	de.PerformClear(mask);
 }
@@ -186,23 +189,18 @@ DrawEngine::~DrawEngine()
 
 // TODO(done): connect all the pipeline stages
 // Shaders are inserted in validateState()
-void DrawEngine::init(NWMCallBacks *call_backs)
+void DrawEngine::init()
 {
-	assert(call_backs);
-	mNativeWindowCallBacks = *call_backs;
-
 	mGLContext = new GLContext(4, 0, *this);
 	MakeCurrent(mGLContext);
 
-	NWMWindowInfo win_info;
-	mNativeWindowCallBacks.GetWindowInfo(&win_info);
-
-	mGLContext->mRT.width  = win_info.width;
-	mGLContext->mRT.height = win_info.height;
-	mGLContext->mRT.format = win_info.format;
-	mGLContext->applyViewport(0, 0, win_info.width, win_info.height);
-
 	initPipeline();
+}
+
+void DrawEngine::SetNativeWindowInfo(NWMWindowInfo &win_info)
+{
+	mGLContext->mFBOM.GetDefaultFBO()->DefaultFBOInitRenderTarget(win_info.width, win_info.height, win_info.format);
+	mGLContext->applyViewport(0, 0, win_info.width, win_info.height);
 }
 
 void DrawEngine::initPipeline()
@@ -327,78 +325,55 @@ bool DrawEngine::validateState(DrawContext *dc)
 {
 	// TODO: some validation work
 	bool ret = true;
-	GLContext *gc = dc->gc;
-	VertexArrayObject *pVAO = gc->mVAOM.getActiveVAO();
-	BufferObject *pElementBO = gc->mBOM.getBoundBuffer(GL_ELEMENT_ARRAY_BUFFER);
 
-	for(size_t i = 0; i < MAX_VERTEX_ATTRIBS; ++i)
+	if (dc)
 	{
-		if(pVAO->mAttribEnables & (1 << i))
+		GLContext *gc = dc->gc;
+		VertexArrayObject *pVAO = gc->mVAOM.getActiveVAO();
+		BufferObject *pElementBO = gc->mBOM.getBoundBuffer(GL_ELEMENT_ARRAY_BUFFER);
+
+		for(size_t i = 0; i < MAX_VERTEX_ATTRIBS; ++i)
 		{
-			VertexAttribState *pVAS = &pVAO->mAttribState[i];
-			
-			if(pVAS->mBO == NULL && pVAS->mOffset == 0)
+			if(pVAO->mAttribEnables & (1 << i))
+			{
+				VertexAttribState *pVAS = &pVAO->mAttribState[i];
+
+				if(pVAS->mBO == NULL && pVAS->mOffset == 0)
+					return false;
+			}
+		}
+
+		if(dc->mDrawType == DrawContext::kElementDraw)
+		{
+			if(!pElementBO && !dc->mIndices)
 				return false;
 		}
-	}
 
-	if(dc->mDrawType == DrawContext::kElementDraw)
+		// link the shaders to the pipeline
+		VertexShader   *pVS = gc->mPM.getCurrentProgram()->getVS();
+		FragmentShader *pFS = gc->mPM.getCurrentProgram()->getFS();
+
+		if(!gc->mTM.validateTextureState(pVS, pFS, dc))
+		{
+			ret = false;
+			goto out;
+		}
+
+		dc->mFS = pFS;
+	}
+	else
 	{
-		if(!pElementBO && !dc->mIndices)
-			return false;
+		// glClear path
 	}
 
-	// link the shaders to the pipeline
-	VertexShader   *pVS = gc->mPM.getCurrentProgram()->getVS();
-	FragmentShader *pFS = gc->mPM.getCurrentProgram()->getFS();
+	ret = mGLContext->mFBOM.ValidateFramebufferStatus(mGLContext);
 
-	if(!gc->mTM.validateTextureState(pVS, pFS, dc))
-		ret = false;
-
-	dc->mFS = pFS;
-
+out:
 	return ret;
 }
 
 void DrawEngine::beginFrame(GLContext *gc)
 {
-	RenderTarget &rt = gc->mRT;
-
-	NWMWindowInfo win_info;
-	mNativeWindowCallBacks.GetWindowInfo(&win_info);
-
-	// TODO: check buffer format compatibility
-	bool size_change = ((win_info.width != rt.width) || (win_info.height != rt.height));
-
-	if (size_change)
-	{
-		if (rt.pColorBuffer)
-		{
-			free(rt.pColorBuffer);
-			rt.pColorBuffer = nullptr;
-		}
-
-		if (rt.pDepthBuffer)
-		{
-			free(rt.pDepthBuffer);
-			rt.pDepthBuffer = nullptr;
-		}
-
-		rt.width  = win_info.width;
-		rt.height = win_info.height;
-		rt.format = win_info.format;
-		gc->applyViewport(0, 0, rt.width, rt.height);
-	}
-
-	if (!rt.pColorBuffer)
-		rt.pColorBuffer = malloc(rt.width * rt.height * 4);
-
-	if (!rt.pDepthBuffer)
-		rt.pDepthBuffer = (float *)malloc(rt.width * rt.height * sizeof(float));
-
-	// TODO: impl stencil buffer
-	rt.pStencilBuffer = NULL;
-
 	gc->mbInFrame = true;
 }
 
@@ -414,7 +389,7 @@ void DrawEngine::PerformClear(unsigned int mask)
 {
 	RenderTarget &rt = mGLContext->mRT;
 
-	if (mask & GL_COLOR_BUFFER_BIT)
+	if (mask & GL_COLOR_BUFFER_BIT && rt.pColorBuffer)
 	{
 		uint8_t r = static_cast<uint8_t>(mGLContext->mState.mClearState.red   * 256.0f);
 		uint8_t g = static_cast<uint8_t>(mGLContext->mState.mClearState.green * 256.0f);
@@ -437,7 +412,7 @@ void DrawEngine::PerformClear(unsigned int mask)
 		}
 	}
 
-	if (mask & GL_DEPTH_BUFFER_BIT)
+	if (mask & GL_DEPTH_BUFFER_BIT && rt.pDepthBuffer)
 	{
 		// Defer clear until the rasterizer stage begin,
 		// and that will only clear the per-tile depth buffer
@@ -445,7 +420,7 @@ void DrawEngine::PerformClear(unsigned int mask)
 		mTBDR->SetDepthClearFlag();
 	}
 
-	if (mask & GL_STENCIL_BUFFER_BIT)
+	if (mask & GL_STENCIL_BUFFER_BIT && rt.pStencilBuffer)
 	{
 		// TODO: clear stencil buffer
 	}
@@ -486,21 +461,24 @@ void DrawEngine::Flush(bool swap_buffer)
 	mDrawContextList = NULL;
 }
 
-bool glspCreateRender(NWMCallBacks *call_backs)
+bool glspCreateRender()
 {
 	DrawEngine &de = DrawEngine::getDrawEngine();
 
-	de.init(call_backs);
+	de.init();
 
 	return true;
 }
 
 bool glspSwapBuffers(NWMBufferToDisplay *buf)
 {
-	DrawEngine &de = DrawEngine::getDrawEngine();
-
-	return de.SwapBuffers(buf);
+	return DrawEngine::getDrawEngine().SwapBuffers(buf);
 }
 
+void glspSetNativeWindowInfo(NWMWindowInfo *win_info)
+{
+	if (win_info)
+		DrawEngine::getDrawEngine().SetNativeWindowInfo(*win_info);
+}
 
 } // namespace glsp

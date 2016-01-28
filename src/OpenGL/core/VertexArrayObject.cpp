@@ -7,6 +7,7 @@
 namespace glsp {
 #include "khronos/GL/glcorearb.h"
 
+
 GLAPI void APIENTRY glGenVertexArrays (GLsizei n, GLuint *arrays)
 {
 	__GET_CONTEXT();
@@ -55,6 +56,11 @@ GLAPI void APIENTRY glVertexAttribPointer (GLuint index, GLint size, GLenum type
 	gc->mVAOM.VertexAttribPointer(gc, index, size, type, normalized, stride, pointer);
 }
 
+GLAPI GLboolean APIENTRY glIsVertexArray (GLuint array)
+{
+	__GET_CONTEXT();
+	return gc->mVAOM.IsVertexArray(gc, array);
+}
 
 VertexAttribState::VertexAttribState():
 	mAttribSize(0),
@@ -68,12 +74,19 @@ VertexAttribState::VertexAttribState():
 VertexArrayObject::VertexArrayObject():
 	mAttribEnables(0)
 {
+	mBoundElementBuffer.mBO = nullptr;
 }
 
 VAOMachine::VAOMachine()
 {
 	mDefaultVAO.setName(0);
 	mActiveVAO = &mDefaultVAO;
+}
+
+VAOMachine::~VAOMachine()
+{
+	if (mActiveVAO != &mDefaultVAO)
+		mActiveVAO->DecRef();
 }
 
 void VAOMachine::GenVertexArrays(GLContext *gc, int n, unsigned *arrays)
@@ -93,6 +106,12 @@ void VAOMachine::DeleteVertexArrays(GLContext *gc, int n, const unsigned *arrays
 		if(pVAO)
 		{
 			mNameSpace.removeObject(pVAO);
+
+			if (mActiveVAO == pVAO)
+			{
+				pVAO->DecRef();
+				mActiveVAO = &mDefaultVAO;
+			}
 			pVAO->DecRef();
 		}
 	}
@@ -104,14 +123,14 @@ void VAOMachine::BindVertexArray(GLContext *gc, unsigned array)
 {
 	GLSP_UNREFERENCED_PARAM(gc);
 
+	VertexArrayObject *pVAO;
+
 	if(!array)
 	{
-		mActiveVAO = &mDefaultVAO;
+		pVAO = &mDefaultVAO;
 	}
 	else
 	{
-		VertexArrayObject *pVAO;
-
 		if(!mNameSpace.validate(array))
 			return;
 
@@ -122,9 +141,14 @@ void VAOMachine::BindVertexArray(GLContext *gc, unsigned array)
 			pVAO = new VertexArrayObject();
 			pVAO->setName(array);
 			mNameSpace.insertObject(pVAO);
-			mActiveVAO = pVAO;
 		}
+		pVAO->IncRef();
 	}
+
+	if (mActiveVAO != &mDefaultVAO)
+		mActiveVAO->DecRef();
+
+	mActiveVAO = pVAO;
 }
 
 void VAOMachine::EnableVertexAttribArray(GLContext *gc, unsigned index)
@@ -187,6 +211,14 @@ void VAOMachine::VertexAttribPointer(
 	vas.mStride = stride;
 	vas.mOffset = reinterpret_cast<unsigned long>(pointer);
 	vas.mBO = gc->mBOM.getBoundBuffer(GL_ARRAY_BUFFER);
+}
+
+unsigned char VAOMachine::IsVertexArray(GLContext *gc, unsigned array)
+{
+	if (mNameSpace.validate(array))
+		return GL_TRUE;
+	else
+		return GL_FALSE;
 }
 
 } // namespace glsp

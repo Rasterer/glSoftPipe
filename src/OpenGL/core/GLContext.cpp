@@ -70,15 +70,6 @@ GLContext::GLContext(int major, int minor, DrawEngine &de):
 
 GLContext::~GLContext()
 {
-	if (mRT.pColorBuffer)
-		free(mRT.pColorBuffer);
-
-	if (mRT.pDepthBuffer)
-		free(mRT.pDepthBuffer);
-
-	if (mRT.pStencilBuffer)
-		free(mRT.pStencilBuffer);
-
 	if (g_GC == this)
 		g_GC = nullptr;
 }
@@ -96,9 +87,7 @@ void GLContext::initGC()
 
 	mState.mEnables    = 0;
 
-	mRT.pColorBuffer   = nullptr;
-	mRT.pDepthBuffer   = nullptr;
-	mRT.pStencilBuffer = nullptr;
+	memset(&mRT, 0, sizeof(mRT));
 }
 
 void GLContext::applyViewport(int x, int y, int width, int height)

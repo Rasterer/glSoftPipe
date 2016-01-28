@@ -130,6 +130,8 @@ D3DNativeWindowManager::~D3DNativeWindowManager()
 
 bool D3DNativeWindowManager::NWMCreateWindow(int w, int h, const char *name)
 {
+	INativeWindowManager::NWMCreateWindow(w, h, name);
+
 	HINSTANCE hInstance = GetModuleHandle(nullptr);
 
 	::WNDCLASSEX wcex;

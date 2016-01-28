@@ -4,6 +4,7 @@
 #include "VertexArrayObject.h"
 #include "Texture.h"
 #include "Shader.h"
+#include "FrameBufferObject.h"
 
 
 namespace glsp {
@@ -31,16 +32,6 @@ struct GLViewport
 	// TODO: depth range
 	float   xCenter, yCenter;
 	float   xScale,  yScale;
-};
-
-struct RenderTarget
-{
-	int width;
-	int height;
-	int format;
-	void  *pColorBuffer;
-	float *pDepthBuffer;
-	void  *pStencilBuffer;
 };
 
 struct ClearState
@@ -86,9 +77,7 @@ public:
 	VAOMachine                mVAOM;
 	ProgramMachine            mPM;
 	TextureMachine            mTM;
-
-	// TODO: impl FBO
-	//FrameBufferObjectMachine  mFBM;
+	FrameBufferObjectMachine  mFBOM;
 
 	GLStateMachine      mState;
 	unsigned int        mEmitFlag;

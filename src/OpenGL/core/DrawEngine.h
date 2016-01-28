@@ -64,7 +64,8 @@ class DrawEngine
 public:
 	friend class TBDR;
 
-	void init(NWMCallBacks *call_backs);
+	void init();
+	void SetNativeWindowInfo(NWMWindowInfo &win_info);
 	bool validateState(DrawContext *dc);
 	void prepareToDraw();
 	void emit(DrawContext *dc);
@@ -134,8 +135,6 @@ private:
 	PipeStage			   *mFirstStage;
 
 	GLContext              *mGLContext;
-
-	NWMCallBacks            mNativeWindowCallBacks;
 };
 
 } // namespace glsp

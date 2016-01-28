@@ -86,8 +86,7 @@ class Texture: public NameItem
 {
 public:
 	Texture();
-
-	Texture(TextureTarget target);
+	Texture(unsigned target);
 
 	Texture& operator=(const Texture &rhs);
 
@@ -96,6 +95,8 @@ public:
 	bool ValidateState();
 
 	uint32_t getLevelNum() const { return mNumMipmaps; }
+	int      GetFormat() const { return mFormat; }
+	unsigned GetTarget() const { return mTextureTarget; }
 	TextureMipmap*  getMipmap(uint32_t layer, int32_t level) const;
 	TextureMipmap*  getBaseMipmap(uint32_t layer) const { return getMipmap(layer, 0); }
 
@@ -144,7 +145,7 @@ private:
 	SamplerObject	mSO;
 	float 			mMagMinThresh;
 
-	TextureTarget	mTextureTarget;
+	unsigned		mTextureTarget;
 	uint32_t		mNumLayers;
 
 	int 			mFormat;
@@ -155,9 +156,6 @@ private:
 
 struct TextureBindingPoint
 {
-	TextureBindingPoint();
-	~TextureBindingPoint();
-
 	Texture *mTex;
 };
 
@@ -173,11 +171,13 @@ public:
 	void DeleteTextures(GLContext *gc, int n, const unsigned *textures);
 	void TexParameteri(GLContext *gc, unsigned target, unsigned pname, int param);
 	void TexParameterfv(GLContext *gc, unsigned target, unsigned pname, const GLfloat *params);
+	unsigned char IsTexture(GLContext *gc, unsigned texture);
 	void TexImage2D(GLContext *gc, unsigned target, int level,
 					int internalformat, int width, int height,
 					int border, unsigned format, unsigned type,
 					const void *pixels);
 
+	Texture* GetBoundTexture(unsigned target, unsigned texture);
 	bool validateTextureState(Shader *pVS, Shader *pFS, DrawContext *dc);
 
 private:

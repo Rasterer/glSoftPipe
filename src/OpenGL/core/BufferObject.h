@@ -22,19 +22,20 @@ struct BufferObject: public NameItem
 
 struct BindingPoint
 {
-	BindingPoint();
-	~BindingPoint();
-
 	BufferObject *mBO;
 };
 
 class BufferObjectMachine
 {
 public:
+	BufferObjectMachine();
+	~BufferObjectMachine();
+
 	void GenBuffers(GLContext *gc, int n, unsigned *buffers);
 	bool DeleteBuffers(GLContext *gc, int n, const unsigned *buffers);
 	bool BindBuffer(GLContext *gc, unsigned target, unsigned buffer);
 	bool BufferData(GLContext *gc, unsigned target, unsigned size, const void *data, unsigned usage);
+	unsigned char IsBuffer(GLContext *gc, unsigned buffer);
 	BufferObject *getBoundBuffer(unsigned target);
 
 private:

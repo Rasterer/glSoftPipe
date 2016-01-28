@@ -17,13 +17,8 @@ struct NWMBufferToDisplay
 	int   format;
 };
 
-struct NWMCallBacks
-{
-	void (*GetWindowInfo)(NWMWindowInfo *win_info);
-};
-
-
-bool glspCreateRender(NWMCallBacks *call_backs);
+bool glspCreateRender();
+void glspSetNativeWindowInfo(NWMWindowInfo *win_info);
 bool glspSwapBuffers(NWMBufferToDisplay *buf);
 
 } // namespace glsp

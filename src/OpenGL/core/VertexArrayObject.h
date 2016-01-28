@@ -7,6 +7,7 @@
 
 namespace glsp {
 
+
 #define MAX_VERTEX_ATTRIBS MAX_SHADER_REGISTERS
 
 struct VertexAttribState
@@ -31,6 +32,7 @@ class VAOMachine
 {
 public:
 	VAOMachine();
+	~VAOMachine();
 	void VertexAttribPointer(GLContext *gc, unsigned index, int size, unsigned type, bool normalized, int stride, const void *pointer);
 	void GenVertexArrays(GLContext *gc, int n, unsigned *arrays);
 	void DeleteVertexArrays(GLContext *gc, int n, const unsigned *arrays);
@@ -39,6 +41,7 @@ public:
 	void DisableVertexAttribArray(GLContext *gc, unsigned index);
 	void EnableVertexArrayAttrib(GLContext *gc, unsigned vaobj, unsigned index);
 	void DisableVertexArrayAttrib(GLContext *gc, unsigned vaobj, unsigned index);
+	unsigned char IsVertexArray(GLContext *gc, unsigned array);
 
 	VertexArrayObject *getActiveVAO() const
 	{
@@ -48,7 +51,7 @@ public:
 private:
 	NameSpace	mNameSpace;
 	VertexArrayObject	*mActiveVAO;
-	VertexArrayObject	mDefaultVAO;
+	VertexArrayObject	 mDefaultVAO;
 };
 
 } // namespace glsp

@@ -16,6 +16,7 @@ using glm::mat4;
 namespace glsp {
 #include "khronos/GL/glcorearb.h"
 
+
 GLAPI GLuint APIENTRY glCreateShader (GLenum type)
 {
 	__GET_CONTEXT();
@@ -99,6 +100,19 @@ GLAPI GLint APIENTRY glGetAttribLocation (GLuint program, const GLchar *name)
 	__GET_CONTEXT();
 	return gc->mPM.GetAttribLocation(gc, program, name);
 }
+
+GLAPI GLboolean APIENTRY glIsProgram (GLuint program)
+{
+	__GET_CONTEXT();
+	return gc->mPM.IsProgram(gc, program);
+}
+
+GLAPI GLboolean APIENTRY glIsShader (GLuint shader)
+{
+	__GET_CONTEXT();
+	return gc->mPM.IsShader(gc, shader);
+}
+
 
 ShaderFactory::~ShaderFactory()
 {
@@ -381,6 +395,12 @@ ProgramMachine::ProgramMachine():
 {
 }
 
+ProgramMachine::~ProgramMachine()
+{
+	if (mCurrentProgram)
+		mCurrentProgram->DecRef();
+}
+
 unsigned ProgramMachine::CreateShader(GLContext *gc, unsigned type)
 {
 	unsigned name;
@@ -409,8 +429,9 @@ void ProgramMachine::DeleteShader(GLContext *gc, unsigned shader)
 	if (pShader)
 	{
 		mShaderNameSpace.removeObject(pShader);
+		pShader->DecRef();
 	}
-	mProgramNameSpace.deleteNames(1, &shader);
+	mShaderNameSpace.deleteNames(1, &shader);
 }
 
 unsigned ProgramMachine::CreateProgram(GLContext *gc)
@@ -435,12 +456,17 @@ void ProgramMachine::DeleteProgram(GLContext *gc, unsigned program)
 {
 	GLSP_UNREFERENCED_PARAM(gc);
 
-	Program *prog = static_cast<Program *>(mShaderNameSpace.retrieveObject(program));
+	Program *prog = static_cast<Program *>(mProgramNameSpace.retrieveObject(program));
 
 	if (prog)
 	{
-		mShaderNameSpace.removeObject(prog);
+		mProgramNameSpace.removeObject(prog);
 
+		if (prog == mCurrentProgram)
+		{
+			prog->DecRef();
+			mCurrentProgram = nullptr;
+		}
 		prog->DecRef();
 	}
 	mProgramNameSpace.deleteNames(1, &program);
@@ -475,6 +501,7 @@ void ProgramMachine::ShaderSource(
 	pShader->setName(shader);
 	pShader->setSource(pString);
 	mShaderNameSpace.insertObject(pShader);
+	pShader->IncRef();
 	pSPH->DecRef();
 }
 
@@ -531,7 +558,27 @@ void ProgramMachine::UseProgram(GLContext *gc, unsigned program)
 	if(!pProg)
 		return;
 
-	setCurrentProgram(pProg);
+	if (mCurrentProgram)
+		mCurrentProgram->DecRef();
+
+	pProg->IncRef();
+	mCurrentProgram = pProg;
+}
+
+unsigned char ProgramMachine::IsProgram(GLContext *, unsigned program)
+{
+	if (mProgramNameSpace.validate(program))
+		return GL_TRUE;
+	else
+		return GL_FALSE;
+}
+
+unsigned char ProgramMachine::IsShader(GLContext *, unsigned shader)
+{
+	if (mShaderNameSpace.validate(shader))
+		return GL_TRUE;
+	else
+		return GL_FALSE;
 }
 
 int ProgramMachine::GetUniformLocation(GLContext *gc, unsigned program, const char *name)

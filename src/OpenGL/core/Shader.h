@@ -16,6 +16,7 @@
 
 namespace glsp {
 
+
 class GLContext;
 class Shader;
 struct Uniform;
@@ -341,7 +342,7 @@ class ProgramMachine
 {
 public:
 	ProgramMachine();
-	~ProgramMachine() { }
+	~ProgramMachine();
 
 	unsigned CreateShader(GLContext *gc, unsigned type);
 	void DeleteShader(GLContext *gc, unsigned shader);
@@ -355,6 +356,8 @@ public:
 	void DetachShader(GLContext *gc, unsigned program, unsigned shader);
 	void LinkProgram(GLContext *gc, unsigned program);
 	void UseProgram(GLContext *gc, unsigned program);
+	unsigned char IsProgram(GLContext *gc, unsigned program);
+	unsigned char IsShader(GLContext *gc, unsigned shader);
 
 	int GetUniformLocation(GLContext *gc, unsigned program, const char *name);
 	int GetAttribLocation(GLContext *gc, unsigned program, const char *name);
@@ -368,13 +371,10 @@ public:
 	Program* getCurrentProgram() const { return mCurrentProgram; }
 
 private:
-	void setCurrentProgram(Program *prog) { mCurrentProgram = prog; }
-
-private:
 	NameSpace mProgramNameSpace;
 	NameSpace mShaderNameSpace;
 	NameSpace mProgramPipelineNameSpace;
-	Program *mCurrentProgram;
+	Program  *mCurrentProgram;
 };
 
 // FIXME: add transpose support

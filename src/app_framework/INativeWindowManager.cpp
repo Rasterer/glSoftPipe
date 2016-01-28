@@ -28,13 +28,8 @@ void INativeWindowManager::release()
 
 bool INativeWindowManager::InitDrawEngine()
 {
-	NWMCallBacks call_backs =
-	{
-		&NWMGetWindowInfo,
-	};
-
 	// Create our glSoftPipe render.
-	return glspCreateRender(&call_backs);
+	return glspCreateRender();
 }
 
 void INativeWindowManager::FinishFrame()
@@ -45,9 +40,13 @@ void INativeWindowManager::FinishFrame()
 	DisplayFrame(&buf);
 }
 
-void INativeWindowManager::NWMGetWindowInfo(NWMWindowInfo *win_info)
+bool INativeWindowManager::NWMCreateWindow(int width, int height, const char *name)
 {
-	INativeWindowManager::get()->GetWindowInfo(win_info);
+	// TODO: pass format
+	NWMWindowInfo win_info = {width, height, 0};
+	glspSetNativeWindowInfo(&win_info);
+
+	return true;
 }
 
 } // namespace glsp

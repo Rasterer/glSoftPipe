@@ -63,6 +63,12 @@ GLAPI void APIENTRY glTexParameterfv (GLenum target, GLenum pname, const GLfloat
 	gc->mTM.TexParameterfv(gc, target, pname, params);
 }
 
+GLAPI GLboolean APIENTRY glIsTexture (GLuint texture)
+{
+	__GET_CONTEXT();
+	return gc->mTM.IsTexture(gc, texture);
+}
+
 namespace {
 
 typedef void (*PFNCopyTexels)(const void *pSrc, TextureMipmap *pMipmap);
@@ -178,6 +184,7 @@ bool PickupCopyFunc(int internalformat, unsigned format, unsigned type, PFNCopyT
 				case GL_FLOAT:
 				{
 					*ppfnCopyTexels = (PFNCopyTexels)CopyTexelIntactly;
+					return true;
 				}
 				default:
 				{
@@ -196,8 +203,10 @@ uint32_t TargetToMipmapLevels(unsigned target)
 {
 	switch(target)
 	{
-		case TEXTURE_TARGET_2D: return MAX_TEXTURE_MIPMAP_LEVELS;
-		default:			return 1;
+		case GL_TEXTURE_2D:
+			return MAX_TEXTURE_MIPMAP_LEVELS;
+		default:
+			return 1;
 	}
 }
 
@@ -604,7 +613,7 @@ Texture::Texture():
 {
 }
 
-Texture::Texture(TextureTarget target):
+Texture::Texture(unsigned target):
 	mAvailableMipmaps(0),
 	mTextureTarget(target),
 	mNumLayers(1), // FIXME: set layer num correctly
@@ -654,7 +663,7 @@ TextureMipmap* Texture::getMipmap(uint32_t layer, int32_t level) const
 {
 	switch(mTextureTarget)
 	{
-		case TEXTURE_TARGET_2D:
+		case GL_TEXTURE_2D:
 			assert(layer == 0);
 			return &mpMipmap[level];
 		default:
@@ -1099,14 +1108,6 @@ bool Texture::ValidateState()
 	return ret;
 }
 
-TextureBindingPoint::TextureBindingPoint():
-	mTex(NULL)
-{
-}
-
-TextureBindingPoint::~TextureBindingPoint()
-{
-}
 
 TextureMachine::TextureMachine():
 	mActiveTextureUnit(0),
@@ -1123,6 +1124,16 @@ TextureMachine::TextureMachine():
 
 TextureMachine::~TextureMachine()
 {
+	for(int j = 0; j < MAX_TEXTURE_UNITS; j++)
+	{
+		for(int k = 0; k < TEXTURE_TARGET_MAX; k++)
+		{
+			TextureBindingPoint *pBP = &mBoundTexture[j][k];
+
+			if(pBP->mTex)
+				pBP->mTex->DecRef();
+		}
+	}
 }
 
 void TextureMachine::GenTextures(GLContext *gc, int n, unsigned *textures)
@@ -1150,12 +1161,15 @@ void TextureMachine::DeleteTextures(GLContext *gc, int n, const unsigned *textur
 					TextureBindingPoint *pBP = &mBoundTexture[j][k];
 
 					if(pBP->mTex == pTex)
+					{
+						pBP->mTex->DecRef();
 						pBP->mTex = &mDefaultTexture;
+					}
 				}
 			}
 
 			mNameSpace.removeObject(pTex);
-			delete pTex;
+			pTex->DecRef();
 		}
 	}
 
@@ -1169,26 +1183,32 @@ void TextureMachine::BindTexture(GLContext *const gc, unsigned target, unsigned 
 	if(!pBP)
 		return;
 
+	Texture *pTex;
+
 	if(!texture)
 	{
-		pBP->mTex = &mDefaultTexture;
+		pTex = &mDefaultTexture;
 	}
 	else
 	{
 		if(!mNameSpace.validate(texture))
 			return;
 
-		Texture *pTex = static_cast<Texture *>(mNameSpace.retrieveObject(texture));
+		pTex = static_cast<Texture *>(mNameSpace.retrieveObject(texture));
 
 		if(!pTex)
 		{
-			pTex = new Texture(TargetToIndex(target));
+			pTex = new Texture(target);
 			pTex->setName(texture);
 			mNameSpace.insertObject(pTex);
 		}
-
-		pBP->mTex = pTex;
+		pTex->IncRef();
 	}
+
+	if (pBP->mTex != &mDefaultTexture)
+		pBP->mTex->DecRef();
+
+	pBP->mTex = pTex;
 }
 
 static bool TexImage2DValidateParams(unsigned target, int internalformat, unsigned format, unsigned type)
@@ -1330,6 +1350,24 @@ void TextureMachine::ActiveTexture(GLContext *gc, unsigned texture)
 	GLSP_UNREFERENCED_PARAM(gc);
 
 	mActiveTextureUnit = texture - GL_TEXTURE0;
+}
+
+unsigned char TextureMachine::IsTexture(GLContext *, unsigned texture)
+{
+	if(mNameSpace.validate(texture))
+		return GL_TRUE;
+	else
+		return GL_FALSE;
+}
+
+Texture* TextureMachine::GetBoundTexture(unsigned target, unsigned texture)
+{
+	Texture *pTex = static_cast<Texture *>(mNameSpace.retrieveObject(texture));
+
+	if (pTex->GetTarget() == target)
+		return pTex;
+	else
+		return nullptr;
 }
 
 } // namespace glsp

@@ -18,7 +18,7 @@ public:
 	bool InitDrawEngine();
 	void FinishFrame();
 
-	virtual bool NWMCreateWindow(int width, int height, const char *name) = 0;
+	virtual bool NWMCreateWindow(int width, int height, const char *name);
 	virtual void NWMDestroyWindow() = 0;
 
 	void SetAppFramework(IAppFramework *app_framework) { mAppFramework = app_framework; }
@@ -32,8 +32,6 @@ private:
 	virtual bool DisplayFrame(NWMBufferToDisplay *buf) = 0;
 
 	static INativeWindowManager *sNWM;
-
-	static void NWMGetWindowInfo(NWMWindowInfo *win_info);
 };
 
 INativeWindowManager* CreateNativeWindowManager();

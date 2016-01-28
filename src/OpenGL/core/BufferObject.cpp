@@ -36,6 +36,12 @@ GLAPI void APIENTRY glBufferData (GLenum target, GLsizeiptr size, const void *da
 	gc->mBOM.BufferData(gc, target, size, data, usage);
 }
 
+GLAPI GLboolean APIENTRY glIsBuffer (GLuint buffer)
+{
+	__GET_CONTEXT();
+	return gc->mBOM.IsBuffer(gc, buffer);
+}
+
 BufferObject::BufferObject():
 	mSize(0),
 	mUsage(0),
@@ -43,23 +49,27 @@ BufferObject::BufferObject():
 {
 }
 
-BindingPoint::BindingPoint():
-	mBO(NULL)
+
+BufferObjectMachine::BufferObjectMachine()
 {
+	memset(mBindings, 0, sizeof(mBindings));
 }
 
-BindingPoint::~BindingPoint()
+BufferObjectMachine::~BufferObjectMachine()
 {
+	for (int i = 0; i < MAX_BUFOBJ_BINDINGS; ++i)
+	{
+		if (mBindings[i].mBO)
+			mBindings[i].mBO->DecRef();
+	}
 }
 
 void BufferObjectMachine::GenBuffers(GLContext *gc, int n, unsigned *buffers)
 {
 	GLSP_UNREFERENCED_PARAM(gc);
 
-	if(n < 0)
-		return;
-
-	mNameSpace.genNames(n, buffers);
+	if(n > 0)
+		mNameSpace.genNames(n, buffers);
 }
 
 bool BufferObjectMachine::DeleteBuffers(GLContext *gc, int n, const unsigned *buffers)
@@ -79,7 +89,10 @@ bool BufferObjectMachine::DeleteBuffers(GLContext *gc, int n, const unsigned *bu
 			pBP = getBindingPoint(gc, GL_ELEMENT_ARRAY_BUFFER);
 
 			if(pBP->mBO == pBO)
+			{
+				pBP->mBO->DecRef();
 				pBP->mBO = NULL;
+			}
 
 			mNameSpace.removeObject(pBO);
 			pBO->DecRef();
@@ -96,14 +109,14 @@ bool BufferObjectMachine::BindBuffer(GLContext *gc, unsigned target, unsigned bu
 	if(!pBP)
 		return false;
 
+	BufferObject *pBO;
+
 	if(!buffer)
 	{
-		pBP->mBO = NULL;
+		pBO = nullptr;
 	}
 	else
 	{
-		BufferObject *pBO;
-
 		if(!mNameSpace.validate(buffer))
 		{
 			GLSP_DPF(GLSP_DPF_LEVEL_ERROR, "BindBuffer: no such buffer %d!\n", buffer);
@@ -118,9 +131,13 @@ bool BufferObjectMachine::BindBuffer(GLContext *gc, unsigned target, unsigned bu
 			pBO->setName(buffer);
 			mNameSpace.insertObject(pBO);
 		}
-
-		pBP->mBO = pBO;
+		pBO->IncRef();
 	}
+
+	if (pBP->mBO)
+		pBP->mBO->DecRef();
+
+	pBP->mBO = pBO;
 
 	return true;
 }
@@ -157,6 +174,14 @@ bool BufferObjectMachine::BufferData(GLContext *gc, unsigned target, unsigned si
 		memcpy(pBO->mAddr, data, size);
 
 	return true;
+}
+
+unsigned char BufferObjectMachine::IsBuffer(GLContext *, unsigned buffer)
+{
+	if (mNameSpace.validate(buffer))
+		return GL_TRUE;
+	else
+		return GL_FALSE;
 }
 
 BufferObject *BufferObjectMachine::getBoundBuffer(unsigned target)
