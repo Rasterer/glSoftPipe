@@ -1130,7 +1130,7 @@ TextureMachine::~TextureMachine()
 		{
 			TextureBindingPoint *pBP = &mBoundTexture[j][k];
 
-			if(pBP->mTex)
+			if(pBP->mTex != &mDefaultTexture)
 				pBP->mTex->DecRef();
 		}
 	}
