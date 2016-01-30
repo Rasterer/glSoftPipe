@@ -221,8 +221,8 @@ void Clipper::onClipping(Batch *bat)
 		 * This can derive that (x, y, z, w) = (0, 0, 0, 0).
 		 * So it's an efficient way to catch this degenerated case.
 		 */
-		if (UNLIKELY(outcodes[0] == (1 << PLANE_ZEROW) &&
-					 outcodes[1] == (1 << PLANE_ZEROW) &&
+		if (UNLIKELY(outcodes[0] == (1 << PLANE_ZEROW) ||
+					 outcodes[1] == (1 << PLANE_ZEROW) ||
 					 outcodes[2] == (1 << PLANE_ZEROW)))
 		{
 			continue;

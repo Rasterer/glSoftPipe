@@ -306,35 +306,38 @@ void Binning::SetupTriangleSIMD(Triangle *tri0, Triangle *tri1, Triangle *tri2, 
 	tri3->mVert[2].mFactorC = tmp[3];
 
 
-	__m128i vSubpixels = _mm_set1_epi32(RAST_SUBPIXELS);
-	__m128i vXmin = _mm_srli_epi32(_mm_min_epi32(_mm_min_epi32(vX0, vX1), vX2), RAST_SUBPIXEL_BITS);
-	vXmin = _mm_min_epi32(_mm_max_epi32(vXmin, _mm_setzero_si128()), _mm_set1_epi32(g_GC->mRT.width - 1));
+	const int max_width_fixed  = (g_GC->mRT.width - 1)  << RAST_SUBPIXEL_BITS;
+	const int max_height_fixed = (g_GC->mRT.height - 1) << RAST_SUBPIXEL_BITS;
+	__m128i vXmin = _mm_min_epi32(_mm_min_epi32(vX0, vX1), vX2);
+	vXmin = _mm_min_epi32(_mm_max_epi32(vXmin, _mm_setzero_si128()), _mm_set1_epi32(max_width_fixed));
+	vXmin = _mm_srli_epi32(vXmin, RAST_SUBPIXEL_BITS);
 	_mm_store_si128((__m128i *)tmp, vXmin);
 	tri0->xmin = tmp[0];
 	tri1->xmin = tmp[1];
 	tri2->xmin = tmp[2];
 	tri3->xmin = tmp[3];
 
-	__m128i vYmin = _mm_srli_epi32(_mm_min_epi32(_mm_min_epi32(vY0, vY1), vY2), RAST_SUBPIXEL_BITS);
-	vYmin = _mm_min_epi32(_mm_max_epi32(vYmin, _mm_setzero_si128()), _mm_set1_epi32(g_GC->mRT.height - 1));
-	_mm_store_si128((__m128i *)tmp, vYmin);
-	tri0->ymin = tmp[0];
-	tri1->ymin = tmp[1];
-	tri2->ymin = tmp[2];
-	tri3->ymin = tmp[3];
-
 	__m128i vXmax = _mm_max_epi32(_mm_max_epi32(vX0, vX1), vX2);
-	vXmax = _mm_sub_epi32(_mm_srli_epi32(ROUND_UP_SIMD(vXmax, vSubpixels), RAST_SUBPIXEL_BITS), _mm_set1_epi32(1));
-	vXmax = _mm_min_epi32(_mm_max_epi32(vXmax, _mm_setzero_si128()), _mm_set1_epi32(g_GC->mRT.width - 1));
+	vXmax = _mm_min_epi32(_mm_max_epi32(vXmax, _mm_setzero_si128()), _mm_set1_epi32(max_width_fixed));
+	vXmax = _mm_srli_epi32(vXmax, RAST_SUBPIXEL_BITS);
 	_mm_store_si128((__m128i *)tmp, vXmax);
 	tri0->xmax = tmp[0];
 	tri1->xmax = tmp[1];
 	tri2->xmax = tmp[2];
 	tri3->xmax = tmp[3];
 
+	__m128i vYmin = _mm_min_epi32(_mm_min_epi32(vY0, vY1), vY2);
+	vYmin = _mm_min_epi32(_mm_max_epi32(vYmin, _mm_setzero_si128()), _mm_set1_epi32(max_height_fixed));
+	vYmin = _mm_srli_epi32(vYmin, RAST_SUBPIXEL_BITS);
+	_mm_store_si128((__m128i *)tmp, vYmin);
+	tri0->ymin = tmp[0];
+	tri1->ymin = tmp[1];
+	tri2->ymin = tmp[2];
+	tri3->ymin = tmp[3];
+
 	__m128i vYmax = _mm_max_epi32(_mm_max_epi32(vY0, vY1), vY2);
-	vYmax = _mm_sub_epi32(_mm_srli_epi32(ROUND_UP_SIMD(vYmax, vSubpixels), RAST_SUBPIXEL_BITS), _mm_set1_epi32(1));
-	vYmax = _mm_min_epi32(_mm_max_epi32(vYmax, _mm_setzero_si128()), _mm_set1_epi32(g_GC->mRT.height - 1));
+	vYmax = _mm_min_epi32(_mm_max_epi32(vYmax, _mm_setzero_si128()), _mm_set1_epi32(max_height_fixed));
+	vYmax = _mm_srli_epi32(vYmax, RAST_SUBPIXEL_BITS);
 	_mm_store_si128((__m128i *)tmp, vYmax);
 	tri0->ymax = tmp[0];
 	tri1->ymax = tmp[1];
@@ -586,15 +589,11 @@ void Binning::SetupTriangle(Triangle *tri)
 	tri->mVert[2].mFactorB = x1x0 << RAST_SUBPIXEL_BITS;
 	tri->mVert[2].mFactorC = C2 + (y0y1 << (RAST_SUBPIXEL_BITS - 1)) + (x1x0 << (RAST_SUBPIXEL_BITS - 1));
 
-	tri->xmin = (std::min({x0, x1, x2}) >> RAST_SUBPIXEL_BITS);
-	tri->ymin = (std::min({y0, y1, y2}) >> RAST_SUBPIXEL_BITS);
-	tri->xmax = ((ROUND_UP(std::max({x0, x1, x2}), RAST_SUBPIXELS) >> RAST_SUBPIXEL_BITS) - 1);
-	tri->ymax = ((ROUND_UP(std::max({y0, y1, y2}), RAST_SUBPIXELS) >> RAST_SUBPIXEL_BITS) - 1);
+	tri->xmin = clamp(std::min({x0, x1, x2}), 0, (g_GC->mRT.width  - 1) << RAST_SUBPIXEL_BITS) >> RAST_SUBPIXEL_BITS;
+	tri->xmax = clamp(std::max({x0, x1, x2}), 0, (g_GC->mRT.width  - 1) << RAST_SUBPIXEL_BITS) >> RAST_SUBPIXEL_BITS;
+	tri->ymin = clamp(std::min({y0, y1, y2}), 0, (g_GC->mRT.height - 1) << RAST_SUBPIXEL_BITS) >> RAST_SUBPIXEL_BITS;
+	tri->ymax = clamp(std::max({y0, y1, y2}), 0, (g_GC->mRT.height - 1) << RAST_SUBPIXEL_BITS) >> RAST_SUBPIXEL_BITS;
 
-	tri->xmin = clamp(tri->xmin, 0, g_GC->mRT.width  - 1);
-	tri->xmax = clamp(tri->xmax, 0, g_GC->mRT.width  - 1);
-	tri->ymin = clamp(tri->ymin, 0, g_GC->mRT.height - 1);
-	tri->ymax = clamp(tri->ymax, 0, g_GC->mRT.height - 1);
 
 	const float WReciprocal0 = 1.0f / v0->position().w;
 	const float WReciprocal1 = 1.0f / v1->position().w;
@@ -1006,10 +1005,15 @@ void TBDR::FineRasterizing(int x, int y)
 
 	for (Triangle *tri: disp_list)
 	{
+		const int minx = ROUND_DOWN(std::max(0, tri->xmin - x), MICRO_TILE_SIZE);
+		const int miny = ROUND_DOWN(std::max(0, tri->ymin - y), MICRO_TILE_SIZE);
+		const int maxx = std::min(MACRO_TILE_SIZE, tri->xmax - x + 1);
+		const int maxy = std::min(MACRO_TILE_SIZE, tri->ymax - y + 1);
+
 		__m128 vNewZ = _mm_set_ps1(tri->mZAtOrigin);
 
-		vNewZ = MAWrapper(_mm_cvtepi32_ps(_mm_set_epi32(x + 1, x, x + 1, x)), _mm_set_ps1(tri->mZGradientX), vNewZ);
-		vNewZ = MAWrapper(_mm_cvtepi32_ps(_mm_set_epi32(y + 1, y + 1, y, y)), _mm_set_ps1(tri->mZGradientY), vNewZ);
+		vNewZ = MAWrapper(_mm_cvtepi32_ps(_mm_set_epi32(x + minx + 1, x + minx, x + minx + 1, x + minx)), _mm_set_ps1(tri->mZGradientX), vNewZ);
+		vNewZ = MAWrapper(_mm_cvtepi32_ps(_mm_set_epi32(y + miny + 1, y + miny + 1, y + miny, y + miny)), _mm_set_ps1(tri->mZGradientY), vNewZ);
 
 		__m128 vZStepQuadx = _mm_set_ps1(tri->mZGradientX * 2);
 		__m128 vZStepQuady = _mm_set_ps1(tri->mZGradientY * 2);
@@ -1017,8 +1021,8 @@ void TBDR::FineRasterizing(int x, int y)
 		__m128 vZStepMTx = _mm_set_ps1(tri->mZGradientX * MICRO_TILE_SIZE);
 		__m128 vZStepMTy = _mm_set_ps1(tri->mZGradientY * MICRO_TILE_SIZE);
 
-		__m128i vMicroTileCornerX = _mm_set_epi32(x + MICRO_TILE_SIZE - 1, x, x + MICRO_TILE_SIZE - 1, x);
-		__m128i vMicroTileCornerY = _mm_set_epi32(y + MICRO_TILE_SIZE - 1, y + MICRO_TILE_SIZE - 1, y, y);
+		__m128i vMicroTileCornerX = _mm_set_epi32(x + minx + MICRO_TILE_SIZE - 1, x + minx, x + minx + MICRO_TILE_SIZE - 1, x + minx);
+		__m128i vMicroTileCornerY = _mm_set_epi32(y + miny + MICRO_TILE_SIZE - 1, y + miny + MICRO_TILE_SIZE - 1, y + miny, y + miny);
 
 		__m128i vFactorA0 = _mm_set1_epi32(tri->mVert[0].mFactorA);
 		__m128i vFactorB0 = _mm_set1_epi32(tri->mVert[0].mFactorB);
@@ -1053,7 +1057,7 @@ void TBDR::FineRasterizing(int x, int y)
 		__m128i vAreaStepMTx2 = _mm_slli_epi32(vFactorA2, MICRO_TILE_SIZE_SHIFT);
 		__m128i vAreaStepMTy2 = _mm_slli_epi32(vFactorB2, MICRO_TILE_SIZE_SHIFT);
 
-		for (int i = 0; i < max_h; i += MICRO_TILE_SIZE)
+		for (int i = miny; i < maxy; i += MICRO_TILE_SIZE)
 		{
 			__m128i vArea0x = vArea0;
 			__m128i vArea1x = vArea1;
@@ -1061,7 +1065,7 @@ void TBDR::FineRasterizing(int x, int y)
 
 			__m128  vNewZx  = vNewZ;
 
-			for (int j = 0; j < max_w; j += MICRO_TILE_SIZE,
+			for (int j = minx; j < maxx; j += MICRO_TILE_SIZE,
 				vArea0x = _mm_add_epi32(vArea0x, vAreaStepMTx0),
 				vArea1x = _mm_add_epi32(vArea1x, vAreaStepMTx1),
 				vArea2x = _mm_add_epi32(vArea2x, vAreaStepMTx2),
@@ -1123,11 +1127,11 @@ void TBDR::FineRasterizing(int x, int y)
 
 					__m128i vQuadX = _mm_set_epi32(xp + 1, xp, xp + 1, xp);
 					__m128i vQuadY = _mm_set_epi32(yp + 1, yp + 1, yp, yp);
-
 					__m128i vArea0xx = MAWrapper(vFactorB0, vQuadY, MAWrapper(vFactorA0, vQuadX, vFactorC0));
 					__m128i vArea1xx = MAWrapper(vFactorB1, vQuadY, MAWrapper(vFactorA1, vQuadX, vFactorC1));
 					__m128i vArea2xx = MAWrapper(vFactorB2, vQuadY, MAWrapper(vFactorA2, vQuadX, vFactorC2));
 
+					// OPT: narrow down to triangle's [min max] range?
 					for (int k = 0; k < MICRO_TILE_SIZE; k += 2)
 					{
 						__m128  vNewZxxx  = vNewZxx;
