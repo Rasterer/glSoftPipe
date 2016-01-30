@@ -9,12 +9,12 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/quaternion.hpp>
 
 #include "IAppFramework.h"
 #include "DataFlow.h"
 #include "Shader.h"
-#include "RenderUtility.h"
+#include "Mesh.h"
+#include "Camera.h"
 
 
 using namespace std;
@@ -137,25 +137,17 @@ private:
 	virtual void onKeyPressed(unsigned long key);
 	virtual void onMouseLeftClickDown(int x, int y);
 
-	void UpdateCameraMatrix();
-
 	ShaderFactory *mShaderFactory;
 	float mScalar;
 	GLuint mProg;
 	GLint mWVPLocation;
 
 	mat4  mTrans;
-	mat4  mView;
 	mat4  mProject;
 	mat4  mTransViewProject;
 
-	// Camera related
-	vec3  mCameraPosition;
-	vec3  mCameraTarget;
-	vec3  mCameraUp;
-	vec3  mCameraRight;
-
-	Mesh *mMesh;
+	GlspCamera mCamera;
+	GlspMesh *mMesh;
 };
 
 LoadModel::~LoadModel()
@@ -196,35 +188,23 @@ void LoadModel::onInit()
 	mWVPLocation = glGetUniformLocation(mProg, "mWVP");
 	GLint samplerLocation = glGetUniformLocation(mProg, "mSampler");
 
-	mCameraPosition = vec3(0.0f, 0.0f, 0.0f);
-	mCameraTarget   = vec3(0.0f, 0.0f, -1.0f);
-	mCameraUp       = vec3(0.0f, 1.0f, 0.0f);
-	mCameraRight    = vec3(1.0f, 0.0f, 0.0f);
-	UpdateCameraMatrix();
+	mCamera.InitCamera(vec3(0.0f, 0.0f, 0.0f),
+					vec3(0.0f, 0.0f, -1.0f),
+					vec3(0.0f, 1.0f, 0.0f));
 
 	mTrans   = ::glm::translate(mat4(1.0f), vec3(0.0f, -20.0f, -100.0f));
 	mProject = ::glm::perspective((float)M_PI * 60.0f / 180.0f, 16.0f / 9.0f, 10.0f, 200.0f);
-	mTransViewProject = mProject * mView * mTrans;
+	mTransViewProject = mProject * mCamera.GetViewMatrix() * mTrans;
 
 	glUniform1i(samplerLocation, 0);
 
-	mMesh = new Mesh();
+	mMesh = new GlspMesh();
 	mMesh->LoadMesh("../../../examples/LoadModel/materials/phoenix_ugv.md2");
-}
-
-void LoadModel::UpdateCameraMatrix()
-{
-	mView   = ::glm::lookAt(mCameraPosition,
-							mCameraTarget + mCameraPosition,
-							mCameraUp);
 }
 
 void LoadModel::onRender()
 {
 	mat4 rotate = ::glm::rotate(mat4(1.0f), (float)M_PI * mScalar / 180, vec3(0.0f, 1.0f, 0.0f));
-	mat4 view   = ::glm::lookAt(mCameraPosition,
-							mCameraTarget + mCameraPosition,
-							mCameraUp);
 	mat4 wvp = mTransViewProject * rotate;
 	glUniformMatrix4fv(mWVPLocation, 1, false, (float *)&wvp);
 	mScalar += 1.0f;
@@ -235,86 +215,11 @@ void LoadModel::onRender()
 
 void LoadModel::onKeyPressed(unsigned long key)
 {
-	bool bUpdateCamera = false;
-
-	switch (key)
+	if (mCamera.CameraControl(key))
 	{
-		case 'W':
-		{
-			mCameraPosition += (mCameraUp * 1.0f);
-			bUpdateCamera = true;
-			break;
-		}
-		case 'X':
-		{
-			mCameraPosition += (mCameraUp * (-1.0f));
-			bUpdateCamera = true;
-			break;
-		}
-		case 'A':
-		{
-			mCameraPosition += (mCameraRight * (-1.0f));
-			bUpdateCamera = true;
-			break;
-		}
-		case 'D':
-		{
-			mCameraPosition += (mCameraRight * 1.0f);
-			bUpdateCamera = true;
-			break;
-		}
-		case 'S':
-		{
-			mCameraPosition += (mCameraTarget * 1.0f);
-			bUpdateCamera = true;
-			break;
-		}
-		case 'Z':
-		{
-			mCameraPosition += (mCameraTarget * (-1.0f));
-			bUpdateCamera = true;
-			break;
-		}
-		case 'U':
-		{
-			// quaternion rotation around right axis
-			mCameraTarget = rotate(angleAxis(0.05f, mCameraRight), mCameraTarget);
-			mCameraUp = cross(mCameraRight, mCameraTarget);
-			bUpdateCamera = true;
-			break;
-		}
-		case 'M':
-		{
-			// quaternion rotation around right axis
-			mCameraTarget = rotate(angleAxis(-0.05f, mCameraRight), mCameraTarget);
-			mCameraUp = cross(mCameraRight, mCameraTarget);
-			bUpdateCamera = true;
-			break;
-		}
-		case 'H':
-		{
-			// quaternion rotation around up axis
-			mCameraTarget = rotate(angleAxis(0.05f, mCameraUp), mCameraTarget);
-			mCameraRight = cross(mCameraTarget, mCameraUp);
-			bUpdateCamera = true;
-			break;
-		}
-		case 'K':
-		{
-			// quaternion rotation around up axis
-			mCameraTarget = rotate(angleAxis(-0.05f, mCameraUp), mCameraTarget);
-			mCameraRight = cross(mCameraTarget, mCameraUp);
-			bUpdateCamera = true;
-			break;
-		}
-		default:
-			break;
-	}
-
-	if (bUpdateCamera)
-	{
-		UpdateCameraMatrix();
-		mTransViewProject = mProject * mView * mTrans;
+		// This key event has been processed by camera control,
+		// need update the TVP matrix.
+		mTransViewProject = mProject * mCamera.GetViewMatrix() * mTrans;
 	}
 }
 

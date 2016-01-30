@@ -12,10 +12,10 @@
 namespace glsp {
 #include "khronos/GL/glcorearb.h"
 
-class Materials
+class GlspMaterials
 {
 public:
-	Materials(GLenum TextureTarget, const std::string& FileName);
+	GlspMaterials(GLenum TextureTarget, const std::string& FileName);
 
     bool Load();
 
@@ -29,15 +29,15 @@ private:
     Magick::Blob m_blob;
 };
 
-struct Vertex
+struct GlspVertex
 {
     glm::vec3 m_pos;
     glm::vec2 m_tex;
     glm::vec3 m_normal;
 
-    Vertex() {}
+    GlspVertex() {}
 
-    Vertex(const glm::vec3& pos, const glm::vec2& tex, const glm::vec3& normal)
+    GlspVertex(const glm::vec3& pos, const glm::vec2& tex, const glm::vec3& normal)
     {
         m_pos    = pos;
         m_tex    = tex;
@@ -45,11 +45,11 @@ struct Vertex
     }
 };
 
-class Mesh
+class GlspMesh
 {
 public:
-    Mesh();
-    ~Mesh();
+    GlspMesh();
+    ~GlspMesh();
 
     bool LoadMesh(const std::string& Filename);
     virtual void Render();
@@ -62,12 +62,12 @@ private:
 
 #define INVALID_MATERIAL 0xFFFFFFFF
 
-    struct MeshEntry {
-        MeshEntry();
+    struct GlspMeshEntry {
+        GlspMeshEntry();
 
-        ~MeshEntry();
+        ~GlspMeshEntry();
 
-        void Init(const std::vector<Vertex>& Vertices,
+        void Init(const std::vector<GlspVertex>& Vertices,
                   const std::vector<unsigned int>& Indices);
 
         GLuint VB;
@@ -76,8 +76,8 @@ private:
         unsigned int MaterialIndex;
     };
 
-    std::vector<MeshEntry> m_Entries;
-	std::vector<Materials*> m_Textures;
+    std::vector<GlspMeshEntry>  m_Entries;
+	std::vector<GlspMaterials*> m_Textures;
 };
 
 } // namespace glsp

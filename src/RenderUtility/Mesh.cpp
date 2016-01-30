@@ -1,4 +1,4 @@
-#include "RenderUtility.h"
+#include "Mesh.h"
 
 #include <cassert>
 #include <cstdio>
@@ -6,14 +6,14 @@
 
 namespace glsp {
 
-Materials::Materials(GLenum TextureTarget, const std::string& FileName)
+GlspMaterials::GlspMaterials(GLenum TextureTarget, const std::string& FileName)
 {
     m_textureTarget = TextureTarget;
     m_fileName      = FileName;
     m_pImage        = NULL;
 }
 
-bool Materials::Load()
+bool GlspMaterials::Load()
 {
     try {
 		m_pImage = new Magick::Image(m_fileName);
@@ -33,14 +33,14 @@ bool Materials::Load()
     return true;
 }
 
-void Materials::Bind(GLenum TextureUnit)
+void GlspMaterials::Bind(GLenum TextureUnit)
 {
     glActiveTexture(TextureUnit);
     glBindTexture(m_textureTarget, m_textureObj);
 }
 
 
-Mesh::MeshEntry::MeshEntry()
+GlspMesh::GlspMeshEntry::GlspMeshEntry()
 {
     VB = 0xffffffff;
     IB = 0xffffffff;
@@ -48,7 +48,7 @@ Mesh::MeshEntry::MeshEntry()
     MaterialIndex = 0xffffffff;
 };
 
-Mesh::MeshEntry::~MeshEntry()
+GlspMesh::GlspMeshEntry::~GlspMeshEntry()
 {
     if (VB != 0xffffffff)
     {
@@ -61,32 +61,32 @@ Mesh::MeshEntry::~MeshEntry()
     }
 }
 
-void Mesh::MeshEntry::Init(const std::vector<Vertex>& Vertices,
+void GlspMesh::GlspMeshEntry::Init(const std::vector<GlspVertex>& Vertices,
                           const std::vector<unsigned int>& Indices)
 {
     NumIndices = Indices.size();
 
     glGenBuffers(1, &VB);
   	glBindBuffer(GL_ARRAY_BUFFER, VB);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * Vertices.size(), &Vertices[0], GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(GlspVertex) * Vertices.size(), &Vertices[0], GL_STATIC_DRAW);
 
     glGenBuffers(1, &IB);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IB);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * NumIndices, &Indices[0], GL_STATIC_DRAW);
 }
 
-Mesh::Mesh()
+GlspMesh::GlspMesh()
 {
 }
 
 
-Mesh::~Mesh()
+GlspMesh::~GlspMesh()
 {
     Clear();
 }
 
 
-void Mesh::Clear()
+void GlspMesh::Clear()
 {
     for (unsigned int i = 0 ; i < m_Textures.size() ; i++)
     {
@@ -99,7 +99,7 @@ void Mesh::Clear()
 }
 
 
-bool Mesh::LoadMesh(const std::string& Filename)
+bool GlspMesh::LoadMesh(const std::string& Filename)
 {
     // Release the previously loaded mesh (if it exists)
     Clear();
@@ -119,7 +119,7 @@ bool Mesh::LoadMesh(const std::string& Filename)
     return Ret;
 }
 
-bool Mesh::InitFromScene(const aiScene* pScene, const std::string& Filename)
+bool GlspMesh::InitFromScene(const aiScene* pScene, const std::string& Filename)
 {  
     m_Entries.resize(pScene->mNumMeshes);
     m_Textures.resize(pScene->mNumMaterials);
@@ -133,11 +133,11 @@ bool Mesh::InitFromScene(const aiScene* pScene, const std::string& Filename)
     return InitMaterials(pScene, Filename);
 }
 
-void Mesh::InitMesh(unsigned int Index, const aiMesh* paiMesh)
+void GlspMesh::InitMesh(unsigned int Index, const aiMesh* paiMesh)
 {
     m_Entries[Index].MaterialIndex = paiMesh->mMaterialIndex;
     
-    std::vector<Vertex> Vertices;
+    std::vector<GlspVertex> Vertices;
     std::vector<unsigned int> Indices;
 
     const aiVector3D Zero3D(0.0f, 0.0f, 0.0f);
@@ -147,7 +147,7 @@ void Mesh::InitMesh(unsigned int Index, const aiMesh* paiMesh)
         const aiVector3D* pNormal   = &(paiMesh->mNormals[i]);
         const aiVector3D* pTexCoord = paiMesh->HasTextureCoords(0) ? &(paiMesh->mTextureCoords[0][i]) : &Zero3D;
 
-        Vertex v(glm::vec3(pPos->x, pPos->y, pPos->z),
+		GlspVertex v(glm::vec3(pPos->x, pPos->y, pPos->z),
                  glm::vec2(pTexCoord->x, pTexCoord->y),
                  glm::vec3(pNormal->x, pNormal->y, pNormal->z));
 
@@ -165,7 +165,7 @@ void Mesh::InitMesh(unsigned int Index, const aiMesh* paiMesh)
     m_Entries[Index].Init(Vertices, Indices);
 }
 
-bool Mesh::InitMaterials(const aiScene* pScene, const std::string& Filename)
+bool GlspMesh::InitMaterials(const aiScene* pScene, const std::string& Filename)
 {
     // Extract the directory part from the file name
     std::string::size_type SlashIndex = Filename.find_last_of("/");
@@ -194,7 +194,7 @@ bool Mesh::InitMaterials(const aiScene* pScene, const std::string& Filename)
 
             if (pMaterial->GetTexture(aiTextureType_DIFFUSE, 0, &Path, NULL, NULL, NULL, NULL, NULL) == AI_SUCCESS) {
                 std::string FullPath = Dir + "/" + Path.data;
-				m_Textures[i] = new Materials(GL_TEXTURE_2D, FullPath);
+				m_Textures[i] = new GlspMaterials(GL_TEXTURE_2D, FullPath);
 
                 if (!m_Textures[i]->Load()) {
                     printf("Error loading texture '%s'\n", FullPath.c_str());
@@ -210,7 +210,7 @@ bool Mesh::InitMaterials(const aiScene* pScene, const std::string& Filename)
 
         // Load a white texture in case the model does not include its own texture
         if (!m_Textures[i]) {
-            m_Textures[i] = new Materials(GL_TEXTURE_2D, "./white.png");
+            m_Textures[i] = new GlspMaterials(GL_TEXTURE_2D, "./white.png");
 
             Ret = m_Textures[i]->Load();
         }
@@ -219,7 +219,7 @@ bool Mesh::InitMaterials(const aiScene* pScene, const std::string& Filename)
     return Ret;
 }
 
-void Mesh::Render()
+void GlspMesh::Render()
 {
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
@@ -227,8 +227,8 @@ void Mesh::Render()
 
     for (unsigned int i = 0 ; i < m_Entries.size() ; i++) {
         glBindBuffer(GL_ARRAY_BUFFER, m_Entries[i].VB);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (const GLvoid*)12);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(GlspVertex), 0);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(GlspVertex), (const GLvoid*)12);
         //glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (const GLvoid*)20);
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Entries[i].IB);
