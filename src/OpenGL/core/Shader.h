@@ -271,20 +271,8 @@ public:
 
 	bool getDiscardFlag() const { return bHasDiscard; }
 
-	void attachTextures(Texture *tex) { mTextures = tex; }
-
 protected:
-	void texture2D(sampler2D sampler, const __m128 &s, const __m128 &t, __m128 out[]);
-	void texture2D(sampler2D sampler, const __m128 &s, const __m128 &t, uint32_t out[]);
-
-	glm::vec4 texture2D(sampler2D sampler, const glm::vec2 &coord)
-	{
-		glm::vec4 res;
-
-		mTextures[sampler].m_pfnTexture2D(this, &mTextures[sampler], coord, res);
-
-		return res;
-	}
+	void texture2D(sampler2D sampler, Fsiosimd &fsio);
 
 private:
 	virtual void execute(fsInput& in, fsOutput& out);
@@ -296,7 +284,6 @@ private:
 	void SetDiscardFlag() { bHasDiscard = true; }
 
 	bool bHasDiscard;
-	Texture* mTextures;
 };
 
 class Program: public NameItem

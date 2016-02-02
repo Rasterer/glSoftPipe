@@ -72,21 +72,9 @@ public:
 	}
 
 private:
-	void execute(fsInput &in, fsOutput &out)
-	{
-		RESOLVE_IN(vec4, gl_Position, in);
-		RESOLVE_IN(vec2, oTexCoor, in);
-
-		RESOLVE_OUT(vec4, FragColor, out);
-
-		(void)gl_Position;
-
-		FragColor = texture2D(mSampler, oTexCoor);
-	}
-
 	virtual void OnExecuteSIMD(Fsiosimd &fsio)
 	{
-		texture2D(mSampler, fsio.mInRegs[4], fsio.mInRegs[4 + 1], fsio.mOutRegs);
+		texture2D(mSampler, fsio);
 
 		_MM_TRANSPOSE4_PS(fsio.mOutRegs[0], fsio.mOutRegs[1], fsio.mOutRegs[2], fsio.mOutRegs[3]);
 	}
@@ -199,7 +187,7 @@ void LoadModel::onInit()
 	glUniform1i(samplerLocation, 0);
 
 	mMesh = new GlspMesh();
-	mMesh->LoadMesh("../../../examples/LoadModel/materials/phoenix_ugv.md2");
+	mMesh->LoadMesh(GLSP_ROOT "/assets/phoenix/phoenix_ugv.md2");
 }
 
 void LoadModel::onRender()

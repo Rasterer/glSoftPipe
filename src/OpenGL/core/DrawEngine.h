@@ -42,12 +42,13 @@ struct DrawContext
 	int mCount;
 	unsigned mIndexSize;
 	DrawType mDrawType;
+	uint32_t mDrawID;
 	const void 		*mIndices;
 	GLContext 		*gc;
 
 	// Hold this data for deferred rendering support.
 	FragmentShader 		*mFS;
-	Texture				 mTextures[MAX_TEXTURE_UNITS];
+	Texture				*mTextures[MAX_TEXTURE_UNITS];
 
 	DrawContext *m_pNext;
 };
@@ -135,6 +136,7 @@ private:
 	PipeStage			   *mFirstStage;
 
 	GLContext              *mGLContext;
+	uint32_t                mDrawCount;
 };
 
 } // namespace glsp

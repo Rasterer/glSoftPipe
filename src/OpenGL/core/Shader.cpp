@@ -269,7 +269,6 @@ void FragmentShader::ExecuteSISD(void *data)
 	const Triangle *tri = static_cast<Triangle *>(fsio.m_priv0);
 
 	fsio.out.resize(getOutRegsNum());
-	attachTextures(tri->mPrim.mDC->mTextures);
 
 	execute(fsio.in, fsio.out);
 }
@@ -278,8 +277,6 @@ void FragmentShader::ExecuteSIMD(void *data)
 {
 	Fsiosimd &fsio = *static_cast<Fsiosimd *>(data);
 	const Triangle *tri = static_cast<Triangle *>(fsio.m_priv0);
-
-	attachTextures(tri->mPrim.mDC->mTextures);
 
 	OnExecuteSIMD(fsio);
 }
@@ -296,14 +293,10 @@ void FragmentShader::execute(fsInput& in, fsOutput& out)
 	out.fragcolor() = vec4(0.0f, 255.0f, 0.0f, 255.0f);
 }
 
-void FragmentShader::texture2D(sampler2D sampler, const __m128 &s, const __m128 &t, __m128 out[])
+void FragmentShader::texture2D(sampler2D sampler, Fsiosimd &fsio)
 {
-	mTextures[sampler].Texture2DSIMD(s, t, out);
-}
-
-void FragmentShader::texture2D(sampler2D sampler, const __m128 &s, const __m128 &t, uint32_t out[])
-{
-	mTextures[sampler].Texture2DSIMD(s, t, out);
+	const Triangle *tri = static_cast<Triangle *>(fsio.m_priv0);
+	tri->mPrim.mDC->mTextures[sampler]->Texture2DSIMD(fsio.mInRegs[4], fsio.mInRegs[5], fsio.mOutRegs);
 }
 
 void FragmentShader::finalize()

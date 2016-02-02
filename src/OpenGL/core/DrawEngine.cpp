@@ -39,8 +39,6 @@ GLAPI void APIENTRY glDrawArrays (GLenum mode, GLint first, GLsizei count)
 	if(!de->validateState(dc))
 		return;
 
-	dc->m_pNext = de->getDrawContextList();
-	de->setDrawContextList(dc);
 	de->prepareToDraw();
 	de->emit(dc);
 
@@ -67,8 +65,6 @@ GLAPI void APIENTRY glDrawElements (GLenum mode, GLsizei count, GLenum type, con
 	if(!de->validateState(dc))
 		return;
 
-	dc->m_pNext = de->getDrawContextList();
-	de->setDrawContextList(dc);
 	de->prepareToDraw();
 	de->emit(dc);
 
@@ -158,7 +154,8 @@ private:
 DrawEngine::DrawEngine():
 	mDrawContextList(nullptr),
 	mFirstStage(nullptr),
-	mGLContext(nullptr)
+	mGLContext(nullptr),
+	mDrawCount(0)
 {
 }
 
@@ -367,7 +364,8 @@ bool DrawEngine::validateState(DrawContext *dc)
 	}
 
 	ret = mGLContext->mFBOM.ValidateFramebufferStatus(mGLContext);
-
+	if (ret && dc)
+		dc->mDrawID = mDrawCount++;
 out:
 	return ret;
 }
@@ -428,6 +426,8 @@ void DrawEngine::PerformClear(unsigned int mask)
 
 void DrawEngine::emit(DrawContext *dc)
 {
+	dc->m_pNext = mDrawContextList;
+	mDrawContextList = dc;
 	linkGeomertryPipeStages();
 	getFirstStage()->emit(dc);
 }
@@ -456,9 +456,16 @@ void DrawEngine::Flush(bool swap_buffer)
 	{
 		DrawContext *tmp = dc;
 		dc = dc->m_pNext;
+
+		for (int i = 0; i < MAX_TEXTURE_UNITS; ++i)
+		{
+			if (tmp->mTextures[i])
+				tmp->mTextures[i]->DecRef();
+		}
 		delete tmp;
 	}
 	mDrawContextList = NULL;
+	mDrawCount = 0;
 }
 
 bool glspCreateRender()
