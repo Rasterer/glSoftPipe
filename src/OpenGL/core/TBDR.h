@@ -119,7 +119,7 @@ public:
 
 	virtual void finalize();
 
-	void FlushDisplayLists(bool swap_buffer);
+	void FlushDisplayLists(bool swap_buffer, bool depth_only);
 	void SetDepthClearFlag() { mDepthClearFlag = true; }
 
 private:
@@ -143,6 +143,7 @@ private:
 	// we can eliminate the depth buffer store.
 	// This is the very zero depth store implemented in HW.
 	bool           mFlushTriggerBySwapBuffer;
+	bool           mDepthOnlyPass;
 };
 
 class PerspectiveCorrectInterpolater: public Interpolater

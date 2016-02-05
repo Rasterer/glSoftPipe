@@ -28,20 +28,26 @@ typedef std::vector<VertexInfo> var_v;
 typedef std::map<std::string, int> VarMap;
 
 
+// GLSP extensions
+GLAPI void* APIENTRY glspGetUniformLocation(GLuint program, const GLchar *name);
+
 // NOTE:
 // APP should use these two macros to define its own variables(name and type)
 // for vertex shader varying: To make life easy, glPosition should come first!
 #define DECLARE_IN(type, attr)	\
 	m##attr = this->declareInput(#attr, typeid(type));	\
+	m##attr <<= 2;
 
 #define RESOLVE_IN(type, attr, input)	\
-	type   &attr = reinterpret_cast<type &>(input.getReg(m##attr));
+	type   &attr = reinterpret_cast<type &>(input.getReg(m##attr >> 2));
 
 #define DECLARE_OUT(type, attr)	\
-	m##attr = this->declareOutput(#attr, typeid(type));
+	m##attr = this->declareOutput(#attr, typeid(type));	\
+	m##attr <<= 2;
 
 #define RESOLVE_OUT(type, varying, output)	\
-	type   &varying = reinterpret_cast<type &>(output.getReg(m##varying));
+	type   &varying = reinterpret_cast<type &>(output.getReg(m##varying >> 2));
+
 
 #define DECLARE_UNIFORM(uni)	\
 	this->declareUniform(#uni, &uni);
@@ -55,7 +61,7 @@ typedef std::map<std::string, int> VarMap;
 // i.e. there is only one texture coordinate in an vertex array.
 #define DECLARE_TEXTURE_COORD(type, attr)	\
 	this->SetTextureCoordLocation();			\
-	m##attr = this->declareInput(#attr, typeid(type));	\
+	DECLARE_IN(type, attr);
 
 
 typedef unsigned int sampler1D;
@@ -272,7 +278,7 @@ public:
 	bool getDiscardFlag() const { return bHasDiscard; }
 
 protected:
-	void texture2D(sampler2D sampler, Fsiosimd &fsio);
+	void texture2D(sampler2D sampler, Fsiosimd &fsio, __m128 &vS, __m128 &vT, __m128 vOut[]);
 
 private:
 	virtual void execute(fsInput& in, fsOutput& out);
@@ -299,6 +305,7 @@ public:
 	void DetachShader(Shader *pShader);
 	void LinkProgram();
 	int  GetUniformLocation(const std::string &name);
+	void* spGetUniformLocation(const std::string &name);
 
 	template <class T>
 	void UniformValue(int location, int count, const T *value);
@@ -348,6 +355,7 @@ public:
 
 	int GetUniformLocation(GLContext *gc, unsigned program, const char *name);
 	int GetAttribLocation(GLContext *gc, unsigned program, const char *name);
+	void* spGetUniformLocation(GLContext *gc, unsigned program, const char *name);
 
 	template <class T>
 	void UniformMatrix(GLContext *gc, int location, int count, bool transpose, const T *value);

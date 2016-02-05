@@ -9,11 +9,11 @@ namespace glsp {
 void GlspCamera::InitCamera(const glm::vec3 &position, const glm::vec3 &target, const glm::vec3 &up)
 {
     mCameraPosition = position;
-    mCameraTarget   = glm::normalize(target);
+    mCameraTarget   = glm::normalize(target - position);
     mCameraUp       = glm::normalize(up);
     mCameraRight    = glm::cross(mCameraTarget, mCameraUp);
     mViewMatrix     = glm::lookAt(mCameraPosition,
-                                mCameraTarget + mCameraPosition,
+                                target,
                                 mCameraUp);
 }
 

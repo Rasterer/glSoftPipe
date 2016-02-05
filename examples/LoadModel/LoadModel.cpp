@@ -74,9 +74,9 @@ public:
 private:
 	virtual void OnExecuteSIMD(Fsiosimd &fsio)
 	{
-		texture2D(mSampler, fsio);
+		texture2D(mSampler, fsio, fsio.mInRegs[moTexCoor], fsio.mInRegs[moTexCoor + 1], fsio.mOutRegs);
 
-		_MM_TRANSPOSE4_PS(fsio.mOutRegs[0], fsio.mOutRegs[1], fsio.mOutRegs[2], fsio.mOutRegs[3]);
+		_MM_TRANSPOSE4_PS(fsio.mOutRegs[mFragColor + 0], fsio.mOutRegs[mFragColor + 1], fsio.mOutRegs[mFragColor + 2], fsio.mOutRegs[mFragColor + 3]);
 	}
 
 private:
@@ -120,7 +120,7 @@ public:
 	~LoadModel();
 
 private:
-	virtual void onInit();
+	virtual bool onInit();
 	virtual void onRender();
 	virtual void onKeyPressed(unsigned long key);
 	virtual void onMouseLeftClickDown(int x, int y);
@@ -145,7 +145,7 @@ LoadModel::~LoadModel()
 	if (mShaderFactory) delete mShaderFactory;
 }
 
-void LoadModel::onInit()
+bool LoadModel::onInit()
 {
 	setWindowInfo(1280, 720, "LoadModel");
 
@@ -188,6 +188,8 @@ void LoadModel::onInit()
 
 	mMesh = new GlspMesh();
 	mMesh->LoadMesh(GLSP_ROOT "/assets/phoenix/phoenix_ugv.md2");
+
+	return true;
 }
 
 void LoadModel::onRender()

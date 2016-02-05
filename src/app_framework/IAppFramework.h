@@ -29,13 +29,13 @@ protected:
 	}
 
 private:
-	void Init()
+	bool Init()
 	{
-		onInit();
+		return onInit();
 	}
 	void Render();
 
-	virtual void onInit() { }
+	virtual bool onInit() { return true; }
 	virtual void onRender() { }
 	virtual void onKeyPressed(unsigned long) { }
 	virtual void onMouseLeftClickDown(int, int) { }

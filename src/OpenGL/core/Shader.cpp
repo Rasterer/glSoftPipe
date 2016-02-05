@@ -113,6 +113,11 @@ GLAPI GLboolean APIENTRY glIsShader (GLuint shader)
 	return gc->mPM.IsShader(gc, shader);
 }
 
+GLAPI void* APIENTRY glspGetUniformLocation(GLuint program, const GLchar *name)
+{
+	__GET_CONTEXT();
+	return gc->mPM.spGetUniformLocation(gc, program, name);
+}
 
 ShaderFactory::~ShaderFactory()
 {
@@ -293,10 +298,10 @@ void FragmentShader::execute(fsInput& in, fsOutput& out)
 	out.fragcolor() = vec4(0.0f, 255.0f, 0.0f, 255.0f);
 }
 
-void FragmentShader::texture2D(sampler2D sampler, Fsiosimd &fsio)
+void FragmentShader::texture2D(sampler2D sampler, Fsiosimd &fsio, __m128 &vS, __m128 &vT, __m128 vOut[])
 {
 	const Triangle *tri = static_cast<Triangle *>(fsio.m_priv0);
-	tri->mPrim.mDC->mTextures[sampler]->Texture2DSIMD(fsio.mInRegs[4], fsio.mInRegs[5], fsio.mOutRegs);
+	tri->mPrim.mDC->mTextures[sampler]->Texture2DSIMD(vS, vT, vOut);
 }
 
 void FragmentShader::finalize()
@@ -381,6 +386,21 @@ int Program::GetUniformLocation(const string &name)
 		return it->second;
 	else
 		return -1;
+}
+
+void* Program::spGetUniformLocation(const std::string &name)
+{
+	UniformMap::iterator it = mUniformMap.find(name);
+
+	if(it != mUniformMap.end())
+	{
+		Uniform & u = mUniformBlock[it->second];
+		return u.mPtr;
+	}
+	else
+	{
+		return nullptr;
+	}
 }
 
 ProgramMachine::ProgramMachine():
@@ -596,6 +616,18 @@ int ProgramMachine::GetAttribLocation(GLContext *gc, unsigned program, const cha
 		return -1;
 
 	return pProg->getVS()->GetInRegLocation(name);
+}
+
+void* ProgramMachine::spGetUniformLocation(GLContext *gc, unsigned program, const char *name)
+{
+	GLSP_UNREFERENCED_PARAM(gc);
+
+	Program *pProg = static_cast<Program *>(mProgramNameSpace.retrieveObject(program));
+
+	if(!pProg)
+		return nullptr;
+
+	return pProg->spGetUniformLocation(name);
 }
 
 } // namespace glsp

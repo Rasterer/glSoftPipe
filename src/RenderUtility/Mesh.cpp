@@ -113,6 +113,7 @@ bool GlspMesh::LoadMesh(const std::string& Filename)
         Ret = InitFromScene(pScene, Filename);
     }
     else {
+        printf("LoadMesh fail: %s\n", Importer.GetErrorString());
         assert(0);
     }
 
@@ -210,6 +211,7 @@ bool GlspMesh::InitMaterials(const aiScene* pScene, const std::string& Filename)
 
         // Load a white texture in case the model does not include its own texture
         if (!m_Textures[i]) {
+            printf("No bound texture, load a white texture.\n");
             m_Textures[i] = new GlspMaterials(GL_TEXTURE_2D, GLSP_ROOT "/assets/white.png");
 
             Ret = m_Textures[i]->Load();
@@ -219,23 +221,23 @@ bool GlspMesh::InitMaterials(const aiScene* pScene, const std::string& Filename)
     return Ret;
 }
 
-void GlspMesh::Render()
+void GlspMesh::Render(bool external_texture)
 {
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
-    //glEnableVertexAttribArray(2);
+    glEnableVertexAttribArray(2);
 
     for (unsigned int i = 0 ; i < m_Entries.size() ; i++) {
         glBindBuffer(GL_ARRAY_BUFFER, m_Entries[i].VB);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(GlspVertex), 0);
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(GlspVertex), (const GLvoid*)12);
-        //glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (const GLvoid*)20);
+        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(GlspVertex), (const GLvoid*)20);
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Entries[i].IB);
 
         const unsigned int MaterialIndex = m_Entries[i].MaterialIndex;
 
-        if (MaterialIndex < m_Textures.size() && m_Textures[MaterialIndex]) {
+        if (!external_texture && MaterialIndex < m_Textures.size() && m_Textures[MaterialIndex]) {
             m_Textures[MaterialIndex]->Bind(GL_TEXTURE0);
         }
 
@@ -244,7 +246,7 @@ void GlspMesh::Render()
 
     glDisableVertexAttribArray(0);
     glDisableVertexAttribArray(1);
-    //glDisableVertexAttribArray(2);
+    glDisableVertexAttribArray(2);
 }
 
 } // namespace glsp

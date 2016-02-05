@@ -68,7 +68,9 @@ bool IAppFramework::AttachApp(GlspApp *app)
 	// call this between InitDrawEngine and AFWCreateWindow because
 	// app's onInit will call into glsp render and will set window
 	// information for AFWCreateWindow.
-	mApp->Init();
+	ret = mApp->Init();
+	if (!ret)
+		return false;
 
 	return AFWCreateWindow(app->mWidth, app->mHeight, app->mName);
 }

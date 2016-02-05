@@ -52,7 +52,7 @@ public:
     ~GlspMesh();
 
     bool LoadMesh(const std::string& Filename);
-    virtual void Render();
+    virtual void Render(bool external_texture = false);
 
 private:
     bool InitFromScene(const aiScene* pScene, const std::string& Filename);

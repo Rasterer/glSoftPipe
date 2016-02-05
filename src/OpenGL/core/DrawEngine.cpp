@@ -381,6 +381,8 @@ void DrawEngine::prepareToDraw()
 	{
 		beginFrame(mGLContext);
 	}
+
+	mGLContext->mFBOM.GetDrawFBO()->SetHasPendingDrawCommand();
 }
 
 void DrawEngine::PerformClear(unsigned int mask)
@@ -434,7 +436,6 @@ void DrawEngine::emit(DrawContext *dc)
 
 bool DrawEngine::SwapBuffers(NWMBufferToDisplay *buf)
 {
-	linkRasterizerPipeStages();
 	Flush(true);
 
 	buf->addr   = mGLContext->mRT.pColorBuffer;
@@ -449,7 +450,10 @@ bool DrawEngine::SwapBuffers(NWMBufferToDisplay *buf)
 
 void DrawEngine::Flush(bool swap_buffer)
 {
-	mTBDR->FlushDisplayLists(swap_buffer);
+	linkRasterizerPipeStages();
+
+	bool depth_only = mGLContext->mFBOM.GetDrawFBO()->IsDepthOnly();
+	mTBDR->FlushDisplayLists(swap_buffer, depth_only);
 
 	DrawContext *dc = mDrawContextList;
 	while(dc)
@@ -466,6 +470,7 @@ void DrawEngine::Flush(bool swap_buffer)
 	}
 	mDrawContextList = NULL;
 	mDrawCount = 0;
+	mGLContext->mFBOM.GetDrawFBO()->ClearHasPendingDrawCommand();
 }
 
 bool glspCreateRender()

@@ -40,12 +40,14 @@ enum FBOAttachment
 	GLSP_INVALID_ATTACHMENT    = 0xFFFFFFFF,
 
 	// Default fbo
-	GLSP_FRONT_LEFT      = 0,
-	GLSP_FRONT_RIGHT     = 1,
-	GLSP_BACK_LEFT     = 2,
-	GLSP_BACK_RIGHT    = 3,
+	GLSP_FRONT_LEFT     = 0,
+	GLSP_FRONT_RIGHT    = 1,
+	GLSP_BACK_LEFT      = 2,
+	GLSP_BACK_RIGHT     = 3,
 	GLSP_DEPTH          = 4,
 	GLSP_STENCIL        = 5,
+
+	GLSP_DEFAULTFBO_COLOR_MASK = 0xF,
 #if 0
 	// alias
 	GLSP_BACK           = 0,
@@ -88,9 +90,14 @@ public:
 	void SetReadDrawBuffers(int mask, bool draw, bool append);
 	int  GetReadMask() const { return mReadMask; }
 	int  GetDrawMask() const { return mDrawMask; }
+	bool IsDepthOnly() const;
 
 	void DefaultFBOInitRenderTarget(int width, int height, int format);
 	bool ValidateFramebufferStatus(GLContext *gc);
+
+	bool HasPendingDrawCommand() const { return mHasPendingDrawCommand; }
+	void SetHasPendingDrawCommand()   { mHasPendingDrawCommand = true;  }
+	void ClearHasPendingDrawCommand() { mHasPendingDrawCommand = false; }
 
 private:
 	union {
@@ -99,8 +106,9 @@ private:
 		RenderTarget   mRenderTarget;
 	};
 
-	int mReadMask;
-	int mDrawMask;
+	int  mReadMask;
+	int  mDrawMask;
+	bool mHasPendingDrawCommand;
 };
 
 class FrameBufferObjectMachine

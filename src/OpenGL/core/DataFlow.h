@@ -10,7 +10,7 @@
 
 namespace glsp {
 
-#define MAX_SHADER_REGISTERS 16
+#define MAX_SHADER_REGISTERS 32
 
 struct DrawContext;
 

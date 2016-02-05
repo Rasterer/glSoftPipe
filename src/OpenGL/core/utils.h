@@ -37,17 +37,26 @@
 namespace glsp {
 
 template <int N>
-inline int fixedpoint_cast(float fp)
+static inline int fixedpoint_cast(float fp)
 {
 	return (int)(fp * N + 0.5f);
 }
 
 template <typename T>
-inline T clamp(T val, T l, T h)
+static inline T clamp(T val, T l, T h)
 {
 	return (val < l) ? l: (val > h) ? h: val;
 }
 
+static inline __m128 _simd_clamp_ps(__m128 &val, __m128 &min, __m128 &max)
+{
+	return _mm_min_ps(_mm_max_ps(val, min), max);
+}
+
+static inline __m128i _simd_clamp_epi32(__m128i &val, __m128i &min, __m128i &max)
+{
+	return _mm_min_epi32(_mm_max_epi32(val, min), max);
+}
 
 static inline __m128i MAWrapper(const __m128i &v, const __m128i &stride, const __m128i &h)
 {
@@ -67,6 +76,40 @@ static inline __m128 MAWrapper(const __m128 &v, const __m128 &stride, const __m1
 #else
 	return _mm_add_ps(_mm_mul_ps(v, stride), h);
 #endif
+}
+
+static inline __m128 length(__m128 &vX, __m128 &vY, __m128 &vZ)
+{
+	__m128 vSquareX = _mm_mul_ps(vX, vX);
+	__m128 vSquareY = _mm_mul_ps(vY, vY);
+	__m128 vSquareZ = _mm_mul_ps(vZ, vZ);
+	return _mm_sqrt_ps(_mm_add_ps(_mm_add_ps(vSquareX, vSquareY), vSquareZ));
+}
+
+static inline void normalize(__m128 &vX, __m128 &vY, __m128 &vZ)
+{
+	__m128 vLengthReciprocal = _mm_rcp_ps(length(vX, vY, vZ));
+	vX = _mm_mul_ps(vX, vLengthReciprocal);
+	vY = _mm_mul_ps(vY, vLengthReciprocal);
+	vZ = _mm_mul_ps(vZ, vLengthReciprocal);
+}
+
+static inline __m128 dot(__m128 &vX0, __m128 &vY0, __m128 &vZ0, __m128 &vX1, __m128 &vY1, __m128 &vZ1)
+{
+	__m128 vRes = _mm_mul_ps(vX0, vX1);
+	vRes = MAWrapper(vY0, vY1, vRes);
+	vRes = MAWrapper(vZ0, vZ1, vRes);
+	return vRes;
+}
+
+static inline void reflect(__m128 &vIncidentX, __m128 &vIncidentY, __m128 &vIncidentZ,
+			__m128 &vNormalX,   __m128 &vNormalY,   __m128 &vNormalZ,
+			__m128 &vReflectX,  __m128 &vReflectY,  __m128 &vReflectZ)
+{
+	__m128 vDotProduct = dot(vNormalX, vNormalY, vNormalZ, vIncidentX, vIncidentY, vIncidentZ);
+	vReflectX = _mm_sub_ps(vIncidentX, _mm_mul_ps(_mm_mul_ps(vDotProduct, vNormalX), _mm_set_ps1(2.0f)));
+	vReflectY = _mm_sub_ps(vIncidentY, _mm_mul_ps(_mm_mul_ps(vDotProduct, vNormalY), _mm_set_ps1(2.0f)));
+	vReflectZ = _mm_sub_ps(vIncidentZ, _mm_mul_ps(_mm_mul_ps(vDotProduct, vNormalZ), _mm_set_ps1(2.0f)));
 }
 
 } // namespace glsp

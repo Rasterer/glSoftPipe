@@ -2,6 +2,7 @@
 
 #include "GLContext.h"
 #include "Texture.h"
+#include "DrawEngine.h"
 
 
 namespace glsp {
@@ -179,16 +180,6 @@ void FrameBufferObjectMachine::BindFramebuffer(GLContext *gc, unsigned target, u
 	if(!framebuffer)
 	{
 		pFBO = &mDefaultFBO;
-		if (bBindReadFBO && mReadFBO != &mDefaultFBO)
-		{
-			mReadFBO->DecRef();
-			mReadFBO = &mDefaultFBO;
-		}
-		if (bBindDrawFBO && mDrawFBO != &mDefaultFBO)
-		{
-			mDrawFBO->DecRef();
-			mDrawFBO = &mDefaultFBO;
-		}
 	}
 	else
 	{
@@ -209,6 +200,11 @@ void FrameBufferObjectMachine::BindFramebuffer(GLContext *gc, unsigned target, u
 	}
 
 	assert(pFBO);
+
+	if (mDrawFBO->HasPendingDrawCommand())
+	{
+		DrawEngine::getDrawEngine().Flush(false);
+	}
 
 	if (bBindReadFBO)
 	{
@@ -239,8 +235,9 @@ unsigned char FrameBufferObjectMachine::IsFramebuffer(GLContext *, unsigned fram
 		return GL_FALSE;
 }
 
-static FBOAttachment GLAttachmentToInternal(unsigned attachment, bool is_default)
+static FBOAttachment GLAttachmentToInternal(unsigned attachment, bool is_default, bool &is_color)
 {
+	is_color = false;
 	FBOAttachment inter_attach = GLSP_INVALID_ATTACHMENT;
 
 	if (is_default)
@@ -253,6 +250,7 @@ static FBOAttachment GLAttachmentToInternal(unsigned attachment, bool is_default
 			case GL_BACK_RIGHT:
 			{
 				inter_attach = static_cast<FBOAttachment>((int)GLSP_FRONT_LEFT + (attachment - GL_FRONT_LEFT));
+				is_color = true;
 				break;
 			}
 			case GL_DEPTH:
@@ -293,14 +291,15 @@ static FBOAttachment GLAttachmentToInternal(unsigned attachment, bool is_default
 			case GL_COLOR_ATTACHMENT15:
 			{
 				inter_attach = static_cast<FBOAttachment>((int)GLSP_COLOR_ATTACHMENT0 + (attachment - GL_COLOR_ATTACHMENT0));
+				is_color = true;
 				break;
 			}
-			case GLSP_DEPTH_ATTACHMENT:
+			case GL_DEPTH_ATTACHMENT:
 			{
 				inter_attach = GLSP_DEPTH_ATTACHMENT;
 				break;
 			}
-			case GLSP_STENCIL_ATTACHMENT:
+			case GL_STENCIL_ATTACHMENT:
 			{
 				inter_attach = GLSP_STENCIL_ATTACHMENT;
 				break;
@@ -339,11 +338,12 @@ void FrameBufferObjectMachine::FramebufferTexture2D(GLContext *gc, unsigned targ
 	if (pFBO == &mDefaultFBO)
 		return;
 
-	FBOAttachment attach = GLAttachmentToInternal(attachment, false);
+	bool is_color;
+	FBOAttachment attach = GLAttachmentToInternal(attachment, false, is_color);
 	if (attach == GLSP_INVALID_ATTACHMENT)
 		return;
 
-	if (texture != GL_TEXTURE_2D)
+	if (textarget != GL_TEXTURE_2D)
 		return;
 
 	Texture *pTex;
@@ -391,9 +391,16 @@ void FrameBufferObjectMachine::SetReadDrawBuffers(GLContext *, int n, const unsi
 	bool is_default = (pFBO == &mDefaultFBO);
 	for (int i = 0; i < n; ++i)
 	{
-		FBOAttachment attach = GLAttachmentToInternal(bufs[i], is_default);
+		if (bufs[i] == GL_NONE)
+		{
+			pFBO->SetReadDrawBuffers(0, draw, false);
+			break;
+		}
 
-		if (attach == GLSP_INVALID_ATTACHMENT)
+		bool is_color;
+		FBOAttachment attach = GLAttachmentToInternal(bufs[i], is_default, is_color);
+
+		if (!is_color && attach == GLSP_INVALID_ATTACHMENT)
 		{
 			pFBO->SetReadDrawBuffers(previous_mask, draw, false);
 			return;
@@ -406,7 +413,8 @@ void FrameBufferObjectMachine::SetReadDrawBuffers(GLContext *, int n, const unsi
 
 FrameBufferObject::FrameBufferObject():
 	mReadMask(1 << GLSP_COLOR_ATTACHMENT0),
-	mDrawMask(1 << GLSP_COLOR_ATTACHMENT0)
+	mDrawMask(1 << GLSP_COLOR_ATTACHMENT0),
+	mHasPendingDrawCommand(false)
 {
 	memset(mAttachPoints, 0, sizeof(mAttachPoints));
 }
@@ -479,10 +487,7 @@ bool FrameBufferObject::ValidateFramebufferStatus(GLContext *gc)
 {
 	if (getName() == 0)
 	{
-		if (mDrawMask & (1 << GLSP_BACK_LEFT))
-			gc->mRT = mRenderTarget;
-		else
-			;// TODO:
+		gc->mRT = mRenderTarget;
 	}
 	else
 	{
@@ -645,6 +650,11 @@ void FrameBufferObject::SetReadDrawBuffers(int mask, bool draw, bool append)
 		else
 			mReadMask = mask;
 	}
+}
+
+bool FrameBufferObject::IsDepthOnly() const
+{
+	return !mDrawMask;
 }
 
 } // namespace glsp

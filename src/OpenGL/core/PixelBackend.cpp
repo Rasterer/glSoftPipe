@@ -3,7 +3,7 @@
 #include <glm/glm.hpp>
 #include "DataFlow.h"
 #include "GLContext.h"
-
+#include "utils.h"
 
 namespace glsp {
 
@@ -166,6 +166,7 @@ void FBWriter::onFBWritingSIMD(const Fsiosimd &fsio)
 	{
 		index = (g_GC->mRT.height - (fsio.y) - 1) * g_GC->mRT.width + fsio.x;
 		tmp   = _mm_cvtps_epi32(_mm_mul_ps(fsio.mOutRegs[0], _mm_set_ps1(256.0f)));
+		tmp   = _simd_clamp_epi32(tmp, _mm_setzero_si128(), _mm_set1_epi32(255));
 		tmp   = _mm_shuffle_epi8(tmp, mask);
 		colorBuffer[index] = _mm_cvtsi128_si32(tmp);;
 	}
@@ -175,6 +176,7 @@ void FBWriter::onFBWritingSIMD(const Fsiosimd &fsio)
 	{
 		index = (g_GC->mRT.height - (fsio.y) - 1) * g_GC->mRT.width + fsio.x + 1;
 		tmp   = _mm_cvtps_epi32(_mm_mul_ps(fsio.mOutRegs[1], _mm_set_ps1(256.0f)));
+		tmp   = _simd_clamp_epi32(tmp, _mm_setzero_si128(), _mm_set1_epi32(255));
 		tmp   = _mm_shuffle_epi8(tmp, mask);
 		colorBuffer[index] = _mm_cvtsi128_si32(tmp);;
 	}
@@ -184,6 +186,7 @@ void FBWriter::onFBWritingSIMD(const Fsiosimd &fsio)
 	{
 		index = (g_GC->mRT.height - (fsio.y + 1) - 1) * g_GC->mRT.width + fsio.x;
 		tmp   = _mm_cvtps_epi32(_mm_mul_ps(fsio.mOutRegs[2], _mm_set_ps1(256.0f)));
+		tmp   = _simd_clamp_epi32(tmp, _mm_setzero_si128(), _mm_set1_epi32(255));
 		tmp   = _mm_shuffle_epi8(tmp, mask);
 		colorBuffer[index] = _mm_cvtsi128_si32(tmp);;
 	}
@@ -193,6 +196,7 @@ void FBWriter::onFBWritingSIMD(const Fsiosimd &fsio)
 	{
 		index = (g_GC->mRT.height - (fsio.y + 1) - 1) * g_GC->mRT.width + fsio.x + 1;
 		tmp   = _mm_cvtps_epi32(_mm_mul_ps(fsio.mOutRegs[3], _mm_set_ps1(256.0f)));
+		tmp   = _simd_clamp_epi32(tmp, _mm_setzero_si128(), _mm_set1_epi32(255));
 		tmp   = _mm_shuffle_epi8(tmp, mask);
 		colorBuffer[index] = _mm_cvtsi128_si32(tmp);;
 	}
