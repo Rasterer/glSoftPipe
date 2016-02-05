@@ -439,9 +439,9 @@ bool ShadowMap::onInit()
 	point_light->SpecularIntensity = 0.6f;
 
 	vec3 *eye_pos = static_cast<vec3 *>(glspGetUniformLocation(mProg, "mEyePos"));
-	*eye_pos = vec3(-40.0f, 60.0f, 0.0f);
+	*eye_pos = vec3(0.0f, 60.0f, 0.0f);
 
-	mCamera.InitCamera(vec3(0.0f, 60.0f, 0.0f),
+	mCamera.InitCamera(*eye_pos,
 					vec3(0.0f, 0.0f, -100.0f),
 					vec3(0, 5, -3));
 

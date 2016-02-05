@@ -43,10 +43,11 @@ void VertexCachedFetcher::FetchVertex(DrawContext *dc)
 
 // NOTE: need to be multiple of 3.
 #define VERTEX_INDEX_STEP 66
-	for (int i = 0; i < dc->mCount; i += VERTEX_INDEX_STEP)
+	for (int v = 0; v < dc->mCount; v += VERTEX_INDEX_STEP)
 	{
-		auto vert_batch_handler = [this, i](void *data) mutable
+		auto vert_batch_handler = [this, v](void *data)
 		{
+			int i = v;
 			DrawContext *dc = static_cast<DrawContext *>(data);
 			GLContext *gc = dc->gc;
 

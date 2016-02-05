@@ -11,9 +11,9 @@ class Batch;
 class vertex_data;
 
 // TODO:
-// *.4 fixed point numbers conresponds to a 8096x8096 guard band.
-#define GUARDBAND_WIDTH  8096
-#define GUARDBAND_HEIGHT 8096
+// *.4 fixed point numbers conresponds to a 2048x2048 guard band.
+#define GUARDBAND_WIDTH  2048
+#define GUARDBAND_HEIGHT 2048
 
 class Clipper: public PipeStage
 {
