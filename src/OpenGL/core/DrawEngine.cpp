@@ -14,10 +14,10 @@
 #include "PixelBackend.h"
 #include "ThreadPool.h"
 #include "compiler.h"
+#include "khronos/GL/glspcorearb.h"
 
 
 namespace glsp {
-#include "khronos/GL/glcorearb.h"
 
 GLAPI void APIENTRY glDrawArrays (GLenum mode, GLint first, GLsizei count)
 {

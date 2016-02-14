@@ -19,6 +19,18 @@ INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src/app_framework)
 ADD_LIBRARY(app_framework STATIC ${APP_FW_SRC})
 
 IF(UNIX)
+
+# Workaround for glfw3 install path issue
+LIST(APPEND CMAKE_PREFIX_PATH /usr/lib64/cmake/glfw)
+FIND_PACKAGE(glfw3 3.1.1 REQUIRED)
+IF(glfw3_FOUND)
+	MESSAGE(STATUS      "Looking for glfw3 - found")
+ELSE(glfw3_FOUND)
+	MESSAGE(FATAL_ERROR "Looking for glfw3 - not found")
+ENDIF(glfw3_FOUND)
+INCLUDE_DIRECTORIES(${GLFW3_INCLUDE_DIR})
+TARGET_LINK_LIBRARIES(app_framework glsp_ogl glfw GLEW GL)
+
 ELSEIF(WIN32)
 TARGET_LINK_LIBRARIES(app_framework glsp_ogl d3d11 D3DCompiler)
 ENDIF(UNIX)

@@ -30,6 +30,9 @@ bool GlspMaterials::Load()
     glTexParameteri(m_textureTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(m_textureTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
+	m_blob.update(nullptr, 0);
+	delete m_pImage;
+
     return true;
 }
 
@@ -194,7 +197,19 @@ bool GlspMesh::InitMaterials(const aiScene* pScene, const std::string& Filename)
             aiString Path;
 
             if (pMaterial->GetTexture(aiTextureType_DIFFUSE, 0, &Path, NULL, NULL, NULL, NULL, NULL) == AI_SUCCESS) {
-                std::string FullPath = Dir + "/" + Path.data;
+				char *back_slash;
+				while ((back_slash = strchr(Path.data, '\\')))
+				{
+					*back_slash = '/';
+				}
+
+				std::string p(Path.data);
+
+				if (p.substr(0, 2) == "./")
+					p = p.substr(2, p.size() - 2);
+
+
+                std::string FullPath = Dir + "/" + p;
 				m_Textures[i] = new GlspMaterials(GL_TEXTURE_2D, FullPath);
 
                 if (!m_Textures[i]->Load()) {

@@ -1,12 +1,14 @@
+#include "INativeWindowManager.h"
+
 #include <cassert>
 #include <cstring>
 
 #include <windows.h>
+#include <Windowsx.h>
 #include <d3d11.h>
 #include <D3Dcompiler.h>
 
-#include "INativeWindowManager.h"
-#include "WinAppFramework.h"
+#include "IAppFramework.h"
 #include "glsp_defs.h"
 #include "glsp_debug.h"
 
@@ -21,17 +23,17 @@ public:
 
 	virtual bool NWMCreateWindow(int w, int h, const char *name);
 	virtual void NWMDestroyWindow();
+    virtual void EnterLoop();
 	virtual void GetWindowInfo(NWMWindowInfo *win_info);
 	virtual bool DisplayFrame(NWMBufferToDisplay *buf);
+
+    LRESULT WinWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 private:
 	bool InitD3DDevice();
 	void DeinitD3DDevice();
 
 	HWND                      mWND;
-	int                       mWNDWidth;
-	int                       mWNDHeight;
-	const char               *mWNDName;
 
 	D3D_FEATURE_LEVEL         mFeatureLevel;
 	ID3D11Device             *mDevice;
@@ -61,7 +63,7 @@ static const char vs_source[] =
 	"void VSMain(in VS_INPUT input, out VS_OUTPUT output) \n"
 	"{ \n"
 	"	output.pos = float4(input.pos, 0.0f ,1.0f); \n"
-	"	output.tex = float2(float2(input.pos.x, -input.pos.y) * 0.5f + 0.5f); \n"
+	"	output.tex = input.pos * 0.5f + 0.5f; \n"
 	"} \n";
 
 static const char ps_source[] =
@@ -94,10 +96,34 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
         break;
 
     default:
-        WinAppFramework *app_framwork =
-            static_cast<WinAppFramework *>(INativeWindowManager::get()->GetAppFramework());
+        D3DNativeWindowManager *nwm =
+            static_cast<D3DNativeWindowManager *>(INativeWindowManager::get());
 
-        return app_framwork->WinWndProc(hWnd, message, wParam, lParam);
+        return nwm->WinWndProc(hWnd, message, wParam, lParam);
+    }
+
+    return 0;
+}
+
+LRESULT D3DNativeWindowManager::WinWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+/*    case WM_PAINT:
+        hdc = ::BeginPaint(hWnd, &ps);
+        ::EndPaint(hWnd, &ps);
+        break;*/
+    case WM_KEYDOWN:
+    {
+        mAppFramework->onKeyPressed(wParam);
+        break;
+    }
+    case WM_LBUTTONDOWN:
+    {
+        mAppFramework->onMouseLeftClickDown(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+    }
+    default:
+        return ::DefWindowProc(hWnd, message, wParam, lParam);
     }
 
     return 0;
@@ -105,9 +131,6 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 
 D3DNativeWindowManager::D3DNativeWindowManager():
 	mWND(nullptr),
-	mWNDWidth(0),
-	mWNDHeight(0),
-	mWNDName(nullptr),
 	mDevice(nullptr),
 	mFeatureLevel(D3D_FEATURE_LEVEL_11_0),
 	mDeviceContext(nullptr),
@@ -149,10 +172,6 @@ bool D3DNativeWindowManager::NWMCreateWindow(int w, int h, const char *name)
 	wcex.hIconSm = ::LoadIcon(nullptr, IDI_APPLICATION);
 	if (!::RegisterClassEx(&wcex))
 		return false;
-
-	mWNDWidth  = w;
-	mWNDHeight = h;
-	mWNDName   = name;
 
 	::RECT rc = {0, 0, w, h};
 	::AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
@@ -356,6 +375,26 @@ void D3DNativeWindowManager::GetWindowInfo(NWMWindowInfo *win_info)
 	win_info->width  = mWNDWidth;
 	win_info->height = mWNDHeight;
 	win_info->format = DXGI_FORMAT_R8G8B8A8_UNORM;
+}
+
+void D3DNativeWindowManager::EnterLoop()
+{
+    // Main message loop
+	IAppFramework *app_framework = GetAppFramework();
+
+    MSG msg = {0};
+    while(WM_QUIT != msg.message)
+    {
+        if(::PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+        {
+            ::TranslateMessage(&msg );
+            ::DispatchMessage( &msg );
+        }
+        else
+        {
+            app_framework->Render();
+        }
+    }
 }
 
 bool D3DNativeWindowManager::DisplayFrame(NWMBufferToDisplay *buf)

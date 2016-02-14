@@ -6,10 +6,10 @@
 
 #include "NameSpace.h"
 #include "compiler.h"
+#include "khronos/GL/glspcorearb.h"
 
 
 namespace glsp {
-#include "khronos/GL/glcorearb.h"
 
 #define MAX_TEXTURE_UNITS 4
 #define MAX_TEXTURE_MIPMAP_LEVELS 6

@@ -6,6 +6,8 @@
 #include "Rasterizer.h"
 #include "Texture.h"
 #include "TBDR.h"
+#include "khronos/GL/glspcorearb.h"
+
 
 using std::string;
 using std::type_info;
@@ -13,8 +15,8 @@ using glm::vec4;
 using glm::vec2;
 using glm::mat4;
 
+
 namespace glsp {
-#include "khronos/GL/glcorearb.h"
 
 
 GLAPI GLuint APIENTRY glCreateShader (GLenum type)
@@ -271,7 +273,7 @@ void FragmentShader::emit(void *data)
 void FragmentShader::ExecuteSISD(void *data)
 {
 	Fsio &fsio = *static_cast<Fsio *>(data);
-	const Triangle *tri = static_cast<Triangle *>(fsio.m_priv0);
+	//const Triangle *tri = static_cast<Triangle *>(fsio.m_priv0);
 
 	fsio.out.resize(getOutRegsNum());
 
@@ -281,7 +283,7 @@ void FragmentShader::ExecuteSISD(void *data)
 void FragmentShader::ExecuteSIMD(void *data)
 {
 	Fsiosimd &fsio = *static_cast<Fsiosimd *>(data);
-	const Triangle *tri = static_cast<Triangle *>(fsio.m_priv0);
+	//const Triangle *tri = static_cast<Triangle *>(fsio.m_priv0);
 
 	OnExecuteSIMD(fsio);
 }
@@ -404,6 +406,9 @@ void* Program::spGetUniformLocation(const std::string &name)
 }
 
 ProgramMachine::ProgramMachine():
+	mProgramNameSpace("Program"),
+	mShaderNameSpace("Shader"),
+	mProgramPipelineNameSpace("ProgramPipeline"),
 	mCurrentProgram(NULL)
 {
 }

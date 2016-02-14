@@ -5,12 +5,12 @@
 #include "BufferObject.h"
 #include "GLContext.h"
 #include "glsp_debug.h"
+#include "khronos/GL/glspcorearb.h"
 
 
 using namespace std;
 
 namespace glsp {
-#include "khronos/GL/glcorearb.h"
 
 GLAPI void APIENTRY glGenBuffers (GLsizei n, GLuint *buffers)
 {
@@ -50,7 +50,8 @@ BufferObject::BufferObject():
 }
 
 
-BufferObjectMachine::BufferObjectMachine()
+BufferObjectMachine::BufferObjectMachine():
+	mNameSpace("BufferObject")
 {
 	memset(mBindings, 0, sizeof(mBindings));
 }

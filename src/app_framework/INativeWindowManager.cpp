@@ -26,6 +26,14 @@ void INativeWindowManager::release()
 	}
 }
 
+INativeWindowManager::INativeWindowManager():
+	mAppFramework(nullptr),
+	mWNDWidth(0),
+	mWNDHeight(0),
+	mWNDName(nullptr)
+{
+}
+
 bool INativeWindowManager::InitDrawEngine()
 {
 	// Create our glSoftPipe render.
@@ -42,6 +50,10 @@ void INativeWindowManager::FinishFrame()
 
 bool INativeWindowManager::NWMCreateWindow(int width, int height, const char *name)
 {
+	mWNDWidth  = width;
+	mWNDHeight = height;
+	mWNDName   = name;
+
 	// TODO: pass format
 	NWMWindowInfo win_info = {width, height, 0};
 	glspSetNativeWindowInfo(&win_info);

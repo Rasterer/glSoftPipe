@@ -2,7 +2,6 @@
 
 #include <cassert>
 
-
 namespace glsp {
 
 IAppFramework* IAppFramework::sAppFramework(nullptr);
@@ -17,8 +16,18 @@ void GlspApp::run()
 		return;
 	}
 
-	app_fw->EnterLoop();
+	INativeWindowManager::get()->EnterLoop();
 	IAppFramework::close();
+}
+
+bool GlspApp::Init()
+{
+	bool ret = onInit();
+
+	if (mWidth <= 0 || mHeight <= 0 || !mName)
+		ret = false;
+
+	return ret;
 }
 
 void GlspApp::Render()

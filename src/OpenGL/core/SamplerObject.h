@@ -1,10 +1,10 @@
 #pragma once
 
 #include "NameSpace.h"
+#include "khronos/GL/glspcorearb.h"
 
 
 namespace glsp {
-#include "khronos/GL/glcorearb.h"
 
 struct SamplerObject: public NameItem
 {

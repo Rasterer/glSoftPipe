@@ -2,23 +2,19 @@
 
 #include "IAppFramework.h"
 
-#include <windows.h>
-
 namespace glsp {
 
-class WinAppFramework: public IAppFramework
+class GLFWAppFramework: public IAppFramework
 {
 public:
-    WinAppFramework() = default;
-    virtual ~WinAppFramework() = default;
+    GLFWAppFramework() = default;
+    virtual ~GLFWAppFramework() = default;
 
     //virtual void* GetAppHandle(GlspApp *app);
     //virtual void EventDispatch();
 
 private:
     virtual bool AFWCreateWindow(int w, int h, const char *name);
-
-    HINSTANCE mAppInstance;
 };
 
 

@@ -1,12 +1,14 @@
 #include "FrameBufferObject.h"
 
+#include <cstring>
+
 #include "GLContext.h"
 #include "Texture.h"
 #include "DrawEngine.h"
+#include "khronos/GL/glspcorearb.h"
 
 
 namespace glsp {
-#include "khronos/GL/glcorearb.h"
 
 GLAPI GLboolean APIENTRY glIsFramebuffer (GLuint framebuffer)
 {
@@ -98,6 +100,7 @@ GLAPI void APIENTRY glDrawBuffers (GLsizei n, const GLenum *bufs)
 }
 
 FrameBufferObjectMachine::FrameBufferObjectMachine():
+	mNameSpace("FrameBufferObject"),
 	mReadFBO(&mDefaultFBO),
 	mDrawFBO(&mDefaultFBO)
 {
@@ -416,7 +419,7 @@ FrameBufferObject::FrameBufferObject():
 	mDrawMask(1 << GLSP_COLOR_ATTACHMENT0),
 	mHasPendingDrawCommand(false)
 {
-	memset(mAttachPoints, 0, sizeof(mAttachPoints));
+	std::memset(mAttachPoints, 0, sizeof(mAttachPoints));
 }
 
 FrameBufferObject::~FrameBufferObject()
@@ -464,6 +467,8 @@ void FrameBufferObject::FramebufferTexture2D(FBOAttachment attach, Texture *tex,
 	if (attach == GLSP_DEPTH_ATTACHMENT && tex->GetFormat() != GL_DEPTH_COMPONENT)
 		return;
 
+	pMipmap->mpTex->IncRef();
+
 	FBOAttachPoint &attach_point = mAttachPoints[attach];
 	if (attach_point.attachment)
 	{
@@ -501,13 +506,13 @@ bool FrameBufferObject::ValidateFramebufferStatus(GLContext *gc)
 				{
 					TextureMipmap* pCurrentMipmap = static_cast<TextureMipmap *>(attach_point.attachment);
 
-					if (width != 0 && width != pCurrentMipmap->mWidth)
+					if (width != 0 && (unsigned)width != pCurrentMipmap->mWidth)
 					{
 						width = 0;
 						break;
 					}
 
-					if (height != 0 && height != pCurrentMipmap->mWidth)
+					if (height != 0 && (unsigned)height != pCurrentMipmap->mWidth)
 					{
 						height = 0;
 						break;

@@ -1110,6 +1110,7 @@ bool Texture::ValidateState()
 
 
 TextureMachine::TextureMachine():
+	mNameSpace("Texture"),
 	mActiveTextureUnit(0),
 	mDefaultTexture(TEXTURE_TARGET_UNBOUND)
 {
@@ -1220,7 +1221,7 @@ static bool TexImage2DValidateParams(unsigned target, int internalformat, unsign
 			return false;
 		}
 
-		if (format != internalformat)
+		if (format != (unsigned)internalformat)
 		{
 			return false;
 		}

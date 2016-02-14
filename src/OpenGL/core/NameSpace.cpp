@@ -6,7 +6,18 @@
 
 namespace glsp {
 
-NameSpace::NameSpace()
+NameItem::NameItem():
+	mName(0),
+	mRefCount(1)
+{
+}
+
+NameItem::~NameItem()
+{
+}
+
+NameSpace::NameSpace(const char *name):
+	mName(name)
 {
 	// Zero was reserved by default
 	NameBlock	nb;

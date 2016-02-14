@@ -15,6 +15,7 @@
 #include "Shader.h"
 #include "Mesh.h"
 #include "Camera.h"
+#include "khronos/GL/glspcorearb.h"
 
 
 using namespace std;
@@ -22,7 +23,6 @@ using namespace glm;
 
 
 namespace glsp {
-#include "khronos/GL/glcorearb.h"
 
 class simpleVertexShader: public VertexShader
 {
@@ -189,6 +189,7 @@ bool LoadModel::onInit()
 	mMesh = new GlspMesh();
 	mMesh->LoadMesh(GLSP_ROOT "/assets/phoenix/phoenix_ugv.md2");
 
+	mScalar = 0.0f;
 	return true;
 }
 
@@ -215,7 +216,7 @@ void LoadModel::onKeyPressed(unsigned long key)
 
 void LoadModel::onMouseLeftClickDown(int x, int y)
 {
-	//printf("Mouse left click: %d %d", x, y);
+	//printf("Mouse left click: %d %d\n", x, y);
 }
 
 

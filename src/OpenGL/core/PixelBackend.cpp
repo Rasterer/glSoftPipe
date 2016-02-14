@@ -51,7 +51,7 @@ bool ZTester::onDepthTesting(const Fsio &fsio)
 
 bool ZTester::onDepthTestingSIMD(Fsiosimd &fsio)
 {
-	const int &index0 = (g_GC->mRT.height - (fsio.y) - 1) * g_GC->mRT.width + fsio.x;
+	const int &index0 = fsio.y * g_GC->mRT.width + fsio.x;
 	const int &index1 = index0 + 1;
 	const int &index2 = index0 - g_GC->mRT.width;
 	const int &index3 = index2 + 1;
@@ -164,7 +164,7 @@ void FBWriter::onFBWritingSIMD(const Fsiosimd &fsio)
 	// left-bottom pixel
 	if (fsio.mCoverageMask & 1)
 	{
-		index = (g_GC->mRT.height - (fsio.y) - 1) * g_GC->mRT.width + fsio.x;
+		index = fsio.y * g_GC->mRT.width + fsio.x;
 		tmp   = _mm_cvtps_epi32(_mm_mul_ps(fsio.mOutRegs[0], _mm_set_ps1(256.0f)));
 		tmp   = _simd_clamp_epi32(tmp, _mm_setzero_si128(), _mm_set1_epi32(255));
 		tmp   = _mm_shuffle_epi8(tmp, mask);
@@ -174,7 +174,7 @@ void FBWriter::onFBWritingSIMD(const Fsiosimd &fsio)
 	// right-bottom pixel
 	if (fsio.mCoverageMask & 2)
 	{
-		index = (g_GC->mRT.height - (fsio.y) - 1) * g_GC->mRT.width + fsio.x + 1;
+		index = fsio.y * g_GC->mRT.width + fsio.x + 1;
 		tmp   = _mm_cvtps_epi32(_mm_mul_ps(fsio.mOutRegs[1], _mm_set_ps1(256.0f)));
 		tmp   = _simd_clamp_epi32(tmp, _mm_setzero_si128(), _mm_set1_epi32(255));
 		tmp   = _mm_shuffle_epi8(tmp, mask);
@@ -184,7 +184,7 @@ void FBWriter::onFBWritingSIMD(const Fsiosimd &fsio)
 	// left-top pixel
 	if (fsio.mCoverageMask & 4)
 	{
-		index = (g_GC->mRT.height - (fsio.y + 1) - 1) * g_GC->mRT.width + fsio.x;
+		index = fsio.y * g_GC->mRT.width + fsio.x;
 		tmp   = _mm_cvtps_epi32(_mm_mul_ps(fsio.mOutRegs[2], _mm_set_ps1(256.0f)));
 		tmp   = _simd_clamp_epi32(tmp, _mm_setzero_si128(), _mm_set1_epi32(255));
 		tmp   = _mm_shuffle_epi8(tmp, mask);
@@ -194,7 +194,7 @@ void FBWriter::onFBWritingSIMD(const Fsiosimd &fsio)
 	// right-top pixel
 	if (fsio.mCoverageMask & 8)
 	{
-		index = (g_GC->mRT.height - (fsio.y + 1) - 1) * g_GC->mRT.width + fsio.x + 1;
+		index = fsio.y * g_GC->mRT.width + fsio.x + 1;
 		tmp   = _mm_cvtps_epi32(_mm_mul_ps(fsio.mOutRegs[3], _mm_set_ps1(256.0f)));
 		tmp   = _simd_clamp_epi32(tmp, _mm_setzero_si128(), _mm_set1_epi32(255));
 		tmp   = _mm_shuffle_epi8(tmp, mask);

@@ -10,10 +10,9 @@
 #include "DrawEngine.h"
 #include "VertexArrayObject.h"
 #include "ThreadPool.h"
-
+#include "khronos/GL/glspcorearb.h"
 
 namespace glsp {
-#include "khronos/GL/glcorearb.h"
 
 
 using glm::vec4;

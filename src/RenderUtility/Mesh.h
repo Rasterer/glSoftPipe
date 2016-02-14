@@ -7,10 +7,10 @@
 #include <assimp/postprocess.h> // Post processing flags
 #include <glm/glm.hpp>
 #include <Magick++.h>
+#include "khronos/GL/glspcorearb.h"
 
 
 namespace glsp {
-#include "khronos/GL/glcorearb.h"
 
 class GlspMaterials
 {
@@ -52,7 +52,7 @@ public:
     ~GlspMesh();
 
     bool LoadMesh(const std::string& Filename);
-    virtual void Render(bool external_texture = false);
+    void Render(bool external_texture = false);
 
 private:
     bool InitFromScene(const aiScene* pScene, const std::string& Filename);

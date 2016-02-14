@@ -7,17 +7,17 @@
 
 namespace glsp {
 
+class NameSpace;
+
 class NameItem
 {
 public:
-	NameItem():
-		mName(0),
-		mRefCount(1)
-	{ }
-	virtual ~NameItem() { }
+	NameItem();
+	virtual ~NameItem();
 
 	// accessors
-	unsigned getName() const { return mName; }
+	unsigned int getName() const { return mName; }
+	unsigned int getRefCount() const { return mRefCount; }
 
 	// mutators
 	void setName(unsigned name) { mName = name; }
@@ -51,7 +51,7 @@ struct NameBlock
 class NameSpace
 {
 public:
-	NameSpace();
+	NameSpace(const char *name);
 	virtual ~NameSpace();
 
 	bool genNames(unsigned n, unsigned *pNames);
@@ -69,6 +69,8 @@ private:
 
 	NameHashTable_t	mNameHashTable;
 	NameBlockList_t	mNameBlockLists;
+
+	const char *mName;
 };
 
 } // namespace glsp

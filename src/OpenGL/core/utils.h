@@ -48,12 +48,12 @@ static inline T clamp(T val, T l, T h)
 	return (val < l) ? l: (val > h) ? h: val;
 }
 
-static inline __m128 _simd_clamp_ps(__m128 &val, __m128 &min, __m128 &max)
+static inline __m128 _simd_clamp_ps(__m128 val, __m128 min, __m128 max)
 {
 	return _mm_min_ps(_mm_max_ps(val, min), max);
 }
 
-static inline __m128i _simd_clamp_epi32(__m128i &val, __m128i &min, __m128i &max)
+static inline __m128i _simd_clamp_epi32(__m128i val, __m128i min, __m128i max)
 {
 	return _mm_min_epi32(_mm_max_epi32(val, min), max);
 }

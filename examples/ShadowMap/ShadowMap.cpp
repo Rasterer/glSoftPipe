@@ -16,6 +16,7 @@
 #include "Mesh.h"
 #include "Camera.h"
 #include "utils.h"
+#include "khronos/GL/glspcorearb.h"
 
 
 using namespace std;
@@ -23,8 +24,6 @@ using namespace glm;
 
 
 namespace glsp {
-#include "khronos/GL/glcorearb.h"
-
 
 class simpleVertexShader: public VertexShader
 {

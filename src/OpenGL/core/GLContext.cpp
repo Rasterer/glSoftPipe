@@ -1,12 +1,14 @@
 #include "GLContext.h"
 
+#include <cstring>
+
 #include "DrawEngine.h"
 #include "Clipper.h"
 #include "glsp_debug.h"
+#include "khronos/GL/glspcorearb.h"
 
 
 namespace glsp {
-#include "khronos/GL/glcorearb.h"
 
 GLAPI void APIENTRY glViewport (GLint x, GLint y, GLsizei width, GLsizei height)
 {

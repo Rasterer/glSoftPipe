@@ -2,10 +2,10 @@
 
 #include "BufferObject.h"
 #include "GLContext.h"
+#include "khronos/GL/glspcorearb.h"
 
 
 namespace glsp {
-#include "khronos/GL/glcorearb.h"
 
 
 GLAPI void APIENTRY glGenVertexArrays (GLsizei n, GLuint *arrays)
@@ -77,7 +77,8 @@ VertexArrayObject::VertexArrayObject():
 	mBoundElementBuffer.mBO = nullptr;
 }
 
-VAOMachine::VAOMachine()
+VAOMachine::VAOMachine():
+	mNameSpace("VertexArrayObject")
 {
 	mDefaultVAO.setName(0);
 	mActiveVAO = &mDefaultVAO;

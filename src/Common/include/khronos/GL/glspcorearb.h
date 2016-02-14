@@ -1,10 +1,6 @@
 #ifndef __glcorearb_h_
 #define __glcorearb_h_ 1
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /*
 ** Copyright (c) 2013-2014 The Khronos Group Inc.
 **
@@ -53,6 +49,10 @@ extern "C" {
 #define GLAPI extern
 #endif
 
+#ifndef GL_GLEXT_PROTOTYPES
+#define GL_GLEXT_PROTOTYPES
+#endif
+
 /* glcorearb.h is for use with OpenGL core profile implementations.
 ** It should should be placed in the same directory as gl.h and
 ** included as <GL/glcorearb.h>.
@@ -76,6 +76,8 @@ extern "C" {
  * Additional extensions included: _nomatch_^
  * Extensions removed: _nomatch_^
  */
+
+namespace glsp {
 
 #ifndef GL_VERSION_1_0
 #define GL_VERSION_1_0 1
@@ -3589,8 +3591,6 @@ GLAPI void APIENTRY glTexPageCommitmentARB (GLenum target, GLint level, GLint xo
 #define GL_KHR_texture_compression_astc_ldr 1
 #endif /* GL_KHR_texture_compression_astc_ldr */
 
-#ifdef __cplusplus
-}
-#endif
+} // namespace glsp
 
 #endif

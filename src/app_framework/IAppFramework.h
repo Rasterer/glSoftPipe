@@ -1,5 +1,6 @@
 #pragma once
 
+#include "compiler.h"
 #include "INativeWindowManager.h"
 
 namespace glsp {
@@ -29,10 +30,7 @@ protected:
 	}
 
 private:
-	bool Init()
-	{
-		return onInit();
-	}
+	bool Init();
 	void Render();
 
 	virtual bool onInit() { return true; }
@@ -57,16 +55,13 @@ public:
 	virtual ~IAppFramework();
 
 	bool AttachApp(GlspApp *app);
-
-	//virtual void* GetAppHandle(GlspApp *app) = 0;
-	virtual void EnterLoop() = 0;
-	//virtual void EventDispatch() = 0;
-
-protected:
 	void Render() { mApp->Render(); }
 	void onKeyPressed(unsigned long key) { mApp->onKeyPressed(key); }
 	void onMouseLeftClickDown(int x, int y) { mApp->onMouseLeftClickDown(x, y); }
+	//virtual void* GetAppHandle(GlspApp *app) = 0;
+	//virtual void EventDispatch() = 0;
 
+protected:
 	INativeWindowManager *mNWM;
 	GlspApp              *mApp;
 	void                 *mAppHandle;

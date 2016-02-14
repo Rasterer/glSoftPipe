@@ -1397,7 +1397,7 @@ void TBDR::FineRasterizing(int x, int y)
 	{
 		for (int j = 0; j < MACRO_TILE_SIZE; ++j)
 		{
-			const int &index = (g_GC->mRT.height - (y + i) - 1) * g_GC->mRT.width + x + j;
+			const int &index = (y + i) * g_GC->mRT.width + x + j;
 
 			if (pp_map[i][j] && z_buf[i][j] < g_GC->mRT.pDepthBuffer[index])
 			{
@@ -1414,7 +1414,7 @@ void TBDR::RenderOnePixel(Triangle *tri, int x, int y, float z)
 	fsio.x = x;
 	fsio.y = y;
 	fsio.z = z;
-	fsio.mIndex  = (g_GC->mRT.height - y - 1) * g_GC->mRT.width + x;
+	fsio.mIndex  = y * g_GC->mRT.width + x;
 	fsio.m_priv0 = tri;
 	fsio.in.resize(tri->mPrim.mVert[0].getRegsNum());
 
