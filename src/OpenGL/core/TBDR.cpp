@@ -166,13 +166,13 @@ void Binning::SetupTriangleSIMD(Triangle *tri0, Triangle *tri1, Triangle *tri2, 
 	/* Fixed point rasterization algorithm
 	 * FXIME: it's possible to overflow integer's range in current guard band setting.
 	 */
-	_MM_SET_ROUNDING_MODE(_MM_ROUND_NEAREST);
-	__m128i vX0 = _mm_cvtps_epi32(_mm_mul_ps(vX0f, vSubpixelsf));
-	__m128i vY0 = _mm_cvtps_epi32(_mm_mul_ps(vY0f, vSubpixelsf));
-	__m128i vX1 = _mm_cvtps_epi32(_mm_mul_ps(vX1f, vSubpixelsf));
-	__m128i vY1 = _mm_cvtps_epi32(_mm_mul_ps(vY1f, vSubpixelsf));
-	__m128i vX2 = _mm_cvtps_epi32(_mm_mul_ps(vX2f, vSubpixelsf));
-	__m128i vY2 = _mm_cvtps_epi32(_mm_mul_ps(vY2f, vSubpixelsf));
+	const __m128  vOneHalf = _mm_set_ps1(0.5f);
+	__m128i vX0 = _mm_cvtps_epi32(_mm_add_ps(_mm_mul_ps(vX0f, vSubpixelsf), vOneHalf));
+	__m128i vY0 = _mm_cvtps_epi32(_mm_add_ps(_mm_mul_ps(vY0f, vSubpixelsf), vOneHalf));
+	__m128i vX1 = _mm_cvtps_epi32(_mm_add_ps(_mm_mul_ps(vX1f, vSubpixelsf), vOneHalf));
+	__m128i vY1 = _mm_cvtps_epi32(_mm_add_ps(_mm_mul_ps(vY1f, vSubpixelsf), vOneHalf));
+	__m128i vX2 = _mm_cvtps_epi32(_mm_add_ps(_mm_mul_ps(vX2f, vSubpixelsf), vOneHalf));
+	__m128i vY2 = _mm_cvtps_epi32(_mm_add_ps(_mm_mul_ps(vY2f, vSubpixelsf), vOneHalf));
 
 	__m128i vX1X0 = _mm_sub_epi32(vX1, vX0);
 	__m128i vX2X1 = _mm_sub_epi32(vX2, vX1);

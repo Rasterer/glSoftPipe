@@ -938,22 +938,82 @@ void Texture::Texture2DSIMD(const __m128 &s, const __m128 &t, __m128 out[])
 	const TextureMipmap *pMipmap = getMipmap(0, 0);
 
 	// OPT: use _mm_cvtps_epi32 with round mode specified
-	__m128 vTexSpaceS = MAWrapper(s, _mm_set1_ps((float)pMipmap->mWidth), _mm_set1_ps(-0.5f));
-	__m128 vTexSpaceT = MAWrapper(t, _mm_set1_ps((float)pMipmap->mHeight), _mm_set1_ps(-0.5f));
-	__m128i vS0 = _mm_cvtps_epi32(_mm_floor_ps(vTexSpaceS));
-	__m128i vT0 = _mm_cvtps_epi32(_mm_floor_ps(vTexSpaceT));
-	__m128i vS1 = _mm_add_epi32(vS0, _mm_set1_epi32(1));
-	__m128i vT1 = _mm_add_epi32(vT0, _mm_set1_epi32(1));
+	// Clamp to Edge
+	//__m128 vTexSpaceS = MAWrapper(s, _mm_set1_ps((float)pMipmap->mWidth), _mm_set1_ps(-0.5f));
+	//__m128 vTexSpaceT = MAWrapper(t, _mm_set1_ps((float)pMipmap->mHeight), _mm_set1_ps(-0.5f));
+	//__m128i vS0 = _mm_cvtps_epi32(_mm_floor_ps(vTexSpaceS));
+	//__m128i vT0 = _mm_cvtps_epi32(_mm_floor_ps(vTexSpaceT));
+	//__m128i vS1 = _mm_add_epi32(vS0, _mm_set1_epi32(1));
+	//__m128i vT1 = _mm_add_epi32(vT0, _mm_set1_epi32(1));
 
-	vS0 = _mm_min_epi32(_mm_max_epi32(vS0, _mm_setzero_si128()), _mm_set1_epi32(pMipmap->mWidth - 1));
-	vT0 = _mm_min_epi32(_mm_max_epi32(vT0, _mm_setzero_si128()), _mm_set1_epi32(pMipmap->mHeight - 1));
-	vS1 = _mm_min_epi32(_mm_max_epi32(vS1, _mm_setzero_si128()), _mm_set1_epi32(pMipmap->mWidth - 1));
-	vT1 = _mm_min_epi32(_mm_max_epi32(vT1, _mm_setzero_si128()), _mm_set1_epi32(pMipmap->mHeight - 1));
+	//vS0 = _mm_min_epi32(_mm_max_epi32(vS0, _mm_setzero_si128()), _mm_set1_epi32(pMipmap->mWidth - 1));
+	//vT0 = _mm_min_epi32(_mm_max_epi32(vT0, _mm_setzero_si128()), _mm_set1_epi32(pMipmap->mHeight - 1));
+	//vS1 = _mm_min_epi32(_mm_max_epi32(vS1, _mm_setzero_si128()), _mm_set1_epi32(pMipmap->mWidth - 1));
+	//vT1 = _mm_min_epi32(_mm_max_epi32(vT1, _mm_setzero_si128()), _mm_set1_epi32(pMipmap->mHeight - 1));
+	//__m128 vScale_s      = _mm_sub_ps(vTexSpaceS, _mm_floor_ps(vTexSpaceS));
+	//__m128 vScale_t      = _mm_sub_ps(vTexSpaceT, _mm_floor_ps(vTexSpaceT));
+	//__m128 vScale_s_Comp = _mm_sub_ps(_mm_set_ps1(1.0f), vScale_s);
+	//__m128 vScale_t_Comp = _mm_sub_ps(_mm_set_ps1(1.0f), vScale_t);
 
-	__m128 vScale_s      = _mm_sub_ps(vTexSpaceS, _mm_floor_ps(vTexSpaceS));
-	__m128 vScale_t      = _mm_sub_ps(vTexSpaceT, _mm_floor_ps(vTexSpaceT));
+	// Wrap mode: repeat
+	//const float w_recip = 1.0f / pMipmap->mWidth;
+	//const float h_recip = 1.0f / pMipmap->mHeight;
+
+	//const __m128 vOneHalfW = _mm_set_ps1(0.5f * w_recip);
+	//const __m128 vOneHalfH = _mm_set_ps1(0.5f * h_recip);
+
+	//const __m128 vBiasW = _mm_set_ps1(1.0f * w_recip);
+	//const __m128 vBiasH = _mm_set_ps1(1.0f * h_recip);
+
+	//__m128 vTexSpaceS = _mm_add_ps(s, vOneHalfW);
+	//__m128 vTexSpaceT = _mm_add_ps(t, vOneHalfH);
+
+	//__m128  vS  = _mm_mul_ps(_mm_sub_ps(vTexSpaceS, _mm_floor_ps(vTexSpaceS)), _mm_set_ps1(pMipmap->mWidth));
+	//__m128  vT  = _mm_mul_ps(_mm_sub_ps(vTexSpaceT, _mm_floor_ps(vTexSpaceT)), _mm_set_ps1(pMipmap->mHeight));
+	//__m128i vS0 = _mm_cvtps_epi32(vS);
+	//__m128i vT0 = _mm_cvtps_epi32(vT);
+
+	//__m128 vScale_s      = _mm_sub_ps(vS, _mm_cvtepi32_ps(vS0));
+	//__m128 vScale_t      = _mm_sub_ps(vT, _mm_cvtepi32_ps(vT0));
+	//__m128 vScale_s_Comp = _mm_sub_ps(_mm_set_ps1(1.0f), vScale_s);
+	//__m128 vScale_t_Comp = _mm_sub_ps(_mm_set_ps1(1.0f), vScale_t);
+
+	//vTexSpaceS = _mm_add_ps(vTexSpaceS, vBiasW);
+	//vTexSpaceT = _mm_add_ps(vTexSpaceT, vBiasH);
+
+	//vS  = _mm_mul_ps(_mm_sub_ps(vTexSpaceS, _mm_floor_ps(vTexSpaceS)), _mm_set_ps1(pMipmap->mWidth));
+	//vT  = _mm_mul_ps(_mm_sub_ps(vTexSpaceT, _mm_floor_ps(vTexSpaceT)), _mm_set_ps1(pMipmap->mHeight));
+	//__m128i vS1 = _mm_cvtps_epi32(vS);
+	//__m128i vT1 = _mm_cvtps_epi32(vT);
+
+	// Wrap mode: repeat
+	const __m128 vRecipW = _mm_set_ps1(1.0f / pMipmap->mWidth);
+	const __m128 vRecipH = _mm_set_ps1(1.0f / pMipmap->mHeight);
+	__m128 vTexSpaceS0 = MAWrapper(s, _mm_set1_ps((float)pMipmap->mWidth), _mm_set1_ps(-0.5f));
+	__m128 vTexSpaceT0 = MAWrapper(t, _mm_set1_ps((float)pMipmap->mHeight), _mm_set1_ps(-0.5f));
+	__m128 vTexSpaceS1 = _mm_add_ps(vTexSpaceS0, _mm_set_ps1(1.0f));
+	__m128 vTexSpaceT1 = _mm_add_ps(vTexSpaceT0, _mm_set_ps1(1.0f));
+
+	// mod operation in GL_LINEAR mode.
+	vTexSpaceS0 = _mm_sub_ps(vTexSpaceS0, _mm_mul_ps(_mm_floor_ps(_mm_mul_ps(vTexSpaceS0, vRecipW)), _mm_set_ps1(pMipmap->mWidth)));
+	vTexSpaceT0 = _mm_sub_ps(vTexSpaceT0, _mm_mul_ps(_mm_floor_ps(_mm_mul_ps(vTexSpaceT0, vRecipH)), _mm_set_ps1(pMipmap->mHeight)));
+	vTexSpaceS1 = _mm_sub_ps(vTexSpaceS1, _mm_mul_ps(_mm_floor_ps(_mm_mul_ps(vTexSpaceS1, vRecipW)), _mm_set_ps1(pMipmap->mWidth)));
+	vTexSpaceT1 = _mm_sub_ps(vTexSpaceT1, _mm_mul_ps(_mm_floor_ps(_mm_mul_ps(vTexSpaceT1, vRecipH)), _mm_set_ps1(pMipmap->mHeight)));
+
+	__m128 vTexS0Floor = _mm_floor_ps(vTexSpaceS0);
+	__m128 vTexT0Floor = _mm_floor_ps(vTexSpaceT0);
+	__m128 vTexS1Floor = _mm_floor_ps(vTexSpaceS1);
+	__m128 vTexT1Floor = _mm_floor_ps(vTexSpaceT1);
+
+	__m128 vScale_s      = _mm_sub_ps(vTexSpaceS0, vTexS0Floor);
+	__m128 vScale_t      = _mm_sub_ps(vTexSpaceT0, vTexT0Floor);
 	__m128 vScale_s_Comp = _mm_sub_ps(_mm_set_ps1(1.0f), vScale_s);
 	__m128 vScale_t_Comp = _mm_sub_ps(_mm_set_ps1(1.0f), vScale_t);
+
+	__m128i vS0 = _mm_cvtps_epi32(vTexS0Floor);
+	__m128i vT0 = _mm_cvtps_epi32(vTexT0Floor);
+	__m128i vS1 = _mm_cvtps_epi32(vTexS1Floor);
+	__m128i vT1 = _mm_cvtps_epi32(vTexT1Floor);
 
 	ALIGN(16) int addr[4];
 

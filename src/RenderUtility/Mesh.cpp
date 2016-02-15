@@ -225,12 +225,12 @@ bool GlspMesh::InitMaterials(const aiScene* pScene, const std::string& Filename)
         }
 
         // Load a white texture in case the model does not include its own texture
-        if (!m_Textures[i]) {
-            printf("No bound texture, load a white texture.\n");
-            m_Textures[i] = new GlspMaterials(GL_TEXTURE_2D, GLSP_ROOT "/assets/white.png");
+		if (!m_Textures[i]) {
+			printf("Material %d: No diffuse texture.\n", i);
+			//m_Textures[i] = new GlspMaterials(GL_TEXTURE_2D, GLSP_ROOT "/assets/white.png");
 
-            Ret = m_Textures[i]->Load();
-        }
+			//Ret = m_Textures[i]->Load();
+		}
     }
 
     return Ret;
