@@ -1465,7 +1465,7 @@ void TBDR::RenderQuadPixelsInOneTriangle(Triangle *tri, int coverage_mask, int x
 	 */
 	ALIGN(16) Fsiosimd fsio;
 
-	FragmentShader *pFS = tri->mPrim.mDC->mFS;
+	FragmentShader *pFS = tri->mPrim.mRasterStates->mFS;
 	size_t fsin_num     = tri->mPrim.mVert[0].getRegsNum();
 	size_t fsout_num    = pFS->getOutRegsNum();
 

@@ -13,6 +13,7 @@
 #include "TBDR.h"
 #include "PixelBackend.h"
 #include "ThreadPool.h"
+#include "MemoryPool.h"
 #include "compiler.h"
 #include "khronos/GL/glspcorearb.h"
 
@@ -25,24 +26,25 @@ GLAPI void APIENTRY glDrawArrays (GLenum mode, GLint first, GLsizei count)
 
 	DrawEngine *de = &DrawEngine::getDrawEngine();
 
-	DrawContext *dc = new DrawContext();
+	DrawContext dc;
 
 	// encapsulate the DrawContext prepare work
-	dc->gc = gc;
-	gc->mDC = dc;
-	dc->mMode = mode;
-	dc->mFirst = first;
-	dc->mCount = count;
-	dc->mDrawType = DrawContext::kArrayDraw;
-	dc->mIndices = 0;
+	dc.gc = gc;
+	dc.mMode = mode;
+	dc.mFirst = first;
+	dc.mCount = count;
+	dc.mDrawType = DrawContext::kArrayDraw;
+	dc.mIndices = 0;
+	dc.mRasterStates = new(MemoryPoolMT::get()) RasterStates();
 
-	if(!de->validateState(dc))
+	if (!dc.mRasterStates)
 		return;
 
-	de->prepareToDraw();
-	de->emit(dc);
+	if (!de->validateState(&dc))
+		MemoryPoolMT::get().deallocate(dc.mRasterStates, sizeof(RasterStates));
 
-	gc->mDC = NULL;
+	de->prepareToDraw();
+	de->emit(&dc);
 }
 
 GLAPI void APIENTRY glDrawElements (GLenum mode, GLsizei count, GLenum type, const void *indices)
@@ -51,24 +53,25 @@ GLAPI void APIENTRY glDrawElements (GLenum mode, GLsizei count, GLenum type, con
 
 	DrawEngine *de = &DrawEngine::getDrawEngine();
 
-	DrawContext *dc = new DrawContext();
+	DrawContext dc;
 
-	dc->gc = gc;
-	gc->mDC = dc;
-	dc->mMode = mode;
-	dc->mFirst = 0;
-	dc->mCount = count;
-	dc->mDrawType = DrawContext::kElementDraw;
-	dc->mIndexSize = (type == GL_UNSIGNED_INT)? 4: ((type == GL_UNSIGNED_SHORT)? 2: 1);
-	dc->mIndices = indices;
+	dc.gc = gc;
+	dc.mMode = mode;
+	dc.mFirst = 0;
+	dc.mCount = count;
+	dc.mDrawType = DrawContext::kElementDraw;
+	dc.mIndexSize = (type == GL_UNSIGNED_INT)? 4: ((type == GL_UNSIGNED_SHORT)? 2: 1);
+	dc.mIndices = indices;
+	dc.mRasterStates = new(MemoryPoolMT::get()) RasterStates();
 
-	if(!de->validateState(dc))
+	if (!dc.mRasterStates)
 		return;
 
-	de->prepareToDraw();
-	de->emit(dc);
+	if (!de->validateState(&dc))
+		MemoryPoolMT::get().deallocate(dc.mRasterStates, sizeof(RasterStates));
 
-	gc->mDC = NULL;
+	de->prepareToDraw();
+	de->emit(&dc);
 }
 
 GLAPI void APIENTRY glClear (GLbitfield mask)
@@ -152,7 +155,6 @@ private:
 };
 
 DrawEngine::DrawEngine():
-	mDrawContextList(nullptr),
 	mFirstStage(nullptr),
 	mGLContext(nullptr),
 	mDrawCount(0)
@@ -346,17 +348,22 @@ bool DrawEngine::validateState(DrawContext *dc)
 				return false;
 		}
 
-		// link the shaders to the pipeline
-		VertexShader   *pVS = gc->mPM.getCurrentProgram()->getVS();
-		FragmentShader *pFS = gc->mPM.getCurrentProgram()->getFS();
+		Program *prog = gc->mPM.getCurrentProgram();
+		if (!prog)
+			return false;
+
+		VertexShader   *pVS = prog->getVS();
+		FragmentShader *pFS = prog->getFS();
+		if (!pVS || !pFS)
+			return false;
 
 		if(!gc->mTM.validateTextureState(pVS, pFS, dc))
-		{
-			ret = false;
-			goto out;
-		}
+			return false;
 
-		dc->mFS = pFS;
+		dc->mRasterStates->mIsDepthTestEnable = (gc->mState.mEnables & GLSP_DEPTH_TEST) ? 1 : 0;
+		dc->mRasterStates->mIsBlendEnable     = (gc->mState.mEnables & GLSP_BLEND) ? 1 : 0;
+		dc->mRasterStates->mIsDepthOnly       = mGLContext->mFBOM.GetDrawFBO()->IsDepthOnly() ? 1 : 0;
+		dc->mRasterStates->mFS = pFS;
 	}
 	else
 	{
@@ -365,8 +372,8 @@ bool DrawEngine::validateState(DrawContext *dc)
 
 	ret = mGLContext->mFBOM.ValidateFramebufferStatus(mGLContext);
 	if (ret && dc)
-		dc->mDrawID = mDrawCount++;
-out:
+		dc->mRasterStates->mDrawID = mDrawCount++;
+
 	return ret;
 }
 
@@ -428,8 +435,6 @@ void DrawEngine::PerformClear(unsigned int mask)
 
 void DrawEngine::emit(DrawContext *dc)
 {
-	dc->m_pNext = mDrawContextList;
-	mDrawContextList = dc;
 	linkGeomertryPipeStages();
 	getFirstStage()->emit(dc);
 }
@@ -455,20 +460,6 @@ void DrawEngine::Flush(bool swap_buffer)
 	bool depth_only = mGLContext->mFBOM.GetDrawFBO()->IsDepthOnly();
 	mTBDR->FlushDisplayLists(swap_buffer, depth_only);
 
-	DrawContext *dc = mDrawContextList;
-	while(dc)
-	{
-		DrawContext *tmp = dc;
-		dc = dc->m_pNext;
-
-		for (int i = 0; i < MAX_TEXTURE_UNITS; ++i)
-		{
-			if (tmp->mTextures[i])
-				tmp->mTextures[i]->DecRef();
-		}
-		delete tmp;
-	}
-	mDrawContextList = NULL;
 	mDrawCount = 0;
 	mGLContext->mFBOM.GetDrawFBO()->ClearHasPendingDrawCommand();
 }

@@ -303,7 +303,7 @@ void FragmentShader::execute(fsInput& in, fsOutput& out)
 void FragmentShader::texture2D(sampler2D sampler, Fsiosimd &fsio, __m128 &vS, __m128 &vT, __m128 vOut[])
 {
 	const Triangle *tri = static_cast<Triangle *>(fsio.m_priv0);
-	tri->mPrim.mDC->mTextures[sampler]->Texture2DSIMD(vS, vT, vOut);
+	tri->mPrim.mRasterStates->mTextures[sampler]->Texture2DSIMD(vS, vT, vOut);
 }
 
 void FragmentShader::finalize()

@@ -13,6 +13,7 @@ namespace glsp {
 #define MAX_SHADER_REGISTERS 32
 
 struct DrawContext;
+struct RasterStates;
 
 class ShaderRegisterFile
 {
@@ -160,7 +161,7 @@ struct Primitive
 	// FIXME: primitive may be not a triangle.
 	float mAreaReciprocal;
 
-	DrawContext *mDC;
+	RasterStates *mRasterStates;
 };
 
 typedef std::vector<int> IBuffer_v;

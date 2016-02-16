@@ -29,6 +29,19 @@ class GeometryStage;
 class RasterizationStage;
 class FragmentShader;
 
+// Hold raster states for deferred rendering support.
+struct RasterStates
+{
+	struct {
+		int mIsDepthTestEnable : 1;
+		int mIsBlendEnable     : 1;
+		int mIsDepthOnly       : 1;
+	};
+
+	uint32_t mDrawID;
+	FragmentShader 		*mFS;
+	Texture				*mTextures[MAX_TEXTURE_UNITS];
+};
 
 struct DrawContext
 {
@@ -42,15 +55,9 @@ struct DrawContext
 	int mCount;
 	unsigned mIndexSize;
 	DrawType mDrawType;
-	uint32_t mDrawID;
 	const void 		*mIndices;
 	GLContext 		*gc;
-
-	// Hold this data for deferred rendering support.
-	FragmentShader 		*mFS;
-	Texture				*mTextures[MAX_TEXTURE_UNITS];
-
-	DrawContext *m_pNext;
+	RasterStates    *mRasterStates;
 };
 
 /*
@@ -84,9 +91,6 @@ public:
 
 	// mutators
 	void setFirstStage(PipeStage *stage) { mFirstStage = stage; }
-
-	DrawContext* getDrawContextList() const { return mDrawContextList; }
-	void setDrawContextList(DrawContext *dc) { mDrawContextList = dc; }
 
 	RasterizationStage* getRastStage() const { return mRast; }
 	Clipper& GetClipper() const { return *mClipper; }
@@ -132,7 +136,6 @@ private:
 	GeometryStage           *mGeometry;
 	RasterizationStage      *mRast;
 
-	DrawContext			   *mDrawContextList;
 	PipeStage			   *mFirstStage;
 
 	GLContext              *mGLContext;

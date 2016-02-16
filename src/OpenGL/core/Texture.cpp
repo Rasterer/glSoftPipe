@@ -1314,7 +1314,7 @@ bool TextureMachine::validateTextureState(Shader *pVS, Shader *pFS, DrawContext 
 		}
 	}
 
-	memset(dc->mTextures, 0, sizeof(dc->mTextures));
+	memset(dc->mRasterStates->mTextures, 0, sizeof(dc->mRasterStates->mTextures));
 	if(pFS->HasSampler())
 	{
 		int num = pFS->getSamplerNum();
@@ -1329,8 +1329,7 @@ bool TextureMachine::validateTextureState(Shader *pVS, Shader *pFS, DrawContext 
 				return false;
 
 			// OPT: use std::shared_ptr?
-			dc->mTextures[unit] = pTex;
-			pTex->IncRef();
+			dc->mRasterStates->mTextures[unit] = pTex;
 		}
 	}
 

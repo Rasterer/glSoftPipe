@@ -85,7 +85,6 @@ public:
 	RenderTarget        mRT;
 
 	DrawEngine		   &mDE;
-	DrawContext		   *mDC;
 
 	bool				mbInFrame;
 

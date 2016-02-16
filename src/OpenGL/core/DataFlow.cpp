@@ -72,7 +72,7 @@ Primitive::Primitive(Primitive &&rhs)
 	mType           = rhs.mType;
 	mVertNum        = rhs.mVertNum;
 	mAreaReciprocal = rhs.mAreaReciprocal;
-	mDC             = rhs.mDC;
+	mRasterStates   = rhs.mRasterStates;
 
 	for (int i = 0; i < mVertNum; ++i)
 	{
@@ -85,7 +85,7 @@ Primitive& Primitive::operator=(Primitive &&rhs)
 	mType           = rhs.mType;
 	mVertNum        = rhs.mVertNum;
 	mAreaReciprocal = rhs.mAreaReciprocal;
-	mDC             = rhs.mDC;
+	mRasterStates   = rhs.mRasterStates;
 
 	for (int i = 0; i < mVertNum; ++i)
 	{
