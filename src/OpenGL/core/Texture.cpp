@@ -1,6 +1,7 @@
 #include "Texture.h"
 #include "DrawEngine.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 
@@ -814,7 +815,7 @@ float Texture::ComputeLambda(const __m128 &s, const __m128 &t)
 	float dvdx = ((v[3] - v[2]) + (v[1] - v[0]));
 	float dvdy = ((v[3] - v[1]) + (v[2] - v[0]));
 
-	return 0.5f * std::log2(std::max(dudx * dudx + dvdx * dvdx, dudy * dudy + dvdy * dvdy)) - 1.0f;
+	return 0.5f * std::log2((std::max)(dudx * dudx + dvdx * dvdx, dudy * dudy + dvdy * dvdy)) - 1.0f;
 }
 
 void Texture::Texture2DSIMD(const __m128 &u, const __m128 &v, uint32_t out[])

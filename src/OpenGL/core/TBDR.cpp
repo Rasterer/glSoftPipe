@@ -1,6 +1,3 @@
-// Avoid MSVC to see min max as macros rather than std functions
-#define NOMINMAX 1
-
 #include "TBDR.h"
 
 #include <algorithm>
@@ -589,10 +586,10 @@ void Binning::SetupTriangle(Triangle *tri)
 	tri->mVert[2].mFactorB = x1x0 << RAST_SUBPIXEL_BITS;
 	tri->mVert[2].mFactorC = C2 + (y0y1 << (RAST_SUBPIXEL_BITS - 1)) + (x1x0 << (RAST_SUBPIXEL_BITS - 1));
 
-	tri->xmin = clamp(std::min({x0, x1, x2}), 0, (g_GC->mRT.width  - 1) << RAST_SUBPIXEL_BITS) >> RAST_SUBPIXEL_BITS;
-	tri->xmax = clamp(std::max({x0, x1, x2}), 0, (g_GC->mRT.width  - 1) << RAST_SUBPIXEL_BITS) >> RAST_SUBPIXEL_BITS;
-	tri->ymin = clamp(std::min({y0, y1, y2}), 0, (g_GC->mRT.height - 1) << RAST_SUBPIXEL_BITS) >> RAST_SUBPIXEL_BITS;
-	tri->ymax = clamp(std::max({y0, y1, y2}), 0, (g_GC->mRT.height - 1) << RAST_SUBPIXEL_BITS) >> RAST_SUBPIXEL_BITS;
+	tri->xmin = clamp((std::min)({x0, x1, x2}), 0, (g_GC->mRT.width  - 1) << RAST_SUBPIXEL_BITS) >> RAST_SUBPIXEL_BITS;
+	tri->xmax = clamp((std::max)({x0, x1, x2}), 0, (g_GC->mRT.width  - 1) << RAST_SUBPIXEL_BITS) >> RAST_SUBPIXEL_BITS;
+	tri->ymin = clamp((std::min)({y0, y1, y2}), 0, (g_GC->mRT.height - 1) << RAST_SUBPIXEL_BITS) >> RAST_SUBPIXEL_BITS;
+	tri->ymax = clamp((std::max)({y0, y1, y2}), 0, (g_GC->mRT.height - 1) << RAST_SUBPIXEL_BITS) >> RAST_SUBPIXEL_BITS;
 
 
 	const float WReciprocal0 = 1.0f / v0->position().w;
@@ -969,8 +966,8 @@ void TBDR::FineRasterizing(int x, int y)
 	if (!mDepthOnlyPass && has_prims)
 		std::memset(&pp_map[0][0], 0, sizeof(PixelPrimMap));
 
-	int max_w = std::min(MACRO_TILE_SIZE, g_GC->mRT.width  - x);
-	int max_h = std::min(MACRO_TILE_SIZE, g_GC->mRT.height - y);
+	int max_w = (std::min)(MACRO_TILE_SIZE, g_GC->mRT.width  - x);
+	int max_h = (std::min)(MACRO_TILE_SIZE, g_GC->mRT.height - y);
 
 	for (Triangle *tri: full_disp_list)
 	{
@@ -1014,10 +1011,10 @@ void TBDR::FineRasterizing(int x, int y)
 
 	for (Triangle *tri: disp_list)
 	{
-		const int minx = ROUND_DOWN(std::max(0, tri->xmin - x), MICRO_TILE_SIZE);
-		const int miny = ROUND_DOWN(std::max(0, tri->ymin - y), MICRO_TILE_SIZE);
-		const int maxx = std::min(MACRO_TILE_SIZE, tri->xmax - x + 1);
-		const int maxy = std::min(MACRO_TILE_SIZE, tri->ymax - y + 1);
+		const int minx = ROUND_DOWN((std::max)(0, tri->xmin - x), MICRO_TILE_SIZE);
+		const int miny = ROUND_DOWN((std::max)(0, tri->ymin - y), MICRO_TILE_SIZE);
+		const int maxx = (std::min)(MACRO_TILE_SIZE, tri->xmax - x + 1);
+		const int maxy = (std::min)(MACRO_TILE_SIZE, tri->ymax - y + 1);
 
 		__m128 vNewZ = _mm_set_ps1(tri->mZAtOrigin);
 
