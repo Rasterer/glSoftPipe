@@ -322,7 +322,9 @@ public:
 class ShadowMap: public GlspApp
 {
 public:
-	ShadowMap() = default;
+	ShadowMap():
+		mScalar(0.0f)
+	{ }
 	~ShadowMap();
 
 private:

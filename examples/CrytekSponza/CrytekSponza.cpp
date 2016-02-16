@@ -232,7 +232,6 @@ private:
 	virtual void onMouseLeftClickDown(int x, int y);
 
 	ShaderFactory *mShaderFactory;
-	float mScalar;
 
 	GLuint mProg;
 	GLint mWVPLocation;

@@ -116,26 +116,15 @@ public:
 	void Texture2DSIMD(const __m128 &u, const __m128 &v, __m128 out[]);
 	void Texture2DSIMD(const __m128 &u, const __m128 &v, uint32_t out[]);
 
-public:
-	void (*m_pfnTexture2D)(const Shader *pShader, const Texture *pTex, const glm::vec2 &coord, glm::vec4 &res);
-	void (*m_pfnTexture2DMag)(const Texture *pTex, unsigned int level, const glm::vec2 &coord, glm::vec4 &res);
-	void (*m_pfnTexture2DMin)(const Texture *pTex, float lambda, const glm::vec2 &coord, glm::vec4 &res);
-
-	//void (*m_pfnTexture2DSIMD)(const Texture *pTex, const glm::vec4 &s, const glm::vec4 &t, glm::vec4 *res);
-	//void (*m_pfnTexture2DMagSIMD)(const Texture *pTex, unsigned int level, const glm::vec4 &s, const glm::vec4 &t, glm::vec4 *res);
-	//void (*m_pfnTexture2DMinSIMD)(const Texture *pTex, float lambda, const glm::vec4 &s, const glm::vec4 &t, glm::vec4 *res);
-
-	typedef int (*PWrapFunc)(int coord, int size);
-
-	PWrapFunc		m_pfnWrapS;
-	PWrapFunc		m_pfnWrapT;
-	PWrapFunc		m_pfnWrapR;
-
 private:
 	// FIXME: now just check base mipmap level
 	// need check more stuff.
 	bool IsComplete();
-	bool PickupWrapFunc(SamplerObject &so);
+
+	void Sample2DNearestLevelSIMD(unsigned level, const __m128 &s, const __m128 &t, __m128 out[]);
+	void Sample2DLinearLevelSIMD (unsigned level, const __m128 &s, const __m128 &t, __m128 out[]);
+	inline void MipmapLerp(__m128 vRes1[4], __m128 vRes2[4], float frac, __m128 out[]);
+	inline float ComputeLambda(const __m128 &s, const __m128 &t);
 
 private:
 	TextureMipmap  *mpMipmap;

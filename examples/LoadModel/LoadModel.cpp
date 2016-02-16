@@ -116,7 +116,9 @@ public:
 class LoadModel: public GlspApp
 {
 public:
-	LoadModel() = default;
+	LoadModel():
+		mScalar(0.0f)
+	{ }
 	~LoadModel();
 
 private:
@@ -189,7 +191,6 @@ bool LoadModel::onInit()
 	mMesh = new GlspMesh();
 	mMesh->LoadMesh(GLSP_ROOT "/assets/phoenix/phoenix_ugv.md2");
 
-	mScalar = 0.0f;
 	return true;
 }
 

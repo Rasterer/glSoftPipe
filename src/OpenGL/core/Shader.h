@@ -150,11 +150,12 @@ protected:
 	void declareSampler();
 	void setHasSampler()    { bHasSampler = true; }
 
+	// Deprecated
 	glm::vec4 texture2D(sampler2D sampler, const glm::vec2 &coord)
 	{
 		glm::vec4 res;
 
-		mTexs[sampler]->m_pfnTexture2D(this, mTexs[sampler], coord, res);
+		//mTexs[sampler]->m_pfnTexture2D(this, mTexs[sampler], coord, res);
 
 		return res;
 	}

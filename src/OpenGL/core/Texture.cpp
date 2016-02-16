@@ -241,72 +241,13 @@ TextureTarget TargetToIndex(unsigned target)
 	}
 }
 
-
-float ComputeLambda(const Shader *pShader, const vec2 &coord, int texW, int texH)
-{
 #if 0
-	const Fsio &fsio = *static_cast<Fsio *>(pShader->getPrivateData());
-	const Triangle *tri = static_cast<Triangle *>(fsio.m_priv0);
-	const fsInput &base = tri->mVert[0].mAttrReciprocal;
-	const fsInput &derivativeX = tri->mGradientX;
-	const fsInput &derivativeY = tri->mGradientY;
-#if 0
-	int texCoordLoc = pShader->GetTextureCoordLocation();
-
-	float z_stepx = 1.0f / (start[0].w + derivativeX[0].w);
-	float z_stepy = 1.0f / (start[0].w + derivativeY[0].w);
-
-	float dudx = texW * ((start[texCoordLoc].x + derivativeX[texCoordLoc].x) * z_stepx - coord.x);
-	float dvdx = texH * ((start[texCoordLoc].y + derivativeX[texCoordLoc].y) * z_stepx - coord.y);
-	float dudy = texW * ((start[texCoordLoc].x + derivativeY[texCoordLoc].x) * z_stepy - coord.x);
-	float dvdy = texH * ((start[texCoordLoc].y + derivativeY[texCoordLoc].y) * z_stepy - coord.y);
-
-	float x = dudx * dudx + dvdx * dvdx;
-	float y = dudy * dudy + dvdy * dvdy;
-
-	return 0.5f * std::log2(std::max(x, y));
-#else
-	// Refer to:
-	// http://www.gamasutra.com/view/feature/3301/runtime_mipmap_filtering.php?print=1
-	const float stepx = fsio.x + 0.5f - base[0].x;
-	const float stepy = fsio.y + 0.5f - base[0].y;
-
-	float Z = derivativeX[0].w * stepx + derivativeY[0].w * stepy + base[0].w;
-	Z = Z * Z; Z = Z * Z; // Z = pow(Z, 4)
-
-	float ux = tri->c + tri->a * stepy;
-	ux = ux * ux;
-
-	float vx = tri->d + tri->b * stepy;
-	vx = vx * vx;
-
-	float uy = tri->e - tri->a * stepx;
-	uy = uy * uy;
-
-	float vy = tri->f - tri->b * stepx;
-	vy = vy * vy;
-
-	texW = texW * texW;
-	texH = texH * texH;
-
-	return 0.5f * std::log2(std::max(ux * texW + vx * texH, uy * texW + vy * texH) / Z);
-#endif
-#endif
-	return 0.0f;
-}
-
 inline void BiLinearInterpolate(float scaleX, float scaleY, const vec4 &lb, const vec4 &lt, const vec4 &rb, const vec4 &rt, vec4 &res)
 {
 	res = lb * ((1.0f - scaleX) * (1.0f - scaleY)) +
 		  lt * ((1.0f - scaleX) * scaleY) +
 		  rb * (scaleX * (1.0f - scaleY)) +
 		  rt * (scaleX * scaleY);
-#if 0
-	res = (lb *= ((1.0 - scaleX) * (1.0f - scaleY))) +
-		  (lt *= ((1.0 - scaleX) * scaleY)) +
-		  (rb *= (scaleX * (1.0f - scaleY))) +
-		  (rt *= (scaleX * scaleY));
-#endif
 }
 
 void Sample2DNearestLevel(const Texture *pTex, unsigned int level, const vec2 &coord, vec4 &res)
@@ -327,29 +268,6 @@ void Sample2DNearestLevel(const Texture *pTex, unsigned int level, const vec2 &c
 
 	res = pAddr[j * pMipmap->mWidth + i];
 }
-
-#if 0
-void Sample2DNearestLevelSIMD(const Texture *pTex, unsigned int level, const vec4 &s, const vec4 &t, vec4 *res)
-{
-	const TextureMipmap *pMipmap = pTex->getMipmap(0, level);
-
-	__m128i vS = _mm_cvtps_epi32(_mm_floor_ps(_mm_load_ps(&s)));
-	__m128i vT = _mm_cvtps_epi32(_mm_floor_ps(_mm_load_ps(&t)));
-	vS = pTex->m_pfnWrapSSIMD(vS, pMipmap->mWidth);
-	vT = pTex->m_pfnWrapTSIMD(vT, pMipmap->mHeight);
-
-	if(i < 0 || i >= (int)pMipmap->mWidth ||
-	   j < 0 || j >= (int)pMipmap->mHeight)
-	{
-		res = pTex->getSamplerObject().mBorderColor;
-		return;
-	}
-
-	vec4 *pAddr = static_cast<vec4 *>(pMipmap->mMem.addr);
-
-	res = pAddr[j * pMipmap->mWidth + i];
-}
-#endif
 
 void Sample2DLinearLevel(const Texture *pTex, unsigned int level, const vec2 &coord, vec4 &res)
 {
@@ -489,12 +407,6 @@ void Sample2DNearest(const Shader *, const Texture *pTex, const vec2 &coord, vec
 {
 	Sample2DNearestLevel(pTex, 0, coord, res);
 }
-#if 0
-void Sample2DNearestSIMD(const Texture *pTex, const glm::vec4 &s, const glm::vec4 &t, glm::vec4 *res)
-{
-	Sample2DNearestLevelSIMD(pTex, 0, s, t, res);
-}
-#endif
 
 void Sample2DLinear(const Shader *, const Texture *pTex, const vec2 &coord, vec4 &res)
 {
@@ -546,7 +458,6 @@ int WrapMirrorClampToEdge(int coord, int size)
 	return clamp(mirror(coord), 0, size - 1);
 }
 
-#if 0
 __m128i WrapClampToEdgeSIMD(__m128i &coord, int size)
 {
 	return _mm_min_epi32(_mm_max_epi32(coord, _mm_setzero_si128()), _mm_set1_epi32(size - 1));
@@ -845,87 +756,65 @@ err:
 	return mIsComplete;
 }
 
-bool Texture::PickupWrapFunc(SamplerObject &so)
+static inline __m128i CoordinateWrapping(uint32_t size, const __m128i &vCoord, int wrap_mode)
 {
-	switch(so.eWrapS)
+	if (wrap_mode == GL_REPEAT)
 	{
-		case GL_CLAMP_TO_EDGE:
-			m_pfnWrapS     = &WrapClampToEdge;
-			//m_pfnWrapSSIMD = &WrapClampToEdgeSIMD;
-			break;
-		case GL_CLAMP_TO_BORDER:
-			m_pfnWrapS     = &WrapClampToBorder;
-			//m_pfnWrapSSIMD = &WrapClampToBorderSIMD;
-			break;
-		case GL_REPEAT:
-			m_pfnWrapS     = &WrapRepeat;
-			//m_pfnWrapSSIMD = &WrapRepeatSIMD;
-			break;
-		case GL_MIRRORED_REPEAT:
-			m_pfnWrapS     = &WrapMirroredRepeat;
-			//m_pfnWrapSSIMD = &WrapMirroredRepeatSIMD;
-			break;
-		case GL_MIRROR_CLAMP_TO_EDGE:
-			m_pfnWrapS     = &WrapMirrorClampToEdge;
-			//m_pfnWrapSSIMD = &WrapMirrorClampToEdgeSIMD;
-			break;
-		default:
-			return false;
+		__m128 vSize = _mm_set_ps1(size);
+		__m128 vCoordf = _mm_cvtepi32_ps(vCoord);
+		vCoordf = _mm_sub_ps(vCoordf, _mm_mul_ps(_mm_floor_ps(_mm_mul_ps(vCoordf, _mm_set_ps1(1.0f / size))), vSize));
+		return _mm_cvtps_epi32(vCoordf);
 	}
-
-	switch(so.eWrapT)
+	else if (wrap_mode == GL_CLAMP_TO_EDGE)
 	{
-		case GL_CLAMP_TO_EDGE:
-			m_pfnWrapT     = &WrapClampToEdge;
-			//m_pfnWrapTSIMD = &WrapClampToEdgeSIMD;
-			break;
-		case GL_CLAMP_TO_BORDER:
-			m_pfnWrapT     = &WrapClampToBorder;
-			//m_pfnWrapTSIMD = &WrapClampToBorderSIMD;
-			break;
-		case GL_REPEAT:
-			m_pfnWrapT     = &WrapRepeat;
-			//m_pfnWrapTSIMD = &WrapRepeatSIMD;
-			break;
-		case GL_MIRRORED_REPEAT:
-			m_pfnWrapT     = &WrapMirroredRepeat;
-			//m_pfnWrapTSIMD = &WrapMirroredRepeatSIMD;
-			break;
-		case GL_MIRROR_CLAMP_TO_EDGE:
-			m_pfnWrapT     = &WrapMirrorClampToEdge;
-			//m_pfnWrapTSIMD = &WrapMirrorClampToEdgeSIMD;
-			break;
-		default:
-			return false;
+		return _mm_max_epi32(_mm_min_epi32(vCoord, _mm_set1_epi32(size - 1)), _mm_setzero_si128());
 	}
-
-	switch(so.eWrapR)
+	else
 	{
-		case GL_CLAMP_TO_EDGE:
-			m_pfnWrapR     = &WrapClampToEdge;
-			//m_pfnWrapRSIMD = &WrapClampToEdgeSIMD;
-			break;
-		case GL_CLAMP_TO_BORDER:
-			m_pfnWrapR     = &WrapClampToBorder;
-			//m_pfnWrapRSIMD = &WrapClampToBorderSIMD;
-			break;
-		case GL_REPEAT:
-			m_pfnWrapR     = &WrapRepeat;
-			//m_pfnWrapRSIMD = &WrapRepeatSIMD;
-			break;
-		case GL_MIRRORED_REPEAT:
-			m_pfnWrapR     = &WrapMirroredRepeat;
-			//m_pfnWrapRSIMD = &WrapMirroredRepeatSIMD;
-			break;
-		case GL_MIRROR_CLAMP_TO_EDGE:
-			m_pfnWrapR     = &WrapMirrorClampToEdge;
-			//m_pfnWrapRSIMD = &WrapMirrorClampToEdgeSIMD;
-			break;
-		default:
-			return false;
+		// TODO: other wrap modes
+		return _mm_setzero_si128();
 	}
+}
 
-	return true;
+inline void Texture::MipmapLerp(__m128 vRes1[4], __m128 vRes2[4], float frac, __m128 out[])
+{
+	switch (mFormat)
+	{
+		case GL_DEPTH_COMPONENT:
+		{
+			out[0] = _simd_lerp_ps(vRes1[0], vRes2[0], frac);
+			break;
+		}
+		case GL_RGBA:
+		default:
+		{
+			for (int i = 0; i < 4; ++i)
+			{
+				out[i] = _simd_lerp_ps(vRes1[i], vRes2[i], frac);
+			}
+			break;
+		}
+	}
+}
+
+float Texture::ComputeLambda(const __m128 &s, const __m128 &t)
+{
+	const TextureMipmap *pBaseMipmap = getMipmap(0, 0);
+	const __m128 vU = _mm_mul_ps(s, _mm_set1_ps((float)pBaseMipmap->mWidth));
+	const __m128 vV = _mm_mul_ps(t, _mm_set1_ps((float)pBaseMipmap->mHeight));
+
+	ALIGN(16) float u[4];
+	ALIGN(16) float v[4];
+
+	_mm_store_ps(u, vU);
+	_mm_store_ps(v, vV);
+
+	float dudx = ((u[3] - u[2]) + (u[1] - u[0]));
+	float dudy = ((u[3] - u[1]) + (u[2] - u[0]));
+	float dvdx = ((v[3] - v[2]) + (v[1] - v[0]));
+	float dvdy = ((v[3] - v[1]) + (v[2] - v[0]));
+
+	return 0.5f * std::log2(std::max(dudx * dudx + dvdx * dvdx, dudy * dudy + dvdy * dvdy)) - 1.0f;
 }
 
 void Texture::Texture2DSIMD(const __m128 &u, const __m128 &v, uint32_t out[])
@@ -935,85 +824,200 @@ void Texture::Texture2DSIMD(const __m128 &u, const __m128 &v, uint32_t out[])
 
 void Texture::Texture2DSIMD(const __m128 &s, const __m128 &t, __m128 out[])
 {
-	const TextureMipmap *pMipmap = getMipmap(0, 0);
+	if (mSO.eMagFilter == mSO.eMinFilter)
+	{
+		// No need to calculate lambda.
+		if (mSO.eMagFilter == GL_LINEAR)
+		{
+			Sample2DLinearLevelSIMD(0, s, t, out);
+		}
+		else
+		{
+			// GL_NEAREST
+			Sample2DNearestLevelSIMD(0, s, t, out);
+		}
+	}
+	else
+	{
+		// TODO:
+		const float lambda = ComputeLambda(s, t);
+		if(lambda <= mMagMinThresh)
+		{
+			// Mag filter
+			if (mSO.eMagFilter == GL_LINEAR)
+			{
+				Sample2DLinearLevelSIMD(0, s, t, out);
+			}
+			else
+			{
+				// GL_NEAREST
+				Sample2DNearestLevelSIMD(0, s, t, out);
+			}
+		}
+		else
+		{
+			// Min filter
+			unsigned lvl1 = 0;
+			unsigned lvl2 = 0;
+			float    frac = 0.0f;
 
-	// OPT: use _mm_cvtps_epi32 with round mode specified
-	// Clamp to Edge
-	//__m128 vTexSpaceS = MAWrapper(s, _mm_set1_ps((float)pMipmap->mWidth), _mm_set1_ps(-0.5f));
-	//__m128 vTexSpaceT = MAWrapper(t, _mm_set1_ps((float)pMipmap->mHeight), _mm_set1_ps(-0.5f));
-	//__m128i vS0 = _mm_cvtps_epi32(_mm_floor_ps(vTexSpaceS));
-	//__m128i vT0 = _mm_cvtps_epi32(_mm_floor_ps(vTexSpaceT));
-	//__m128i vS1 = _mm_add_epi32(vS0, _mm_set1_epi32(1));
-	//__m128i vT1 = _mm_add_epi32(vT0, _mm_set1_epi32(1));
+			if (mAvailableMipmaps == 0 || mSO.eMinFilter == GL_LINEAR || GL_LINEAR == GL_NEAREST)
+			{
+				// only access the base level-of-detail.
+				lvl1 = 0;
+			}
+			else if (mSO.eMinFilter == GL_LINEAR_MIPMAP_NEAREST || mSO.eMinFilter == GL_NEAREST_MIPMAP_NEAREST)
+			{
+				if(lambda <= 0.5f)
+					lvl1 = 0;
+				else
+					lvl1 = (unsigned)std::ceil(lambda + 0.5f) - 1;
 
-	//vS0 = _mm_min_epi32(_mm_max_epi32(vS0, _mm_setzero_si128()), _mm_set1_epi32(pMipmap->mWidth - 1));
-	//vT0 = _mm_min_epi32(_mm_max_epi32(vT0, _mm_setzero_si128()), _mm_set1_epi32(pMipmap->mHeight - 1));
-	//vS1 = _mm_min_epi32(_mm_max_epi32(vS1, _mm_setzero_si128()), _mm_set1_epi32(pMipmap->mWidth - 1));
-	//vT1 = _mm_min_epi32(_mm_max_epi32(vT1, _mm_setzero_si128()), _mm_set1_epi32(pMipmap->mHeight - 1));
-	//__m128 vScale_s      = _mm_sub_ps(vTexSpaceS, _mm_floor_ps(vTexSpaceS));
-	//__m128 vScale_t      = _mm_sub_ps(vTexSpaceT, _mm_floor_ps(vTexSpaceT));
-	//__m128 vScale_s_Comp = _mm_sub_ps(_mm_set_ps1(1.0f), vScale_s);
-	//__m128 vScale_t_Comp = _mm_sub_ps(_mm_set_ps1(1.0f), vScale_t);
+				if(lvl1 > mAvailableMipmaps)
+					lvl1 = mAvailableMipmaps;
+			}
+			else if (mSO.eMinFilter == GL_NEAREST_MIPMAP_LINEAR || mSO.eMinFilter == GL_LINEAR_MIPMAP_LINEAR)
+			{
+				const float lvl1f = std::floor(lambda);
+				lvl1 = static_cast<unsigned>(lvl1f);
+				frac = lambda - lvl1f;
 
-	// Wrap mode: repeat
-	//const float w_recip = 1.0f / pMipmap->mWidth;
-	//const float h_recip = 1.0f / pMipmap->mHeight;
+				if (lvl1 >= mAvailableMipmaps)
+				{
+					lvl1 = mAvailableMipmaps;
+					lvl2 = mAvailableMipmaps;
+				}
+				else
+				{
+					lvl2 = lvl1 + 1;
+				}
+			}
 
-	//const __m128 vOneHalfW = _mm_set_ps1(0.5f * w_recip);
-	//const __m128 vOneHalfH = _mm_set_ps1(0.5f * h_recip);
+			switch (mSO.eMinFilter)
+			{
+				case GL_LINEAR:
+				case GL_LINEAR_MIPMAP_NEAREST:
+				{
+					Sample2DLinearLevelSIMD(lvl1, s, t, out);
+					break;
+				}
+				case GL_NEAREST:
+				case GL_NEAREST_MIPMAP_NEAREST:
+				{
+					Sample2DNearestLevelSIMD(lvl1, s, t, out);
+					break;
+				}
+				case GL_NEAREST_MIPMAP_LINEAR:
+				{
+					if (lvl1 >= mAvailableMipmaps)
+					{
+						Sample2DNearestLevelSIMD(mAvailableMipmaps, s, t, out);
+					}
+					else
+					{
+						__m128 vRes1[4];
+						__m128 vRes2[4];
+						Sample2DNearestLevelSIMD(lvl1, s, t, vRes1);
+						Sample2DNearestLevelSIMD(lvl2, s, t, vRes2);
+						MipmapLerp(vRes1, vRes2, frac, out);
+					}
+					break;
+				}
+				case GL_LINEAR_MIPMAP_LINEAR:
+				{
+					if (lvl1 >= mAvailableMipmaps)
+					{
+						Sample2DLinearLevelSIMD(mAvailableMipmaps, s, t, out);
+					}
+					else
+					{
+						__m128 vRes1[4];
+						__m128 vRes2[4];
+						Sample2DLinearLevelSIMD(lvl1, s, t, vRes1);
+						Sample2DLinearLevelSIMD(lvl2, s, t, vRes2);
+						MipmapLerp(vRes1, vRes2, frac, out);
+					}
+					break;
+				}
+			}
+		}
+	}
+}
 
-	//const __m128 vBiasW = _mm_set_ps1(1.0f * w_recip);
-	//const __m128 vBiasH = _mm_set_ps1(1.0f * h_recip);
+void Texture::Sample2DNearestLevelSIMD(unsigned level, const __m128 &s, const __m128 &t, __m128 out[])
+{
+	const TextureMipmap *pMipmap = getMipmap(0, level);
 
-	//__m128 vTexSpaceS = _mm_add_ps(s, vOneHalfW);
-	//__m128 vTexSpaceT = _mm_add_ps(t, vOneHalfH);
+	__m128 vTexSpaceS0 = _mm_mul_ps(s, _mm_set1_ps((float)pMipmap->mWidth));
+	__m128 vTexSpaceT0 = _mm_mul_ps(t, _mm_set1_ps((float)pMipmap->mHeight));
+	__m128 vTexS0Floor = _mm_floor_ps(vTexSpaceS0);
+	__m128 vTexT0Floor = _mm_floor_ps(vTexSpaceT0);
+	__m128i vS0 = _mm_cvtps_epi32(vTexS0Floor);
+	__m128i vT0 = _mm_cvtps_epi32(vTexT0Floor);
+	vS0 = CoordinateWrapping(pMipmap->mWidth,  vS0, mSO.eWrapS);
+	vT0 = CoordinateWrapping(pMipmap->mWidth,  vT0, mSO.eWrapS);
 
-	//__m128  vS  = _mm_mul_ps(_mm_sub_ps(vTexSpaceS, _mm_floor_ps(vTexSpaceS)), _mm_set_ps1(pMipmap->mWidth));
-	//__m128  vT  = _mm_mul_ps(_mm_sub_ps(vTexSpaceT, _mm_floor_ps(vTexSpaceT)), _mm_set_ps1(pMipmap->mHeight));
-	//__m128i vS0 = _mm_cvtps_epi32(vS);
-	//__m128i vT0 = _mm_cvtps_epi32(vT);
+	ALIGN(16) int addr[4];
 
-	//__m128 vScale_s      = _mm_sub_ps(vS, _mm_cvtepi32_ps(vS0));
-	//__m128 vScale_t      = _mm_sub_ps(vT, _mm_cvtepi32_ps(vT0));
-	//__m128 vScale_s_Comp = _mm_sub_ps(_mm_set_ps1(1.0f), vScale_s);
-	//__m128 vScale_t_Comp = _mm_sub_ps(_mm_set_ps1(1.0f), vScale_t);
+	switch (mFormat)
+	{
+		case GL_RGBA:
+		{
+			uint32_t *pAddr = static_cast<uint32_t *>(pMipmap->mMem.addr);
 
-	//vTexSpaceS = _mm_add_ps(vTexSpaceS, vBiasW);
-	//vTexSpaceT = _mm_add_ps(vTexSpaceT, vBiasH);
+			_mm_store_si128((__m128i *)addr, MAWrapper(vT0, _mm_set1_epi32(pMipmap->mWidth), vS0));
+			__m128i vLB = _mm_set_epi32(pAddr[addr[3]], pAddr[addr[2]], pAddr[addr[1]], pAddr[addr[0]]);
 
-	//vS  = _mm_mul_ps(_mm_sub_ps(vTexSpaceS, _mm_floor_ps(vTexSpaceS)), _mm_set_ps1(pMipmap->mWidth));
-	//vT  = _mm_mul_ps(_mm_sub_ps(vTexSpaceT, _mm_floor_ps(vTexSpaceT)), _mm_set_ps1(pMipmap->mHeight));
-	//__m128i vS1 = _mm_cvtps_epi32(vS);
-	//__m128i vT1 = _mm_cvtps_epi32(vT);
+			static __m128i vMask  = _mm_set1_epi32(0xFF);
+			static __m128  vNorm = _mm_set_ps1(1.0f / 256.0f);
+			for (int i = 0; i < 4; ++i)
+			{
+				out[i] = _mm_cvtepi32_ps(_mm_and_si128(_mm_srli_epi32(vLB, i << 3), vMask));
+				out[i] = _mm_mul_ps(out[i], vNorm);
+			}
 
-	// Wrap mode: repeat
-	const __m128 vRecipW = _mm_set_ps1(1.0f / pMipmap->mWidth);
-	const __m128 vRecipH = _mm_set_ps1(1.0f / pMipmap->mHeight);
+			break;
+		}
+		case GL_DEPTH_COMPONENT:
+		{
+			float *pAddr = static_cast<float *>(pMipmap->mMem.addr);
+
+			_mm_store_si128((__m128i *)addr, MAWrapper(vT0, _mm_set1_epi32(pMipmap->mWidth), vS0));
+			out[0] = _mm_set_ps(pAddr[addr[3]], pAddr[addr[2]], pAddr[addr[1]], pAddr[addr[0]]);
+
+			break;
+		}
+		default:
+		{
+			break;
+		}
+	}
+}
+
+void Texture::Sample2DLinearLevelSIMD(unsigned level, const __m128 &s, const __m128 &t, __m128 out[])
+{
+	const TextureMipmap *pMipmap = getMipmap(0, level);
+
 	__m128 vTexSpaceS0 = MAWrapper(s, _mm_set1_ps((float)pMipmap->mWidth), _mm_set1_ps(-0.5f));
 	__m128 vTexSpaceT0 = MAWrapper(t, _mm_set1_ps((float)pMipmap->mHeight), _mm_set1_ps(-0.5f));
-	__m128 vTexSpaceS1 = _mm_add_ps(vTexSpaceS0, _mm_set_ps1(1.0f));
-	__m128 vTexSpaceT1 = _mm_add_ps(vTexSpaceT0, _mm_set_ps1(1.0f));
-
-	// mod operation in GL_LINEAR mode.
-	vTexSpaceS0 = _mm_sub_ps(vTexSpaceS0, _mm_mul_ps(_mm_floor_ps(_mm_mul_ps(vTexSpaceS0, vRecipW)), _mm_set_ps1(pMipmap->mWidth)));
-	vTexSpaceT0 = _mm_sub_ps(vTexSpaceT0, _mm_mul_ps(_mm_floor_ps(_mm_mul_ps(vTexSpaceT0, vRecipH)), _mm_set_ps1(pMipmap->mHeight)));
-	vTexSpaceS1 = _mm_sub_ps(vTexSpaceS1, _mm_mul_ps(_mm_floor_ps(_mm_mul_ps(vTexSpaceS1, vRecipW)), _mm_set_ps1(pMipmap->mWidth)));
-	vTexSpaceT1 = _mm_sub_ps(vTexSpaceT1, _mm_mul_ps(_mm_floor_ps(_mm_mul_ps(vTexSpaceT1, vRecipH)), _mm_set_ps1(pMipmap->mHeight)));
 
 	__m128 vTexS0Floor = _mm_floor_ps(vTexSpaceS0);
 	__m128 vTexT0Floor = _mm_floor_ps(vTexSpaceT0);
-	__m128 vTexS1Floor = _mm_floor_ps(vTexSpaceS1);
-	__m128 vTexT1Floor = _mm_floor_ps(vTexSpaceT1);
+
+	__m128i vTexSpaceS0i = _mm_cvtps_epi32(vTexS0Floor);
+	__m128i vTexSpaceT0i = _mm_cvtps_epi32(vTexT0Floor);
+	__m128i vTexSpaceS1i = _mm_add_epi32(vTexSpaceS0i, _mm_set1_epi32(1));
+	__m128i vTexSpaceT1i = _mm_add_epi32(vTexSpaceT0i, _mm_set1_epi32(1));
+
+	__m128i vS0 = CoordinateWrapping(pMipmap->mWidth,  vTexSpaceS0i, mSO.eWrapS);
+	__m128i vS1 = CoordinateWrapping(pMipmap->mWidth,  vTexSpaceS1i, mSO.eWrapS);
+	__m128i vT0 = CoordinateWrapping(pMipmap->mHeight, vTexSpaceT0i, mSO.eWrapT);
+	__m128i vT1 = CoordinateWrapping(pMipmap->mHeight, vTexSpaceT1i, mSO.eWrapT);
 
 	__m128 vScale_s      = _mm_sub_ps(vTexSpaceS0, vTexS0Floor);
 	__m128 vScale_t      = _mm_sub_ps(vTexSpaceT0, vTexT0Floor);
 	__m128 vScale_s_Comp = _mm_sub_ps(_mm_set_ps1(1.0f), vScale_s);
 	__m128 vScale_t_Comp = _mm_sub_ps(_mm_set_ps1(1.0f), vScale_t);
-
-	__m128i vS0 = _mm_cvtps_epi32(vTexS0Floor);
-	__m128i vT0 = _mm_cvtps_epi32(vTexT0Floor);
-	__m128i vS1 = _mm_cvtps_epi32(vTexS1Floor);
-	__m128i vT1 = _mm_cvtps_epi32(vTexT1Floor);
 
 	ALIGN(16) int addr[4];
 
@@ -1035,8 +1039,8 @@ void Texture::Texture2DSIMD(const __m128 &s, const __m128 &t, __m128 out[])
 			_mm_store_si128((__m128i *)addr, MAWrapper(vT1, _mm_set1_epi32(pMipmap->mWidth), vS1));
 			__m128i vRT = _mm_set_epi32(pAddr[addr[3]], pAddr[addr[2]], pAddr[addr[1]], pAddr[addr[0]]);
 
-			__m128i vMask  = _mm_set1_epi32(0xFF);
-			__m128  vNorm = _mm_set_ps1(1.0f / 256.0f);
+			static __m128i vMask  = _mm_set1_epi32(0xFF);
+			static __m128  vNorm = _mm_set_ps1(1.0f / 256.0f);
 			for (int i = 0; i < 4; ++i)
 			{
 				__m128 vLBf = _mm_cvtepi32_ps(_mm_and_si128(_mm_srli_epi32(vLB, i << 3), vMask));
@@ -1083,89 +1087,22 @@ void Texture::Texture2DSIMD(const __m128 &s, const __m128 &t, __m128 out[])
 	}
 }
 
+
 bool Texture::ValidateState()
 {
 	if(!IsComplete())
 		return false;
 
-	if(mSO.eMagFilter == mSO.eMinFilter)
-	{
-		switch(mSO.eMagFilter)
-		{
-			case GL_NEAREST:
-				m_pfnTexture2D     = &Sample2DNearest;
-				//m_pfnTexture2DSIMD = &Sample2DNearestSIMD;
-				break;
-			case GL_LINEAR:
-				m_pfnTexture2D     = &Sample2DLinear;
-				//m_pfnTexture2DSIMD = &Sample2DLinearSIMD;
-				break;
-			default:
-				return false;
-		}
-	}
+	if(mSO.eMagFilter == GL_LINEAR &&
+	  (mSO.eMinFilter == GL_NEAREST_MIPMAP_NEAREST ||
+	   mSO.eMinFilter == GL_NEAREST_MIPMAP_LINEAR))
+		// Pixel: Texel = 1: sqrt(2)
+		mMagMinThresh = 0.5f;
 	else
-	{
-		if(mSO.eMagFilter == GL_LINEAR &&
-		  (mSO.eMinFilter == GL_NEAREST_MIPMAP_NEAREST ||
-		   mSO.eMinFilter == GL_NEAREST_MIPMAP_LINEAR))
-			// Pixel: Texel = 1: sqrt(2)
-			mMagMinThresh = 0.5f;
-		else
-			// Pixel: Texel = 1: 1
-			mMagMinThresh = 0.0f;
+		// Pixel: Texel = 1: 1
+		mMagMinThresh = 0.0f;
 
-		switch(mSO.eMagFilter)
-		{
-			case GL_NEAREST:
-				m_pfnTexture2DMag     = &Sample2DNearestLevel;
-				//m_pfnTexture2DMagSIMD = &Sample2DNearestLevelSIMD;
-				break;
-			case GL_LINEAR:
-				m_pfnTexture2DMag     = &Sample2DLinearLevel;
-				//m_pfnTexture2DMagSIMD = &Sample2DLinearLevelSIMD;
-				break;
-			default:
-				return false;
-		}
-
-		switch(mSO.eMinFilter)
-		{
-			case GL_NEAREST:
-				m_pfnTexture2DMin = &Sample2DNearestNonmipmap;
-				//m_pfnTexture2DMinSIMD = &Sample2DNearestNonmipmapSIMD;
-				break;
-			case GL_LINEAR:
-				m_pfnTexture2DMin     = &Sample2DLinearNonmipmap;
-				//m_pfnTexture2DMinSIMD = &Sample2DLinearNonmipmapSIMD;
-				break;
-			case GL_NEAREST_MIPMAP_NEAREST:
-				m_pfnTexture2DMin = &Sample2DNearestMipmapNearest;
-				//m_pfnTexture2DMinSIMD = &Sample2DNearestMipmapNearestSIMD;
-				break;
-			case GL_NEAREST_MIPMAP_LINEAR:
-				m_pfnTexture2DMin = &Sample2DNearestMipmapLinear;
-				//m_pfnTexture2DMinSIMD = &Sample2DNearestMipmapLinearSIMD;
-				break;
-			case GL_LINEAR_MIPMAP_NEAREST:
-				m_pfnTexture2DMin = &Sample2DLinearMipmapNearest;
-				//m_pfnTexture2DMinSIMD = &Sample2DLinearMipmapNearestSIMD;
-				break;
-			case GL_LINEAR_MIPMAP_LINEAR:
-				m_pfnTexture2DMin = &Sample2DLinearMipmapLinear;
-				//m_pfnTexture2DMinSIMD = &Sample2DLinearMipmapLinearSIMD;
-				break;
-			default:
-				return false;
-		}
-
-		m_pfnTexture2D     = &Sample2DLambda;
-		//m_pfnTexture2DSIMD = &Sample2DLambdaSIMD;
-	}
-
-	bool ret = PickupWrapFunc(mSO);
-
-	return ret;
+	return true;
 }
 
 

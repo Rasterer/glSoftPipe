@@ -58,6 +58,13 @@ static inline __m128i _simd_clamp_epi32(__m128i val, __m128i min, __m128i max)
 	return _mm_min_epi32(_mm_max_epi32(val, min), max);
 }
 
+static inline __m128 _simd_lerp_ps(__m128 val1, __m128 val2, float weight)
+{
+	val1 = _mm_mul_ps(val1, _mm_set_ps1(1.0f - weight));
+	val2 = _mm_mul_ps(val2, _mm_set_ps1(weight));
+	return _mm_add_ps(val1, val2);
+}
+
 static inline __m128i MAWrapper(const __m128i &v, const __m128i &stride, const __m128i &h)
 {
 #if defined(__AVX2__)
