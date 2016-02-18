@@ -98,11 +98,15 @@ Blender::Blender():
 
 void Blender::emit(void *data)
 {
+#if 0
 	Fsio *pFsio = static_cast<Fsio *>(data);
 
 	onBlending(*pFsio);
+#endif
 
-	getNextStage()->emit(pFsio);
+	Fsiosimd *pFsio = static_cast<Fsiosimd *>(data);
+
+	onBlendingSIMD(*pFsio);
 }
 
 // TODO: impl
@@ -117,6 +121,65 @@ void Blender::onBlending(Fsio &fsio)
 	src.b = (uint8_t)((src.b * src.a + dst[4*index+0] * (1 - src.a) / 256.0f));
 	src.r = (uint8_t)((src.r * src.a + dst[4*index+3] * (1 - src.a) / 256.0f));
 	return;
+}
+
+static inline void ColorBlending(int32_t *colorBuffer, int index, __m128 &vInputColor)
+{
+	__m128i vSrcColori;
+	__m128  vSrcColor;
+	__m128i vDestColori;
+	__m128  vDestColor;
+
+	static const __m128i mask = _mm_set_epi8(0x80, 0x80, 0x80, 0x80,
+								0x80, 0x80, 0x80, 0x80,
+								0x80, 0x80, 0x80, 0x80,
+								0x0C, 0x08, 0x04, 0x00);
+
+	vDestColori = _mm_cvtsi32_si128(colorBuffer[index]);
+	vDestColori = _mm_unpacklo_epi8 (vDestColori, _mm_setzero_si128());
+	vDestColori = _mm_unpacklo_epi16(vDestColori, _mm_setzero_si128());
+	vDestColor  = _mm_cvtepi32_ps(vDestColori);
+
+	float src_alpha = _mm_cvtss_f32(_mm_shuffle_ps(vInputColor, vInputColor, _MM_SHUFFLE(0, 0, 0, 3)));
+	vSrcColor  = _mm_mul_ps(vInputColor, _mm_set_ps1(256.0f));
+	vSrcColor  = _simd_lerp_ps(vDestColor, vSrcColor, src_alpha);
+	vSrcColori = _simd_clamp_epi32(_mm_cvtps_epi32(vSrcColor), _mm_setzero_si128(), _mm_set1_epi32(255));
+	vSrcColori = _mm_shuffle_epi8(vSrcColori, mask);
+	colorBuffer[index] = _mm_cvtsi128_si32(vSrcColori);;
+}
+
+void Blender::onBlendingSIMD(Fsiosimd &fsio)
+{
+	int32_t *colorBuffer = (int32_t *)g_GC->mRT.pColorBuffer;
+	int index;
+
+	// left-bottom pixel
+	if (fsio.mCoverageMask & 1)
+	{
+		index = fsio.y * g_GC->mRT.width + fsio.x;
+		ColorBlending(colorBuffer, index, fsio.mOutRegs[0]);
+	}
+
+	// right-bottom pixel
+	if (fsio.mCoverageMask & 2)
+	{
+		index = fsio.y * g_GC->mRT.width + fsio.x + 1;
+		ColorBlending(colorBuffer, index, fsio.mOutRegs[1]);
+	}
+
+	// left-top pixel
+	if (fsio.mCoverageMask & 4)
+	{
+		index = (fsio.y + 1) * g_GC->mRT.width + fsio.x;
+		ColorBlending(colorBuffer, index, fsio.mOutRegs[2]);
+	}
+
+	// right-top pixel
+	if (fsio.mCoverageMask & 8)
+	{
+		index = (fsio.y + 1) * g_GC->mRT.width + fsio.x + 1;
+		ColorBlending(colorBuffer, index, fsio.mOutRegs[3]);
+	}
 }
 
 Dither::Dither():
@@ -136,8 +199,8 @@ void FBWriter::emit(void *data)
 	onFBWriting(*pFsio);
 #else
 	Fsiosimd *pFsio = static_cast<Fsiosimd *>(data);
-#endif
 	onFBWritingSIMD(*pFsio);
+#endif
 }
 
 void FBWriter::onFBWriting(const Fsio &fsio)
@@ -156,11 +219,12 @@ void FBWriter::onFBWritingSIMD(const Fsiosimd &fsio)
 	int32_t *colorBuffer = (int32_t *)g_GC->mRT.pColorBuffer;
 	int index;
 
-	__m128i tmp;
-	__m128i mask = _mm_set_epi8(0x80, 0x80, 0x80, 0x80,
+	static __m128i mask = _mm_set_epi8(0x80, 0x80, 0x80, 0x80,
 								0x80, 0x80, 0x80, 0x80,
 								0x80, 0x80, 0x80, 0x80,
 								0x0C, 0x08, 0x04, 0x00);
+	__m128i tmp;
+
 	// left-bottom pixel
 	if (fsio.mCoverageMask & 1)
 	{
@@ -184,7 +248,7 @@ void FBWriter::onFBWritingSIMD(const Fsiosimd &fsio)
 	// left-top pixel
 	if (fsio.mCoverageMask & 4)
 	{
-		index = fsio.y * g_GC->mRT.width + fsio.x;
+		index = (fsio.y + 1) * g_GC->mRT.width + fsio.x;
 		tmp   = _mm_cvtps_epi32(_mm_mul_ps(fsio.mOutRegs[2], _mm_set_ps1(256.0f)));
 		tmp   = _simd_clamp_epi32(tmp, _mm_setzero_si128(), _mm_set1_epi32(255));
 		tmp   = _mm_shuffle_epi8(tmp, mask);
@@ -194,7 +258,7 @@ void FBWriter::onFBWritingSIMD(const Fsiosimd &fsio)
 	// right-top pixel
 	if (fsio.mCoverageMask & 8)
 	{
-		index = fsio.y * g_GC->mRT.width + fsio.x + 1;
+		index = (fsio.y + 1) * g_GC->mRT.width + fsio.x + 1;
 		tmp   = _mm_cvtps_epi32(_mm_mul_ps(fsio.mOutRegs[3], _mm_set_ps1(256.0f)));
 		tmp   = _simd_clamp_epi32(tmp, _mm_setzero_si128(), _mm_set1_epi32(255));
 		tmp   = _mm_shuffle_epi8(tmp, mask);

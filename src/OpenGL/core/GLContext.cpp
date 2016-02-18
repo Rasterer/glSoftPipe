@@ -41,6 +41,40 @@ GLAPI void APIENTRY glEnable (GLenum cap)
 			gc->mState.mEnables |= GLSP_CULL_FACE;
 			break;
 		}
+		case GL_BLEND:
+		{
+			gc->mState.mEnables |= GLSP_BLEND;
+			break;
+		}
+		default:
+		{
+			GLSP_DPF(GLSP_DPF_LEVEL_ERROR, "unknown cap\n");
+		}
+	}
+}
+
+GLAPI void APIENTRY glDisable (GLenum cap)
+{
+	__GET_CONTEXT();
+
+	// TODO: impl other options
+	switch (cap)
+	{
+		case GL_DEPTH_TEST:
+		{
+			gc->mState.mEnables &= ~GLSP_DEPTH_TEST;
+			break;
+		}
+		case GL_CULL_FACE:
+		{
+			gc->mState.mEnables &= ~GLSP_CULL_FACE;
+			break;
+		}
+		case GL_BLEND:
+		{
+			gc->mState.mEnables &= ~GLSP_BLEND;
+			break;
+		}
 		default:
 		{
 			GLSP_DPF(GLSP_DPF_LEVEL_ERROR, "unknown cap\n");

@@ -67,6 +67,7 @@ public:
 
 private:
 	inline void onBlending(Fsio &fsio);
+	inline void onBlendingSIMD(Fsiosimd &fsio);
 };
 
 class Dither: public PipeStage
