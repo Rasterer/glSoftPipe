@@ -435,34 +435,39 @@ void Binning::SetupTriangleSIMD(Triangle *tri0, Triangle *tri1, Triangle *tri2, 
 	tri2->mWRecipAtOrigin = tmpf[2];
 	tri3->mWRecipAtOrigin = tmpf[3];
 
-	__m128 vZ0f = _mm_set_ps(v30->position().z, v20->position().z, v10->position().z, v00->position().z);
-	__m128 vZ1f = _mm_set_ps(v31->position().z, v21->position().z, v11->position().z, v01->position().z);
-	__m128 vZ2f = _mm_set_ps(v32->position().z, v22->position().z, v12->position().z, v02->position().z);
-	__m128 vZGradientX = _mm_add_ps(_mm_add_ps(_mm_mul_ps(vY1Y2f, vZ0f), _mm_mul_ps(vY2Y0f, vZ1f)),
-									_mm_mul_ps(vY0Y1f, vZ2f));
-	__m128 vZGradientY = _mm_add_ps(_mm_add_ps(_mm_mul_ps(vX2X1f, vZ0f), _mm_mul_ps(vX0X2f, vZ1f)),
-									_mm_mul_ps(vX1X0f, vZ2f));
-	__m128 vZAtOrigin = _mm_sub_ps(_mm_sub_ps(vZ0f, _mm_mul_ps(vZGradientX, vXoffset)),
-								_mm_mul_ps(vZGradientY, vYoffset));
+	if (prim0->mRasterStates->mIsDepthTestEnable)
+	{
+		__m128 vZ0f = _mm_set_ps(v30->position().z, v20->position().z, v10->position().z, v00->position().z);
+		__m128 vZ1f = _mm_set_ps(v31->position().z, v21->position().z, v11->position().z, v01->position().z);
+		__m128 vZ2f = _mm_set_ps(v32->position().z, v22->position().z, v12->position().z, v02->position().z);
+		__m128 vZGradientX = _mm_add_ps(_mm_add_ps(_mm_mul_ps(vY1Y2f, vZ0f), _mm_mul_ps(vY2Y0f, vZ1f)),
+										_mm_mul_ps(vY0Y1f, vZ2f));
+		__m128 vZGradientY = _mm_add_ps(_mm_add_ps(_mm_mul_ps(vX2X1f, vZ0f), _mm_mul_ps(vX0X2f, vZ1f)),
+										_mm_mul_ps(vX1X0f, vZ2f));
+		__m128 vZAtOrigin = _mm_sub_ps(_mm_sub_ps(vZ0f, _mm_mul_ps(vZGradientX, vXoffset)),
+									_mm_mul_ps(vZGradientY, vYoffset));
 
-	_mm_store_ps(tmpf, vZGradientX);
-	tri0->mZGradientX = tmpf[0];
-	tri1->mZGradientX = tmpf[1];
-	tri2->mZGradientX = tmpf[2];
-	tri3->mZGradientX = tmpf[3];
+		_mm_store_ps(tmpf, vZGradientX);
+		tri0->mZGradientX = tmpf[0];
+		tri1->mZGradientX = tmpf[1];
+		tri2->mZGradientX = tmpf[2];
+		tri3->mZGradientX = tmpf[3];
 
-	_mm_store_ps(tmpf, vZGradientY);
-	tri0->mZGradientY = tmpf[0];
-	tri1->mZGradientY = tmpf[1];
-	tri2->mZGradientY = tmpf[2];
-	tri3->mZGradientY = tmpf[3];
+		_mm_store_ps(tmpf, vZGradientY);
+		tri0->mZGradientY = tmpf[0];
+		tri1->mZGradientY = tmpf[1];
+		tri2->mZGradientY = tmpf[2];
+		tri3->mZGradientY = tmpf[3];
 
-	_mm_store_ps(tmpf, vZAtOrigin);
-	tri0->mZAtOrigin = tmpf[0];
-	tri1->mZAtOrigin = tmpf[1];
-	tri2->mZAtOrigin = tmpf[2];
-	tri3->mZAtOrigin = tmpf[3];
+		_mm_store_ps(tmpf, vZAtOrigin);
+		tri0->mZAtOrigin = tmpf[0];
+		tri1->mZAtOrigin = tmpf[1];
+		tri2->mZAtOrigin = tmpf[2];
+		tri3->mZAtOrigin = tmpf[3];
+	}
 
+	if (prim0->mRasterStates->mIsDepthOnly)
+		return;
 
 	// FIXME: attributes size of these triangles may be different.
 	const size_t size = v00->getRegsNum();
@@ -632,9 +637,15 @@ void Binning::SetupTriangle(Triangle *tri)
 	tri->mWRecipGradientY   = lambday0 + lambday1 + lambday2;
 	tri->mWRecipAtOrigin    = WReciprocal0 - tri->mWRecipGradientX * xoffset - tri->mWRecipGradientY * yoffset;
 
-	tri->mZGradientX = y1y2f * v0->position().z + y2y0f * v1->position().z + y0y1f * v2->position().z;
-	tri->mZGradientY = x2x1f * v0->position().z + x0x2f * v1->position().z + x1x0f * v2->position().z;
-	tri->mZAtOrigin  = v0->position().z - tri->mZGradientX * xoffset - tri->mZGradientY * yoffset;
+	if (prim.mRasterStates->mIsDepthTestEnable)
+	{
+		tri->mZGradientX = y1y2f * v0->position().z + y2y0f * v1->position().z + y0y1f * v2->position().z;
+		tri->mZGradientY = x2x1f * v0->position().z + x0x2f * v1->position().z + x1x0f * v2->position().z;
+		tri->mZAtOrigin  = v0->position().z - tri->mZGradientX * xoffset - tri->mZGradientY * yoffset;
+	}
+
+	if (prim.mRasterStates->mIsDepthOnly)
+		return;
 
 	const size_t size = v0->getRegsNum();
 	tri->mAttrPlaneEquationA.resize(size);
@@ -939,93 +950,246 @@ void TBDR::FineRasterizing(int x, int y)
 	x = (x << MACRO_TILE_SIZE_SHIFT);
 	y = (y << MACRO_TILE_SIZE_SHIFT);
 
-	bool has_prims = !disp_list.empty() || !full_disp_list.empty();
+	const bool has_prims = !disp_list.empty() || !full_disp_list.empty();
 
-	if (mDepthClearFlag)
+	const int max_w = (std::min)(MACRO_TILE_SIZE, g_GC->mRT.width  - x);
+	const int max_h = (std::min)(MACRO_TILE_SIZE, g_GC->mRT.height - y);
+
+	float *rt_zbuf = g_GC->mRT.pDepthBuffer + g_GC->mRT.width * y + x;
+
+	if (!has_prims)
 	{
-		if (has_prims)
+		// enter this only when clear flag set.
+		if (!mFlushTriggerBySwapBuffer)
 		{
-			__m128 vDepth = _mm_set_ps1(static_cast<float>(g_GC->mState.mClearState.depth));
-			float *addr = &z_buf[0][0];
+			float *dst = rt_zbuf;
 
-			// Assume 64 bytes cache line size
-			for (int i = 0; i < MACRO_TILE_SIZE * MACRO_TILE_SIZE; i += 16, addr += 16)
+			__m128 vDepth = _mm_set_ps1(static_cast<float>(g_GC->mState.mClearState.depth));
+			for (int i = 0; i < max_h; ++i, dst += g_GC->mRT.width)
 			{
-				_mm_store_ps(addr     , vDepth);
-				_mm_store_ps(addr + 4 , vDepth);
-				_mm_store_ps(addr + 8 , vDepth);
-				_mm_store_ps(addr + 12, vDepth);
+				float *dstx = dst;
+				for (int j = 0; j < max_w; j += 4, dstx += 4)
+				{
+					_mm_stream_ps(dstx, vDepth);
+				}
 			}
+		}
+
+		return;
+	}
+	else if (mDepthClearFlag)
+	{
+		__m128 vDepth = _mm_set_ps1(static_cast<float>(g_GC->mState.mClearState.depth));
+		float *addr = &z_buf[0][0];
+
+		// Assume 64 bytes cache line size
+		for (int i = 0; i < MACRO_TILE_SIZE * MACRO_TILE_SIZE; i += 16, addr += 16)
+		{
+			_mm_store_ps(addr     , vDepth);
+			_mm_store_ps(addr + 4 , vDepth);
+			_mm_store_ps(addr + 8 , vDepth);
+			_mm_store_ps(addr + 12, vDepth);
 		}
 	}
 	else
 	{
-		// TODO: load depth buffer from render target.
+		// load on tile depth buffer from render target.
+		float *src = rt_zbuf;
+
+		for (int i = 0; i < max_h; ++i, src += g_GC->mRT.width)
+		{
+			float *srcx = src;
+			for (int j = 0; j < max_w; j += 4, srcx += 4)
+			{
+				__m128 vDepth = _mm_castsi128_ps(_mm_stream_load_si128((__m128i *)srcx));
+				_mm_store_ps(&z_buf[i][j], vDepth);
+			}
+		}
 	}
 
-	if (!mDepthOnlyPass && has_prims)
-		std::memset(&pp_map[0][0], 0, sizeof(PixelPrimMap));
-
-	int max_w = (std::min)(MACRO_TILE_SIZE, g_GC->mRT.width  - x);
-	int max_h = (std::min)(MACRO_TILE_SIZE, g_GC->mRT.height - y);
+	bool prim_tile_valid = false;
 
 	for (Triangle *tri: full_disp_list)
 	{
-		// 4x1 in one go
-		__m128 vNewZ   = _mm_set_ps1(tri->mZAtOrigin);
+		RasterStates *raster_states = tri->mPrim.mRasterStates;
 
-		vNewZ = MAWrapper(_mm_cvtepi32_ps(_mm_set_epi32(x + 3, x + 2, x + 1, x)), _mm_set_ps1(tri->mZGradientX), vNewZ);
-		vNewZ = MAWrapper(_mm_cvtepi32_ps(_mm_set_epi32(y, y, y, y)), _mm_set_ps1(tri->mZGradientY), vNewZ);
-
-		float *zbuf_pos = &z_buf[0][0];
-		Triangle **pp_map_pos = &pp_map[0][0];
-		__m128 vStepx = _mm_set_ps1(tri->mZGradientX * 4);
-		__m128 vStepy = _mm_set_ps1(tri->mZGradientY);
-
-		for (int i = 0; i < max_h; ++i)
+		if (!prim_tile_valid && !raster_states->mIsDepthOnly && !raster_states->mIsBlendEnable)
 		{
-			float *zbuf_posx = zbuf_pos;
-			Triangle **pp_map_posx = pp_map_pos;
-			__m128 vNewZx = vNewZ;
+			// Switch from PT(punch through) mode to HSR(hidden surface removal) mode,
+			// need initialize current primtive tile here.
+			std::memset(&pp_map[0][0], 0, sizeof(PixelPrimMap));
 
-			for (int j = 0; j < max_w; j += 4)
+			prim_tile_valid = true;
+		}
+		else if (prim_tile_valid && raster_states->mIsBlendEnable)
+		{
+			// Switch from HSR(hidden surface removal) mode to PT(punch through) mode,
+			// need flush current primtive tile here.
+			for (int i = 0; i < max_h; i += 2)
 			{
-				__m128 vCurrentZ = _mm_load_ps(zbuf_posx);
-				__m128i vMask = _mm_castps_si128(_mm_cmp_ps(vNewZx, vCurrentZ, _CMP_LT_OS));
-
-				_mm_maskstore_ps(zbuf_posx, vMask, vNewZx);
-				zbuf_posx   += 4;
-
-				if (!mDepthOnlyPass)
+				for (int j = 0; j < max_w; j += 2)
 				{
-					_simd_mask_store(pp_map_posx, vMask, tri);
-					pp_map_posx += 4;
+					RenderQuadPixels(pp_map, x, y, i, j);
 				}
-				vNewZx = _mm_add_ps(vNewZx, vStepx);
 			}
-			zbuf_pos += MACRO_TILE_SIZE;
-			pp_map_pos += MACRO_TILE_SIZE;
-			vNewZ = _mm_add_ps(vNewZ, vStepy);
+
+			prim_tile_valid = false;
+		}
+
+		if (raster_states->mIsDepthTestEnable)
+		{
+			__m128 vNewZ   = _mm_set_ps1(tri->mZAtOrigin);
+
+			vNewZ = MAWrapper(_mm_cvtepi32_ps(_mm_set_epi32(x + 3, x + 2, x + 1, x)), _mm_set_ps1(tri->mZGradientX), vNewZ);
+			vNewZ = MAWrapper(_mm_cvtepi32_ps(_mm_set_epi32(y, y, y, y)), _mm_set_ps1(tri->mZGradientY), vNewZ);
+
+			__m128 vZStepQuadx = _mm_set_ps1(tri->mZGradientX * 4);
+			__m128 vZStepQuady = _mm_set_ps1(tri->mZGradientY);
+			__m128 vZStepMTx = _mm_set_ps1(tri->mZGradientX * MICRO_TILE_SIZE);
+			__m128 vZStepMTy = _mm_set_ps1(tri->mZGradientY * MICRO_TILE_SIZE);
+
+			for (int i = 0; i < max_h; i += MICRO_TILE_SIZE)
+			{
+				__m128 vNewZx = vNewZ;
+
+				for (int j = 0; j < max_w; j += MICRO_TILE_SIZE)
+				{
+					uint64_t coverage_mask = 0;
+
+					float *zbuf_pos = &z_buf[i][j];
+					__m128 vNewZxx = vNewZx;
+
+					for (int k = 0; k < MICRO_TILE_SIZE; ++k)
+					{
+						float *zbuf_posx = zbuf_pos;
+						__m128 vNewZxxx = vNewZxx;
+
+						for (int l = 0; l < MICRO_TILE_SIZE; l += 4)
+						{
+							__m128 vCurrentZ = _mm_load_ps(zbuf_posx);
+							__m128 vMask = _mm_cmp_ps(vNewZxxx, vCurrentZ, _CMP_LT_OS);
+							_mm_maskstore_ps(zbuf_posx, _mm_castps_si128(vMask), vNewZxxx);
+
+							uint64_t mask = (uint64_t)_mm_movemask_ps(vMask);
+							coverage_mask |= (mask << ((k << MICRO_TILE_SIZE_SHIFT) + l));
+
+							zbuf_posx   += 4;
+							vNewZxxx = _mm_add_ps(vNewZxxx, vZStepQuadx);
+						}
+
+						zbuf_pos   += MACRO_TILE_SIZE;
+						vNewZxx = _mm_add_ps(vNewZxx, vZStepQuady);
+					}
+					vNewZx  = _mm_add_ps(vNewZx, vZStepMTx);
+
+					if (coverage_mask && !raster_states->mIsDepthOnly)
+					{
+						if (!raster_states->mIsBlendEnable)
+						{
+							for (int k = 0; k < MICRO_TILE_SIZE; ++k)
+							{
+								for (int l = 0; l < MICRO_TILE_SIZE; ++l)
+								{
+									if (coverage_mask & ((uint64_t)0x1 << ((k << MICRO_TILE_SIZE_SHIFT) + l)))
+									{
+										pp_map[i + k][j + l] = tri;
+									}
+								}
+							}
+						}
+						else
+						{
+							for (int k = 0; (k < MICRO_TILE_SIZE) && ((i + k) < max_h); k += 2)
+							{
+								for (int l = 0; (l < MICRO_TILE_SIZE) && ((j + l) < max_w); l += 2)
+								{
+									int shift = (k << MICRO_TILE_SIZE_SHIFT) + l;
+									int quad_mask = ((int)(coverage_mask >> shift)) & 0x3;
+									shift += MICRO_TILE_SIZE;
+									quad_mask |= ((((int)(coverage_mask >> shift)) & 0x3) << 2);
+
+									RenderQuadPixelsInOneTriangle(tri, quad_mask, x, y, (j + l), (i + k));
+								}
+							}
+						}
+					}
+				}
+				vNewZ = _mm_add_ps(vNewZ, vZStepMTy);
+			}
+		}
+		else
+		{
+			if (raster_states->mIsBlendEnable)
+			{
+				for (int i = 0; i < max_w; i += 2)
+				{
+					for (int j = 0; j < max_h; j += 2)
+					{
+						RenderQuadPixelsInOneTriangle(tri, 0xF, x, y, j, i);
+					}
+				}
+			}
+			else
+			{
+				Triangle **p = &pp_map[0][0];
+				for (int i = 0; i < MACRO_TILE_SIZE * MACRO_TILE_SIZE; ++i)
+				{
+					p[i] = tri;
+				}
+			}
 		}
 	}
 
 	for (Triangle *tri: disp_list)
 	{
+		RasterStates *raster_states = tri->mPrim.mRasterStates;
+
+		if (!prim_tile_valid && !raster_states->mIsDepthOnly && !raster_states->mIsBlendEnable)
+		{
+			// Switch from PT(punch through) mode to HSR(hidden surface removal) mode,
+			// need initialize current primtive tile here.
+			std::memset(&pp_map[0][0], 0, sizeof(PixelPrimMap));
+
+			prim_tile_valid = true;
+		}
+		else if (prim_tile_valid && raster_states->mIsBlendEnable)
+		{
+			// Switch from HSR(hidden surface removal) mode to PT(punch through) mode,
+			// need flush current primtive tile here.
+			for (int i = 0; i < max_h; i += 2)
+			{
+				for (int j = 0; j < max_w; j += 2)
+				{
+					RenderQuadPixels(pp_map, x, y, i, j);
+				}
+			}
+
+			prim_tile_valid = false;
+		}
+
 		const int minx = ROUND_DOWN((std::max)(0, tri->xmin - x), MICRO_TILE_SIZE);
 		const int miny = ROUND_DOWN((std::max)(0, tri->ymin - y), MICRO_TILE_SIZE);
 		const int maxx = (std::min)(MACRO_TILE_SIZE, tri->xmax - x + 1);
 		const int maxy = (std::min)(MACRO_TILE_SIZE, tri->ymax - y + 1);
 
-		__m128 vNewZ = _mm_set_ps1(tri->mZAtOrigin);
+		__m128 vNewZ;
+		__m128 vZStepQuadx;
+		__m128 vZStepQuady;
+		__m128 vZStepMTx;
+		__m128 vZStepMTy;
+		if (raster_states->mIsDepthTestEnable)
+		{
+			vNewZ = _mm_set_ps1(tri->mZAtOrigin);
 
-		vNewZ = MAWrapper(_mm_cvtepi32_ps(_mm_set_epi32(x + minx + 3, x + minx + 2, x + minx + 1, x + minx)), _mm_set_ps1(tri->mZGradientX), vNewZ);
-		vNewZ = MAWrapper(_mm_cvtepi32_ps(_mm_set_epi32(y + miny, y + miny, y + miny, y + miny)), _mm_set_ps1(tri->mZGradientY), vNewZ);
+			vNewZ = MAWrapper(_mm_cvtepi32_ps(_mm_set_epi32(x + minx + 3, x + minx + 2, x + minx + 1, x + minx)), _mm_set_ps1(tri->mZGradientX), vNewZ);
+			vNewZ = MAWrapper(_mm_cvtepi32_ps(_mm_set_epi32(y + miny, y + miny, y + miny, y + miny)), _mm_set_ps1(tri->mZGradientY), vNewZ);
 
-		__m128 vZStepQuadx = _mm_set_ps1(tri->mZGradientX * 4);
-		__m128 vZStepQuady = _mm_set_ps1(tri->mZGradientY);
+			vZStepQuadx = _mm_set_ps1(tri->mZGradientX * 4);
+			vZStepQuady = _mm_set_ps1(tri->mZGradientY);
 
-		__m128 vZStepMTx = _mm_set_ps1(tri->mZGradientX * MICRO_TILE_SIZE);
-		__m128 vZStepMTy = _mm_set_ps1(tri->mZGradientY * MICRO_TILE_SIZE);
+			vZStepMTx = _mm_set_ps1(tri->mZGradientX * MICRO_TILE_SIZE);
+			vZStepMTy = _mm_set_ps1(tri->mZGradientY * MICRO_TILE_SIZE);
+		}
 
 		__m128i vMicroTileCornerX = _mm_set_epi32(x + minx + MICRO_TILE_SIZE - 1, x + minx, x + minx + MICRO_TILE_SIZE - 1, x + minx);
 		__m128i vMicroTileCornerY = _mm_set_epi32(y + miny + MICRO_TILE_SIZE - 1, y + miny + MICRO_TILE_SIZE - 1, y + miny, y + miny);
@@ -1075,7 +1239,7 @@ void TBDR::FineRasterizing(int x, int y)
 				vArea0x = _mm_add_epi32(vArea0x, vAreaStepMTx0),
 				vArea1x = _mm_add_epi32(vArea1x, vAreaStepMTx1),
 				vArea2x = _mm_add_epi32(vArea2x, vAreaStepMTx2),
-				vNewZx = _mm_add_ps(vNewZx, vZStepMTx))
+				vNewZx  = _mm_add_ps(vNewZx, vZStepMTx))
 			{
 				__m128i vTest0 = _mm_cmplt_epi32(vArea0x, _mm_setzero_si128());
 				// This micro tile is totally outside the triangle
@@ -1090,42 +1254,43 @@ void TBDR::FineRasterizing(int x, int y)
 				if (_mm_test_all_ones(vTest2))
 					continue;
 
+				uint64_t coverage_mask = 0;
+
 				// This micro tile is totally inside the triangle
 				if (_mm_test_all_zeros(vTest0, _mm_set1_epi32(0xFFFFFFFF)) &&
 					_mm_test_all_zeros(vTest1, _mm_set1_epi32(0xFFFFFFFF)) &&
 					_mm_test_all_zeros(vTest2, _mm_set1_epi32(0xFFFFFFFF)))
 				{
-					float *zbuf_pos = &z_buf[i][j];
-					Triangle **pp_map_pos = &pp_map[i][j];
-
-					__m128 vNewZxx = vNewZx;
-
-					for (int k = 0; k < MICRO_TILE_SIZE; ++k)
+					if (raster_states->mIsDepthTestEnable)
 					{
-						float *zbuf_posx = zbuf_pos;
-						Triangle **pp_map_posx = pp_map_pos;
-						__m128 vNewZxxx = vNewZxx;
+						float *zbuf_pos = &z_buf[i][j];
+						__m128 vNewZxx = vNewZx;
 
-						for (int l = 0; l < MICRO_TILE_SIZE; l += 4)
+						for (int k = 0; k < MICRO_TILE_SIZE; ++k)
 						{
-							__m128 vCurrentZ = _mm_load_ps(zbuf_posx);
-							__m128i vMask = _mm_castps_si128(_mm_cmp_ps(vNewZxxx, vCurrentZ, _CMP_LT_OS));
+							float *zbuf_posx = zbuf_pos;
+							__m128 vNewZxxx = vNewZxx;
 
-							_mm_maskstore_ps(zbuf_posx, vMask, vNewZxxx);
-							zbuf_posx   += 4;
-
-							if (!mDepthOnlyPass)
+							for (int l = 0; l < MICRO_TILE_SIZE; l += 4)
 							{
-								_simd_mask_store(pp_map_posx, vMask, tri);
-								pp_map_posx += 4;
+								__m128 vCurrentZ = _mm_load_ps(zbuf_posx);
+								__m128 vMask = _mm_cmp_ps(vNewZxxx, vCurrentZ, _CMP_LT_OS);
+								_mm_maskstore_ps(zbuf_posx, _mm_castps_si128(vMask), vNewZxxx);
+
+								uint64_t mask = (uint64_t)_mm_movemask_ps(vMask);
+								coverage_mask |= (mask << ((k << MICRO_TILE_SIZE_SHIFT) + l));
+
+								zbuf_posx   += 4;
+								vNewZxxx = _mm_add_ps(vNewZxxx, vZStepQuadx);
 							}
 
-							vNewZxxx = _mm_add_ps(vNewZxxx, vZStepQuadx);
+							zbuf_pos   += MACRO_TILE_SIZE;
+							vNewZxx = _mm_add_ps(vNewZxx, vZStepQuady);
 						}
-
-						zbuf_pos   += MACRO_TILE_SIZE;
-						pp_map_pos += MACRO_TILE_SIZE;
-						vNewZxx = _mm_add_ps(vNewZxx, vZStepQuady);
+					}
+					else
+					{
+						coverage_mask = 0xFFFFFFFFFFFFFFFF;
 					}
 				}
 				else
@@ -1168,19 +1333,19 @@ void TBDR::FineRasterizing(int x, int y)
 							if (_mm_test_all_ones(vTest2x))
 								continue;
 
-							float *zbuf_pos = &z_buf[i + k][j + l];
-							__m128 vCurrentZ = _mm_load_ps(zbuf_pos);
-							__m128i vMask = _mm_castps_si128(_mm_cmp_ps(vNewZxxx, vCurrentZ, _CMP_LT_OS));
-							vMask = _mm_andnot_si128(vTest0x, vMask);
-							vMask = _mm_andnot_si128(vTest1x, vMask);
-							vMask = _mm_andnot_si128(vTest2x, vMask);
+							__m128i vMask = _mm_andnot_si128(_mm_or_si128(_mm_or_si128(vTest0x, vTest1x), vTest2x), _mm_set1_epi32(0xFFFFFFFF));
 
-							_mm_maskstore_ps(zbuf_pos, vMask, vNewZxxx);
-							if (!mDepthOnlyPass)
+							if (raster_states->mIsDepthTestEnable)
 							{
-								Triangle **pp_map_pos = &pp_map[i + k][j + l];
-								_simd_mask_store(pp_map_pos, vMask, tri);
+								float *zbuf_pos = &z_buf[i + k][j + l];
+								__m128 vCurrentZ = _mm_load_ps(zbuf_pos);
+								__m128i vTmp = _mm_castps_si128(_mm_cmp_ps(vNewZxxx, vCurrentZ, _CMP_LT_OS));
+								vMask = _mm_and_si128(vMask, vTmp);
+								_mm_maskstore_ps(zbuf_pos, vMask, vNewZxxx);
 							}
+
+							uint64_t mask = (uint64_t)_mm_movemask_ps(_mm_castsi128_ps(vMask));
+							coverage_mask |= (mask << ((k << MICRO_TILE_SIZE_SHIFT) + l));
 						}
 
 						vArea0xx = _mm_add_epi32(vArea0xx, vAreaStepQuady0);
@@ -1189,8 +1354,39 @@ void TBDR::FineRasterizing(int x, int y)
 						vNewZxx = _mm_add_ps(vNewZxx, vZStepQuady);
 					}
 				}
-			}
 
+				if (coverage_mask && !raster_states->mIsDepthOnly)
+				{
+					if (!raster_states->mIsBlendEnable)
+					{
+						for (int k = 0; k < MICRO_TILE_SIZE; ++k)
+						{
+							for (int l = 0; l < MICRO_TILE_SIZE; ++l)
+							{
+								if (coverage_mask & ((uint64_t)0x1 << ((k << MICRO_TILE_SIZE_SHIFT) + l)))
+								{
+									pp_map[i + k][j + l] = tri;
+								}
+							}
+						}
+					}
+					else
+					{
+						for (int k = 0; (k < MICRO_TILE_SIZE) && ((i + k) < maxy); k += 2)
+						{
+							for (int l = 0; (l < MICRO_TILE_SIZE) && ((j + l) < maxx); l += 2)
+							{
+								int shift = (k << MICRO_TILE_SIZE_SHIFT) + l;
+								int quad_mask = ((int)(coverage_mask >> shift)) & 0x3;
+								shift += MICRO_TILE_SIZE;
+								quad_mask |= ((((int)(coverage_mask >> shift)) & 0x3) << 2);
+
+								RenderQuadPixelsInOneTriangle(tri, quad_mask, x, y, (j + l), (i + k));
+							}
+						}
+					}
+				}
+			}
 			vArea0 = _mm_add_epi32(vArea0, vAreaStepMTy0);
 			vArea1 = _mm_add_epi32(vArea1, vAreaStepMTy1);
 			vArea2 = _mm_add_epi32(vArea2, vAreaStepMTy2);
@@ -1200,209 +1396,32 @@ void TBDR::FineRasterizing(int x, int y)
 
 	if (!mFlushTriggerBySwapBuffer)
 	{
-		float *dst = g_GC->mRT.pDepthBuffer + g_GC->mRT.width * y + x;
-		if (mDepthClearFlag && !has_prims)
+		// store on tile depth buffer to render target.
+		float *dst = rt_zbuf;
+
+		for (int i = 0; i < max_h; ++i, dst += g_GC->mRT.width)
 		{
-			__m128 vDepth = _mm_set_ps1(static_cast<float>(g_GC->mState.mClearState.depth));
-			for (int i = 0; i < max_h; ++i, dst += g_GC->mRT.width)
+			float *dstx = dst;
+			for (int j = 0; j < max_w; j += 4, dstx += 4)
 			{
-				float *dstx = dst;
-				for (int j = 0; j < max_w; j += 4, dstx += 4)
-				{
-					_mm_stream_ps(dstx, vDepth);
-				}
-			}
-		}
-		else
-		{
-			for (int i = 0; i < max_h; ++i, dst += g_GC->mRT.width)
-			{
-				float *dstx = dst;
-				for (int j = 0; j < max_w; j += 4, dstx += 4)
-				{
-					__m128 vDepth = _mm_load_ps(&z_buf[i][j]);
-					_mm_stream_ps(dstx, vDepth);
-				}
+				__m128 vDepth = _mm_load_ps(&z_buf[i][j]);
+				_mm_stream_ps(dstx, vDepth);
 			}
 		}
 	}
 
 	// TODO: early z/stencil
 	// TODO: hierarcical z/stencil
-	if (!mDepthOnlyPass && has_prims)
+	if (prim_tile_valid)
 	{
 		for (int i = 0; i < max_h; i += 2)
 		{
 			for (int j = 0; j < max_w; j += 2)
 			{
-				RenderQuadPixels(pp_map, x, y, i, j);
+				RenderQuadPixels(pp_map, x, y, j, i);
 			}
 		}
 	}
-
-
-// Deprecated SISD path, left for debug purpose.
-#if 0
-	for (Triangle *tri: full_disp_list)
-	{
-		float z = tri->mZAtOrigin + tri->mZGradientX * x + tri->mZGradientY * y;
-
-		for (int i = 0; i < MACRO_TILE_SIZE && (y + i) < g_GC->mRT.height; ++i)
-		{
-			float zx = z;
-
-			for (int j = 0; j < MACRO_TILE_SIZE && (x + j) < g_GC->mRT.width; ++j)
-			{
-				int offset = (i / 2) * 2 * MACRO_TILE_SIZE + (j / 2) * 4 + (i % 2) * 2 + j % 2;
-				if (zx < *(&z_buf[0][0] + offset))
-				{
-					*(&z_buf[0][0] + offset) = zx;
-					*(&pp_map[0][0] + offset) = tri;
-				}
-
-				zx += tri->mZGradientX;
-			}
-			z += tri->mZGradientY;
-		}
-	}
-
-	for (Triangle *tri: disp_list)
-	{
-		for (int yp = y, i = 0; i < MICRO_TILES_IN_MACRO_TILE && yp < g_GC->mRT.height; yp += MICRO_TILE_SIZE, ++i)
-		{
-			for (int xp = x, j = 0; j < MICRO_TILES_IN_MACRO_TILE && xp < g_GC->mRT.width; xp += MICRO_TILE_SIZE, ++j)
-			{
-				const int & xleft   = xp;
-				const int & ybottom = yp;
-				const int & xright  = xp + MICRO_TILE_SIZE - 1;
-				const int & ytop    = yp + MICRO_TILE_SIZE - 1;
-
-				int left_bottom_v0  = tri->mVert[0].mFactorA * xleft  + tri->mVert[0].mFactorB * ybottom + tri->mVert[0].mFactorC;
-				int left_top_v0     = tri->mVert[0].mFactorA * xleft  + tri->mVert[0].mFactorB * ytop    + tri->mVert[0].mFactorC;
-				int right_bottom_v0 = tri->mVert[0].mFactorA * xright + tri->mVert[0].mFactorB * ybottom + tri->mVert[0].mFactorC;
-				int right_top_v0    = tri->mVert[0].mFactorA * xright + tri->mVert[0].mFactorB * ytop    + tri->mVert[0].mFactorC;
-
-				int left_bottom_v1  = tri->mVert[1].mFactorA * xleft  + tri->mVert[1].mFactorB * ybottom + tri->mVert[1].mFactorC;
-				int left_top_v1     = tri->mVert[1].mFactorA * xleft  + tri->mVert[1].mFactorB * ytop    + tri->mVert[1].mFactorC;
-				int right_bottom_v1 = tri->mVert[1].mFactorA * xright + tri->mVert[1].mFactorB * ybottom + tri->mVert[1].mFactorC;
-				int right_top_v1    = tri->mVert[1].mFactorA * xright + tri->mVert[1].mFactorB * ytop    + tri->mVert[1].mFactorC;
-
-				int left_bottom_v2  = tri->mVert[2].mFactorA * xleft  + tri->mVert[2].mFactorB * ybottom + tri->mVert[2].mFactorC;
-				int left_top_v2     = tri->mVert[2].mFactorA * xleft  + tri->mVert[2].mFactorB * ytop    + tri->mVert[2].mFactorC;
-				int right_bottom_v2 = tri->mVert[2].mFactorA * xright + tri->mVert[2].mFactorB * ybottom + tri->mVert[2].mFactorC;
-				int right_top_v2    = tri->mVert[2].mFactorA * xright + tri->mVert[2].mFactorB * ytop    + tri->mVert[2].mFactorC;
-
-				const bool positive_half0  = (left_bottom_v0  >= 0) &&
-											 (left_top_v0     >= 0) &&
-											 (right_bottom_v0 >= 0) &&
-											 (right_top_v0    >= 0);
-				const bool negative_half0  = (left_bottom_v0  <  0) &&
-											 (left_top_v0     <  0) &&
-											 (right_bottom_v0 <  0) &&
-											 (right_top_v0    <  0);
-				const bool positive_half1  = (left_bottom_v1  >= 0) &&
-											 (left_top_v1     >= 0) &&
-											 (right_bottom_v1 >= 0) &&
-											 (right_top_v1    >= 0);
-				const bool negative_half1  = (left_bottom_v1  <  0) &&
-											 (left_top_v1     <  0) &&
-											 (right_bottom_v1 <  0) &&
-											 (right_top_v1    <  0);
-				const bool positive_half2  = (left_bottom_v2  >= 0) &&
-											 (left_top_v2     >= 0) &&
-											 (right_bottom_v2 >= 0) &&
-											 (right_top_v2    >= 0);
-				const bool negative_half2  = (left_bottom_v2  <  0) &&
-											 (left_top_v2     <  0) &&
-											 (right_bottom_v2 <  0) &&
-											 (right_top_v2    <  0);
-
-				// Micro tile is totally outside the triangle
-				if (negative_half0 || negative_half1 || negative_half2)
-				{
-					continue;
-				}
-				else
-				{
-					float z = tri->mZAtOrigin + tri->mZGradientX * xp + tri->mZGradientY * yp;
-
-					// Micro tile is totally inside the triangle
-					if (positive_half0 && positive_half1 && positive_half2)
-					{
-						for (int k = 0; k < MICRO_TILE_SIZE && (yp + k) < g_GC->mRT.height; ++k)
-						{
-							float zx = z;
-
-							for (int l = 0; l < MICRO_TILE_SIZE && (xp + l) < g_GC->mRT.width; ++l)
-							{
-								const int xoff = (j << MICRO_TILE_SIZE_SHIFT) + l;
-								const int yoff = (i << MICRO_TILE_SIZE_SHIFT) + k;
-								const int offset = (yoff / 2) * 2 * MACRO_TILE_SIZE + (xoff / 2) * 4 + (yoff % 2) * 2 + xoff % 2;
-
-								if (zx < *(&z_buf[0][0] + offset))
-								{
-									*(&z_buf[0][0] + offset) = zx;
-									*(&pp_map[0][0] + offset) = tri;
-								}
-								zx += tri->mZGradientX;
-							}
-							z += tri->mZGradientY;
-						}
-					}
-					// This micro tile totally contain the triangle(can do OPT ?),
-					// or it's clipped against the triangle edges, so need further rasterization
-					else
-					{
-						for (int k = 0; k < MICRO_TILE_SIZE && (yp + k) < g_GC->mRT.height; ++k)
-						{
-							int sum0 = left_bottom_v0;
-							int sum1 = left_bottom_v1;
-							int sum2 = left_bottom_v2;
-
-							for (int l = 0; l < MICRO_TILE_SIZE && (xp + l) < g_GC->mRT.width; ++l)
-							{
-								if (sum0 > 0 && sum1 > 0 && sum2 > 0)
-								{
-									const int xoff = (j << MICRO_TILE_SIZE_SHIFT) + l;
-									const int yoff = (i << MICRO_TILE_SIZE_SHIFT) + k;
-
-									const float zp = z + l * tri->mZGradientX + k * tri->mZGradientY;
-									const int offset = (yoff / 2) * 2 * MACRO_TILE_SIZE + (xoff / 2) * 4 + (yoff % 2) * 2 + xoff % 2;
-
-									if (zp < *(&z_buf[0][0] + offset))
-									{
-										*(&z_buf[0][0] + offset) = zp;
-										*(&pp_map[0][0] + offset) = tri;
-									}
-								}
-								sum0 += tri->mVert[0].mFactorA;
-								sum1 += tri->mVert[1].mFactorA;
-								sum2 += tri->mVert[2].mFactorA;
-							}
-
-							left_bottom_v0 += tri->mVert[0].mFactorB;
-							left_bottom_v1 += tri->mVert[1].mFactorB;
-							left_bottom_v2 += tri->mVert[2].mFactorB;
-						}
-					}
-				}
-			}
-		}
-	}
-
-	for (int i = 0; i < MACRO_TILE_SIZE; ++i)
-	{
-		for (int j = 0; j < MACRO_TILE_SIZE; ++j)
-		{
-			const int &index = (y + i) * g_GC->mRT.width + x + j;
-
-			if (pp_map[i][j] && z_buf[i][j] < g_GC->mRT.pDepthBuffer[index])
-			{
-				RenderOnePixel(pp_map[i][j], x + j, y + i, z_buf[i][j]);
-			}
-		}
-	}
-#endif
 }
 
 void TBDR::RenderOnePixel(Triangle *tri, int x, int y, float z)
@@ -1425,10 +1444,10 @@ void TBDR::RenderQuadPixels(PixelPrimMap pp_map, int x, int y, int i, int j)
 
 	Triangle *tri[4] =
 	{
-		pp_map[i + 0][j + 0],
-		pp_map[i + 1][j + 0],
-		pp_map[i + 0][j + 1],
-		pp_map[i + 1][j + 1]
+		pp_map[j + 0][i + 0],
+		pp_map[j + 0][i + 1],
+		pp_map[j + 1][i + 0],
+		pp_map[j + 1][i + 1]
 	};
 
 	for (int s = 0; s < 4; s++)
@@ -1471,8 +1490,8 @@ void TBDR::RenderQuadPixelsInOneTriangle(Triangle *tri, int coverage_mask, int x
 
 	fsio.mInRegsNum  = fsin_num;
 	fsio.mOutRegsNum = fsout_num;
-	fsio.x = x + j;
-	fsio.y = y + i;
+	fsio.x = x + i;
+	fsio.y = y + j;
 	fsio.mCoverageMask = coverage_mask;
 	fsio.m_priv0 = tri;
 
@@ -1480,7 +1499,11 @@ void TBDR::RenderQuadPixelsInOneTriangle(Triangle *tri, int coverage_mask, int x
 	mDE.mInterpolater->emit(&fsio);
 
 	pFS->emit(&fsio);
-	mDE.mFBWriter->emit(&fsio);
+
+	if (tri->mPrim.mRasterStates->mIsBlendEnable)
+		mDE.mBlender->emit(&fsio);
+	else
+		mDE.mFBWriter->emit(&fsio);
 }
 
 void TBDR::finalize()

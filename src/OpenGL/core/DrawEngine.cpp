@@ -364,6 +364,14 @@ bool DrawEngine::validateState(DrawContext *dc)
 		dc->mRasterStates->mIsBlendEnable     = (gc->mState.mEnables & GLSP_BLEND) ? 1 : 0;
 		dc->mRasterStates->mIsDepthOnly       = mGLContext->mFBOM.GetDrawFBO()->IsDepthOnly() ? 1 : 0;
 		dc->mRasterStates->mFS = pFS;
+
+		if (dc->mRasterStates->mIsDepthOnly)
+		{
+			if (!dc->mRasterStates->mIsDepthTestEnable)
+				return false;
+
+			dc->mRasterStates->mIsBlendEnable = 0;
+		}
 	}
 	else
 	{
