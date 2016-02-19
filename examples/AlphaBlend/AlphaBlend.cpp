@@ -177,7 +177,7 @@ private:
 		fsio.mOutRegs[0] = _mm_mul_ps(_mm_mul_ps(fsio.mOutRegs[0], vFactor), _mm_set_ps1(mPointLight.Color.x));
 		fsio.mOutRegs[1] = _mm_mul_ps(_mm_mul_ps(fsio.mOutRegs[1], vFactor), _mm_set_ps1(mPointLight.Color.y));
 		fsio.mOutRegs[2] = _mm_mul_ps(_mm_mul_ps(fsio.mOutRegs[2], vFactor), _mm_set_ps1(mPointLight.Color.z));
-		fsio.mOutRegs[3] = _mm_mul_ps(_mm_mul_ps(fsio.mOutRegs[3], vFactor), _mm_set_ps1(1.0f));
+		fsio.mOutRegs[3] = _mm_set_ps1(0.6f);
 		_MM_TRANSPOSE4_PS(fsio.mOutRegs[mFragColor + 0], fsio.mOutRegs[mFragColor + 1], fsio.mOutRegs[mFragColor + 2], fsio.mOutRegs[mFragColor + 3]);
 	}
 
@@ -219,11 +219,11 @@ public:
 	}
 };
 
-class CrytekSponza: public GlspApp
+class AlphaBlend: public GlspApp
 {
 public:
-	CrytekSponza() = default;
-	~CrytekSponza();
+	AlphaBlend() = default;
+	~AlphaBlend();
 
 private:
 	virtual bool onInit();
@@ -240,23 +240,26 @@ private:
 	mat4  mWorld;
 	mat4  mProject;
 	mat4  mWVP;
+	mat4  mCubeWorld;
+	mat4  mCubeWVP;
 
 	GlspCamera     mCamera;
 	GlspMesh      *mMesh;
+	GlspMesh      *mCubeMesh;
 };
 
-CrytekSponza::~CrytekSponza()
+AlphaBlend::~AlphaBlend()
 {
 	if (mProg)          glDeleteProgram(mProg);
 	if (mMesh)          delete mMesh;
 	if (mShaderFactory) delete mShaderFactory;
 }
 
-bool CrytekSponza::onInit()
+bool AlphaBlend::onInit()
 {
 #define WINDOW_WIDTH  1600
 #define WINDOW_HEIGHT 900
-	setWindowInfo(WINDOW_WIDTH, WINDOW_HEIGHT, "CrytekSponza");
+	setWindowInfo(WINDOW_WIDTH, WINDOW_HEIGHT, "AlphaBlend");
 
 	mShaderFactory = new LightingShaderFactory();
 
@@ -294,25 +297,34 @@ bool CrytekSponza::onInit()
 	point_light->AttenuationLinear = 0.01f;
 	point_light->AttenuationSquare = 0.0001f;
 	point_light->AmbientIntensity = 0.8f;
-	point_light->DiffuseIntensity = 0.2f;
-	point_light->SpecularIntensity = 1.0f;
+	point_light->DiffuseIntensity = 0.4f;
+	point_light->SpecularIntensity = 0.4f;
 
 	vec3 *eye_pos = static_cast<vec3 *>(glspGetUniformLocation(mProg, "mEyePos"));
-	*eye_pos = vec3(10.0f, 0.0f, 0.0f);
+	*eye_pos = vec3(0.0f, 0.0f, 0.0f);
 
 	mCamera.InitCamera(*eye_pos,
 					vec3(-1.0f, 0.0f, 0.0f),
 					vec3(0.0f, 1.0f, 0.0f));
 
-	mat4 trans = glm::translate(mat4(1.0f), vec3(0.0f, -4.0f, 0.0f));
+	mat4 trans = glm::translate(mat4(1.0f), vec3(0.0f, -5.0f, 0.0f));
 	mat4 scale = glm::scale(mat4(1.0f), vec3(0.03f, 0.03f, 0.03f));
 	mWorld  = trans * scale;
 
 	mProject = glm::perspective((float)M_PI * 60.0f / 180.0f, 16.0f / 9.0f, 1.0f, 500.0f);
 	mWVP = mProject * mCamera.GetViewMatrix() * mWorld;
 
+	mat4 cube_trans  = glm::translate(mat4(1.0f), vec3(-12.0f, 2.0f, 0.0f));
+	mat4 cube_scale  = glm::scale(mat4(1.0f), vec3(4.0f, 4.0f, 4.0f));
+	mat4 cube_rotate = glm::rotate(mat4(1.0f), (float)M_PI * 45 / 180, vec3(1.0f, 1.0f, 0.8f));
+	mCubeWorld  = cube_trans * cube_rotate * cube_scale;
+	mCubeWVP    = mProject * mCamera.GetViewMatrix() * mCubeWorld;
+
 	mMesh = new GlspMesh();
 	mMesh->LoadMesh(GLSP_ROOT "assets/crytek_sponza/sponza.obj");
+
+	mCubeMesh = new GlspMesh();
+	mCubeMesh->LoadMesh(GLSP_ROOT "assets/cube/cube.obj");
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
@@ -320,27 +332,39 @@ bool CrytekSponza::onInit()
 	return true;
 }
 
-void CrytekSponza::onRender()
+void AlphaBlend::onRender()
 {
+	glDisable(GL_BLEND);
+	glEnable(GL_DEPTH_TEST);
+
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glUniformMatrix4fv(mWVPLocation, 1, false, (float *)&mWVP);
 	glUniformMatrix4fv(mWorldLocation, 1, false, (float *)&mWorld);
 
 	mMesh->Render();
+
+	glDisable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+
+	glUniformMatrix4fv(mWVPLocation, 1, false, (float *)&mCubeWVP);
+	glUniformMatrix4fv(mWorldLocation, 1, false, (float *)&mCubeWorld);
+
+	mCubeMesh->Render();
 }
 
-void CrytekSponza::onKeyPressed(unsigned long key)
+void AlphaBlend::onKeyPressed(unsigned long key)
 {
 	if (mCamera.CameraControl(key))
 	{
 		// This key event has been processed by camera control,
 		// need update the TVP matrix.
 		mWVP = mProject * mCamera.GetViewMatrix() * mWorld;
+		mCubeWVP = mProject * mCamera.GetViewMatrix() * mCubeWorld;
 	}
 }
 
-void CrytekSponza::onMouseLeftClickDown(int x, int y)
+void AlphaBlend::onMouseLeftClickDown(int x, int y)
 {
 	// printf("Mouse left click: %d %d", x, y);
 }
@@ -351,6 +375,6 @@ void CrytekSponza::onMouseLeftClickDown(int x, int y)
 int main(int argc, char *argv[])
 {
 	Magick::InitializeMagick(*argv);
-	glsp::CrytekSponza app;
+	glsp::AlphaBlend app;
 	app.run();
 }
