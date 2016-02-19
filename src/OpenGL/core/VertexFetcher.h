@@ -30,6 +30,8 @@ public:
 
 protected:
 	virtual void FetchVertex(DrawContext *dc);
+
+	unsigned int mBatchCount;
 };
 
 } // namespace glsp

@@ -174,7 +174,6 @@ void Clipper::ClipAgainstGuardband(Primitive &prim, int outcodes_union, Primlist
 			new_prim->mVert[0] = *rr[src][0];
 			new_prim->mVert[1] = std::move(*rr[src][i]); /* OPT to avoid copy */
 			new_prim->mVert[2] = *rr[src][i+1];
-			new_prim->mRasterStates = prim.mRasterStates;
 
 			out.push_back(new_prim);
 		}

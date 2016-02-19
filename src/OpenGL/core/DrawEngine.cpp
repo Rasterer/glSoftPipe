@@ -469,6 +469,7 @@ void DrawEngine::Flush(bool swap_buffer)
 	mTBDR->FlushDisplayLists(swap_buffer, depth_only);
 
 	mDrawCount = 0;
+	mVertexFetcher->finalize();
 	mGLContext->mFBOM.GetDrawFBO()->ClearHasPendingDrawCommand();
 }
 

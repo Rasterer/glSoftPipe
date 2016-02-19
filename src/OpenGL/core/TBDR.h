@@ -64,7 +64,7 @@ public:
 class Triangle
 {
 public:
-	Triangle(Primitive &prim);
+	Triangle(Primitive &prim, Batch *bat);
 	~Triangle() = default;
 
 	// Plane equation, used for fast computation of perspective corrected barycentric coordinates.
@@ -91,14 +91,17 @@ public:
 	int					ymin;
 	int					ymax;
 
-	// NOTE: the order may be changed from the original order
-	// in Primitive to keep counter-clockwise
-	IntermVertex		mVert[3];
-
 	Primitive	       &mPrim;
 
 	// Store the vert2(in counter-clockwise) for later attribute plane equation.
 	const vsOutput     *mVert2;
+	const RasterStates *mRasterStates;
+
+	// NOTE: the order may be changed from the original order
+	// in Primitive to keep counter-clockwise
+	IntermVertex		mVert[3];
+
+	unsigned int		mBatchID;
 
 	// Attributes plane equation, used for fast attributes interpolation.
 	vsOutput			mAttrPlaneEquationA;

@@ -18,7 +18,7 @@ struct RasterStates;
 class ShaderRegisterFile
 {
 public:
-	typedef std::vector<glm::vec4, ::glsp::ShaderRegisterAllocator<glm::vec4> > RegArray;
+	typedef std::vector<glm::vec4, MemoryPoolMTAllocator<glm::vec4> > RegArray;
 
 	ShaderRegisterFile() = default;
 	ShaderRegisterFile(const ShaderRegisterFile&) = default;
@@ -160,8 +160,6 @@ struct Primitive
 	// The reciprocal of the directed area of a triangle.
 	// FIXME: primitive may be not a triangle.
 	float mAreaReciprocal;
-
-	RasterStates *mRasterStates;
 };
 
 typedef std::vector<int> IBuffer_v;
@@ -202,6 +200,7 @@ public:
 	vsOutput_v		mVsOut;
 	IBuffer_v		mIndexBuf;
 	Primlist		mPrims;
+	unsigned int    mBatchID;
 
 	// point back to the mDC
 	DrawContext	   *mDC;
@@ -231,12 +230,8 @@ public:
 #endif
 };
 
-class Fsio
+struct Fsio
 {
-public:
-	Fsio() = default;
-	~Fsio() = default;
-
 	fsInput in;
 	fsOutput out;
 
@@ -247,12 +242,8 @@ public:
 	void *m_priv0;
 };
 
-class ALIGN(16) Fsiosimd
+struct ALIGN(16) Fsiosimd
 {
-public:
-	Fsiosimd() = default;
-	~Fsiosimd() = default;
-
 	__m128  mInRegs [MAX_SHADER_REGISTERS];
 
 	union {

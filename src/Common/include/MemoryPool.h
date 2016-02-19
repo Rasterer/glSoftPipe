@@ -52,7 +52,7 @@ private:
 };
 
 template <typename T>
-class ShaderRegisterAllocator
+class MemoryPoolMTAllocator
 {
 public:
 	typedef T * pointer;
@@ -79,10 +79,10 @@ public:
 	}
 
 	template <typename U> struct rebind {
-		typedef ShaderRegisterAllocator<U> other;
+		typedef MemoryPoolMTAllocator<U> other;
 	};
 
-	bool operator!=(const ShaderRegisterAllocator& other) const
+	bool operator!=(const MemoryPoolMTAllocator& other) const
 	{
 		return !(*this == other);
 	}
@@ -93,15 +93,15 @@ public:
 		new (pv) T();
 	}
 
-	bool operator==(const ShaderRegisterAllocator& other) const
+	bool operator==(const MemoryPoolMTAllocator& other) const
 	{
 		return true;
 	}
 
-	ShaderRegisterAllocator() { }
-	ShaderRegisterAllocator(const ShaderRegisterAllocator&) { }
-	template <typename U> ShaderRegisterAllocator(const ShaderRegisterAllocator<U>&) { }
-	~ShaderRegisterAllocator() { }
+	MemoryPoolMTAllocator() { }
+	MemoryPoolMTAllocator(const MemoryPoolMTAllocator&) { }
+	template <typename U> MemoryPoolMTAllocator(const MemoryPoolMTAllocator<U>&) { }
+	~MemoryPoolMTAllocator() { }
 
 	pointer allocate(size_type n) const
 	{
@@ -118,7 +118,7 @@ public:
 		return allocate(n);
 	}
 
-	ShaderRegisterAllocator& operator=(const ShaderRegisterAllocator&) = delete;
+	MemoryPoolMTAllocator& operator=(const MemoryPoolMTAllocator&) = delete;
 
 private:
 };

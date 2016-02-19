@@ -47,7 +47,6 @@ void PrimitiveAssembler::assemble(Batch *bat)
 		prim->mVert[0]	= out[*(it + 0)];
 		prim->mVert[1]	= out[*(it + 1)];
 		prim->mVert[2]	= out[*(it + 2)];
-		prim->mRasterStates = bat->mDC->mRasterStates;
 
 		pl.push_back(prim);
 	}

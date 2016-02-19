@@ -23,7 +23,8 @@ VertexFetcher::VertexFetcher():
 }
 
 VertexCachedFetcher::VertexCachedFetcher():
-	VertexFetcher()
+	VertexFetcher(),
+	mBatchCount(0)
 {
 }
 
@@ -44,7 +45,10 @@ void VertexCachedFetcher::FetchVertex(DrawContext *dc)
 #define VERTEX_INDEX_STEP 66
 	for (int v = 0; v < dc->mCount; v += VERTEX_INDEX_STEP)
 	{
-		auto vert_batch_handler = [this, v](void *data)
+		unsigned int batch_id = mBatchCount;
+		mBatchCount++;
+
+		auto vert_batch_handler = [this, v, batch_id](void *data)
 		{
 			int i = v;
 			DrawContext *dc = static_cast<DrawContext *>(data);
@@ -69,6 +73,7 @@ void VertexCachedFetcher::FetchVertex(DrawContext *dc)
 			std::unordered_map<int, int> cacheIndex;
 			Batch bat;
 			bat.mDC = dc;
+			bat.mBatchID = batch_id;
 			vsInput_v &cache = bat.mVertexCache;
 
 			// OPT: Too many copies 
@@ -129,6 +134,7 @@ void VertexCachedFetcher::FetchVertex(DrawContext *dc)
 
 			this->getNextStage()->emit(&bat);
 		};
+
 		WorkItem *task = thread_pool.CreateWork(vert_batch_handler, dc);
 		thread_pool.AddWork(task);
 	}
@@ -136,6 +142,7 @@ void VertexCachedFetcher::FetchVertex(DrawContext *dc)
 
 void VertexCachedFetcher::finalize()
 {
+	mBatchCount = 0;
 }
 
 } // namespace glsp
