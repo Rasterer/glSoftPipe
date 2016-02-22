@@ -347,11 +347,6 @@ void Binning::SetupTriangleSIMD(Triangle *tri0, Triangle *tri1, Triangle *tri2, 
 	tri2->ymax = tmp[2];
 	tri3->ymax = tmp[3];
 
-
-	__m128 vWReciprocal0 = _mm_rcp_ps(_mm_set_ps(v30->position().w, v20->position().w, v10->position().w, v00->position().w));
-	__m128 vWReciprocal1 = _mm_rcp_ps(_mm_set_ps(v31->position().w, v21->position().w, v11->position().w, v01->position().w));
-	__m128 vWReciprocal2 = _mm_rcp_ps(_mm_set_ps(v32->position().w, v22->position().w, v12->position().w, v02->position().w));
-
 	__m128 vAreaRecip = _mm_set_ps(prim3->mAreaReciprocal,
 								prim2->mAreaReciprocal,
 								prim1->mAreaReciprocal,
@@ -366,6 +361,49 @@ void Binning::SetupTriangleSIMD(Triangle *tri0, Triangle *tri1, Triangle *tri2, 
 	__m128 vX0X2f = _mm_mul_ps(_mm_sub_ps(vX0f, vX2f), vAreaRecip);
 	__m128 vX1X0f = _mm_mul_ps(_mm_sub_ps(vX1f, vX0f), vAreaRecip);
 
+	__m128 vXoffset = _mm_sub_ps(vX0f, _mm_set_ps1(0.5f));
+	__m128 vYoffset = _mm_sub_ps(vY0f, _mm_set_ps1(0.5f));
+
+	ALIGN(16) float tmpf[4];
+
+	if (tri0->mRasterStates->mIsDepthTestEnable)
+	{
+		__m128 vZ0f = _mm_set_ps(v30->position().z, v20->position().z, v10->position().z, v00->position().z);
+		__m128 vZ1f = _mm_set_ps(v31->position().z, v21->position().z, v11->position().z, v01->position().z);
+		__m128 vZ2f = _mm_set_ps(v32->position().z, v22->position().z, v12->position().z, v02->position().z);
+		__m128 vZGradientX = _mm_add_ps(_mm_add_ps(_mm_mul_ps(vY1Y2f, vZ0f), _mm_mul_ps(vY2Y0f, vZ1f)),
+										_mm_mul_ps(vY0Y1f, vZ2f));
+		__m128 vZGradientY = _mm_add_ps(_mm_add_ps(_mm_mul_ps(vX2X1f, vZ0f), _mm_mul_ps(vX0X2f, vZ1f)),
+										_mm_mul_ps(vX1X0f, vZ2f));
+		__m128 vZAtOrigin = _mm_sub_ps(_mm_sub_ps(vZ0f, _mm_mul_ps(vZGradientX, vXoffset)),
+									_mm_mul_ps(vZGradientY, vYoffset));
+
+		_mm_store_ps(tmpf, vZGradientX);
+		tri0->mZGradientX = tmpf[0];
+		tri1->mZGradientX = tmpf[1];
+		tri2->mZGradientX = tmpf[2];
+		tri3->mZGradientX = tmpf[3];
+
+		_mm_store_ps(tmpf, vZGradientY);
+		tri0->mZGradientY = tmpf[0];
+		tri1->mZGradientY = tmpf[1];
+		tri2->mZGradientY = tmpf[2];
+		tri3->mZGradientY = tmpf[3];
+
+		_mm_store_ps(tmpf, vZAtOrigin);
+		tri0->mZAtOrigin = tmpf[0];
+		tri1->mZAtOrigin = tmpf[1];
+		tri2->mZAtOrigin = tmpf[2];
+		tri3->mZAtOrigin = tmpf[3];
+	}
+
+	if (tri0->mRasterStates->mIsDepthOnly)
+		return;
+
+	__m128 vWReciprocal0 = _mm_rcp_ps(_mm_set_ps(v30->position().w, v20->position().w, v10->position().w, v00->position().w));
+	__m128 vWReciprocal1 = _mm_rcp_ps(_mm_set_ps(v31->position().w, v21->position().w, v11->position().w, v01->position().w));
+	__m128 vWReciprocal2 = _mm_rcp_ps(_mm_set_ps(v32->position().w, v22->position().w, v12->position().w, v02->position().w));
+
 	__m128 vLambdax0 = _mm_mul_ps(vY1Y2f, vWReciprocal0);
 	__m128 vLambdax1 = _mm_mul_ps(vY2Y0f, vWReciprocal1);
 	__m128 vLambdax2 = _mm_mul_ps(vY0Y1f, vWReciprocal2);
@@ -373,11 +411,6 @@ void Binning::SetupTriangleSIMD(Triangle *tri0, Triangle *tri1, Triangle *tri2, 
 	__m128 vLambday0 = _mm_mul_ps(vX2X1f, vWReciprocal0);
 	__m128 vLambday1 = _mm_mul_ps(vX0X2f, vWReciprocal1);
 	__m128 vLambday2 = _mm_mul_ps(vX1X0f, vWReciprocal2);
-
-	__m128 vXoffset = _mm_sub_ps(vX0f, _mm_set_ps1(0.5f));
-	__m128 vYoffset = _mm_sub_ps(vY0f, _mm_set_ps1(0.5f));
-
-	ALIGN(16) float tmpf[4];
 
 	_mm_store_ps(tmpf, vLambdax0);
 	tri0->mPCBCOnW0GradientX = tmpf[0];
@@ -440,40 +473,6 @@ void Binning::SetupTriangleSIMD(Triangle *tri0, Triangle *tri1, Triangle *tri2, 
 	tri1->mWRecipAtOrigin = tmpf[1];
 	tri2->mWRecipAtOrigin = tmpf[2];
 	tri3->mWRecipAtOrigin = tmpf[3];
-
-	if (tri0->mRasterStates->mIsDepthTestEnable)
-	{
-		__m128 vZ0f = _mm_set_ps(v30->position().z, v20->position().z, v10->position().z, v00->position().z);
-		__m128 vZ1f = _mm_set_ps(v31->position().z, v21->position().z, v11->position().z, v01->position().z);
-		__m128 vZ2f = _mm_set_ps(v32->position().z, v22->position().z, v12->position().z, v02->position().z);
-		__m128 vZGradientX = _mm_add_ps(_mm_add_ps(_mm_mul_ps(vY1Y2f, vZ0f), _mm_mul_ps(vY2Y0f, vZ1f)),
-										_mm_mul_ps(vY0Y1f, vZ2f));
-		__m128 vZGradientY = _mm_add_ps(_mm_add_ps(_mm_mul_ps(vX2X1f, vZ0f), _mm_mul_ps(vX0X2f, vZ1f)),
-										_mm_mul_ps(vX1X0f, vZ2f));
-		__m128 vZAtOrigin = _mm_sub_ps(_mm_sub_ps(vZ0f, _mm_mul_ps(vZGradientX, vXoffset)),
-									_mm_mul_ps(vZGradientY, vYoffset));
-
-		_mm_store_ps(tmpf, vZGradientX);
-		tri0->mZGradientX = tmpf[0];
-		tri1->mZGradientX = tmpf[1];
-		tri2->mZGradientX = tmpf[2];
-		tri3->mZGradientX = tmpf[3];
-
-		_mm_store_ps(tmpf, vZGradientY);
-		tri0->mZGradientY = tmpf[0];
-		tri1->mZGradientY = tmpf[1];
-		tri2->mZGradientY = tmpf[2];
-		tri3->mZGradientY = tmpf[3];
-
-		_mm_store_ps(tmpf, vZAtOrigin);
-		tri0->mZAtOrigin = tmpf[0];
-		tri1->mZAtOrigin = tmpf[1];
-		tri2->mZAtOrigin = tmpf[2];
-		tri3->mZAtOrigin = tmpf[3];
-	}
-
-	if (tri0->mRasterStates->mIsDepthOnly)
-		return;
 
 	// FIXME: attributes size of these triangles may be different.
 	const size_t size = v00->getRegsNum();
@@ -1048,7 +1047,7 @@ void TBDR::FineRasterizing(int x, int y)
 			{
 				for (int j = 0; j < max_w; j += 2)
 				{
-					RenderQuadPixels(pp_map, x, y, i, j);
+					RenderQuadPixels(pp_map, x, y, j, i);
 				}
 			}
 
@@ -1142,9 +1141,9 @@ void TBDR::FineRasterizing(int x, int y)
 			{
 				if (raster_states->mIsBlendEnable)
 				{
-					for (int i = 0; i < max_w; i += 2)
+					for (int i = 0; i < max_h; i += 2)
 					{
-						for (int j = 0; j < max_h; j += 2)
+						for (int j = 0; j < max_w; j += 2)
 						{
 							RenderQuadPixelsInOneTriangle(tri, 0xF, x, y, j, i);
 						}
