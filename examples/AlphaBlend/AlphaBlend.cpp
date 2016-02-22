@@ -113,71 +113,9 @@ public:
 private:
 	virtual void OnExecuteSIMD(Fsiosimd &fsio)
 	{
-		__m128 vNormalizedX = fsio.mInRegs[moNormal + 0];
-		__m128 vNormalizedY = fsio.mInRegs[moNormal + 1];
-		__m128 vNormalizedZ = fsio.mInRegs[moNormal + 2];
-		normalize(vNormalizedX, vNormalizedY, vNormalizedZ);
-
-		__m128 vLightToVertexX = _mm_sub_ps(fsio.mInRegs[moWorldCoord + 0], _mm_set_ps1(mPointLight.Position.x));
-		__m128 vLightToVertexY = _mm_sub_ps(fsio.mInRegs[moWorldCoord + 1], _mm_set_ps1(mPointLight.Position.y));
-		__m128 vLightToVertexZ = _mm_sub_ps(fsio.mInRegs[moWorldCoord + 2], _mm_set_ps1(mPointLight.Position.z));
-		__m128 vDistance       = length(vLightToVertexX, vLightToVertexY, vLightToVertexZ);
-		normalize(vLightToVertexX, vLightToVertexY, vLightToVertexZ);
-
-		__m128 vNormalLightDot = dot(vNormalizedX, vNormalizedY, vNormalizedZ, vLightToVertexX, vLightToVertexY, vLightToVertexZ);
-		__m128 vMask = _mm_cmp_ps(vNormalLightDot, _mm_setzero_ps(), _CMP_LT_OS);
-		vNormalLightDot = _mm_and_ps(vNormalLightDot, vMask);
-
-		__m128 vSpecularFactor;
-		__m128 vDiffuseFactor;
-		if (_mm_test_all_zeros(_mm_castps_si128(vNormalLightDot), _mm_set1_epi32(0xFFFFFFFF)))
-		{
-			vDiffuseFactor  = _mm_setzero_ps();
-			vSpecularFactor = _mm_setzero_ps();
-		}
-		else
-		{
-			// reverse the sign bit, because we use incident light to calculate
-			// the factor above.
-			vDiffuseFactor = _mm_xor_ps(vNormalLightDot, _mm_set_ps1(-0.0f));
-			vDiffuseFactor = _mm_mul_ps(vDiffuseFactor, _mm_set_ps1(mPointLight.DiffuseIntensity));
-
-			__m128 vVectexToEyeX = _mm_sub_ps(_mm_set_ps1(mEyePos.x), fsio.mInRegs[moWorldCoord + 0]);
-			__m128 vVectexToEyeY = _mm_sub_ps(_mm_set_ps1(mEyePos.y), fsio.mInRegs[moWorldCoord + 1]);
-			__m128 vVectexToEyeZ = _mm_sub_ps(_mm_set_ps1(mEyePos.z), fsio.mInRegs[moWorldCoord + 2]);
-			normalize(vVectexToEyeX, vVectexToEyeY, vVectexToEyeZ);
-
-			__m128 vReflectDirectionX;
-			__m128 vReflectDirectionY;
-			__m128 vReflectDirectionZ;
-			reflect(vLightToVertexX, vLightToVertexY, vLightToVertexZ,
-					vNormalizedX, vNormalizedY, vNormalizedZ,
-					vReflectDirectionX, vReflectDirectionY, vReflectDirectionZ);
-			normalize(vReflectDirectionX, vReflectDirectionY, vReflectDirectionZ);
-
-			vSpecularFactor = dot(vReflectDirectionX, vReflectDirectionY, vReflectDirectionZ,
-								vVectexToEyeX, vVectexToEyeY, vVectexToEyeZ);
-			__m128 vMask1 = _mm_cmp_ps(vSpecularFactor, _mm_setzero_ps(), _CMP_GT_OS);
-			vSpecularFactor = _mm_and_ps(_mm_and_ps(vSpecularFactor, vMask1), vMask);
-			vSpecularFactor = _mm_mul_ps(vSpecularFactor, _mm_set_ps1(mPointLight.SpecularIntensity));
-		}
-
-		__m128 vAmbientFactor = _mm_set_ps1(mPointLight.AmbientIntensity);
-		__m128 vFactor = _mm_add_ps(_mm_add_ps(vDiffuseFactor, vSpecularFactor), vAmbientFactor);
-
-		__m128 vAttenuationConstant = _mm_set_ps1(mPointLight.AttenuationConstant);
-		__m128 vAttenuationLinear   = _mm_mul_ps(vDistance, _mm_set_ps1(mPointLight.AttenuationLinear));
-		__m128 vAttenuationSquare   = _mm_mul_ps(_mm_mul_ps(vDistance, vDistance), _mm_set_ps1(mPointLight.AttenuationSquare));
-
-		__m128 vAttenuation = _mm_add_ps(_mm_add_ps(vAttenuationConstant, vAttenuationLinear), vAttenuationSquare);
-
-		vFactor = _mm_div_ps(vFactor, vAttenuation);
-
 		texture2D(mSampler, fsio, fsio.mInRegs[moTexCoor + 0], fsio.mInRegs[moTexCoor + 1], fsio.mOutRegs);
-		fsio.mOutRegs[0] = _mm_mul_ps(_mm_mul_ps(fsio.mOutRegs[0], vFactor), _mm_set_ps1(mPointLight.Color.x));
-		fsio.mOutRegs[1] = _mm_mul_ps(_mm_mul_ps(fsio.mOutRegs[1], vFactor), _mm_set_ps1(mPointLight.Color.y));
-		fsio.mOutRegs[2] = _mm_mul_ps(_mm_mul_ps(fsio.mOutRegs[2], vFactor), _mm_set_ps1(mPointLight.Color.z));
-		fsio.mOutRegs[3] = _mm_set_ps1(0.6f);
+		fsio.mOutRegs[3] = _mm_set_ps1(0.4f);
+
 		_MM_TRANSPOSE4_PS(fsio.mOutRegs[mFragColor + 0], fsio.mOutRegs[mFragColor + 1], fsio.mOutRegs[mFragColor + 2], fsio.mOutRegs[mFragColor + 3]);
 	}
 
@@ -326,15 +264,13 @@ bool AlphaBlend::onInit()
 	mCubeMesh = new GlspMesh();
 	mCubeMesh->LoadMesh(GLSP_ROOT "assets/cube/cube.obj");
 
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_CULL_FACE);
-
 	return true;
 }
 
 void AlphaBlend::onRender()
 {
 	glDisable(GL_BLEND);
+	glEnable(GL_CULL_FACE);
 	glEnable(GL_DEPTH_TEST);
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -345,6 +281,7 @@ void AlphaBlend::onRender()
 	mMesh->Render();
 
 	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
 	glEnable(GL_BLEND);
 
 	glUniformMatrix4fv(mWVPLocation, 1, false, (float *)&mCubeWVP);
